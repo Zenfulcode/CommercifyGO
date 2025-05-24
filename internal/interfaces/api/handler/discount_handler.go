@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
 
@@ -29,22 +30,50 @@ func NewDiscountHandler(discountUseCase *usecase.DiscountUseCase, orderUseCase *
 
 // CreateDiscount handles creating a new discount (admin only)
 func (h *DiscountHandler) CreateDiscount(w http.ResponseWriter, r *http.Request) {
-	var input usecase.CreateDiscountInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req dto.CreateDiscountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Convert DTO to usecase input
+	input := usecase.CreateDiscountInput{
+		Code:             req.Code,
+		Type:             req.Type,
+		Method:           req.Method,
+		Value:            req.Value,
+		MinOrderValue:    req.MinOrderValue,
+		MaxDiscountValue: req.MaxDiscountValue,
+		ProductIDs:       req.ProductIDs,
+		CategoryIDs:      req.CategoryIDs,
+		StartDate:        req.StartDate,
+		EndDate:          req.EndDate,
+		UsageLimit:       req.UsageLimit,
 	}
 
 	discount, err := h.discountUseCase.CreateDiscount(input)
 	if err != nil {
 		h.logger.Error("Failed to create discount: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ResponseDTO[dto.DiscountDTO]{
+			Success: false,
+			Message: "Failed to create discount",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
 		return
+	}
+
+	response := dto.ResponseDTO[dto.DiscountDTO]{
+		Success: true,
+		Message: "Discount created successfully",
+		Data:    dto.ConvertToDiscountDTO(discount),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(discount)
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetDiscount handles getting a discount by ID (admin only)
@@ -59,12 +88,25 @@ func (h *DiscountHandler) GetDiscount(w http.ResponseWriter, r *http.Request) {
 	discount, err := h.discountUseCase.GetDiscountByID(uint(id))
 	if err != nil {
 		h.logger.Error("Failed to get discount: %v", err)
-		http.Error(w, "Discount not found", http.StatusNotFound)
+		response := dto.ResponseDTO[interface{}]{
+			Success: false,
+			Message: "Discount not found",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
+	response := dto.ResponseDTO[dto.DiscountDTO]{
+		Success: true,
+		Message: "Discount retrieved successfully",
+		Data:    dto.ConvertToDiscountDTO(discount),
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(discount)
+	json.NewEncoder(w).Encode(response)
 }
 
 // UpdateDiscount handles updating a discount (admin only)
@@ -76,21 +118,50 @@ func (h *DiscountHandler) UpdateDiscount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var input usecase.UpdateDiscountInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req dto.UpdateDiscountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Convert DTO to usecase input
+	input := usecase.UpdateDiscountInput{
+		Code:             req.Code,
+		Type:             req.Type,
+		Method:           req.Method,
+		Value:            req.Value,
+		MinOrderValue:    req.MinOrderValue,
+		MaxDiscountValue: req.MaxDiscountValue,
+		ProductIDs:       req.ProductIDs,
+		CategoryIDs:      req.CategoryIDs,
+		StartDate:        req.StartDate,
+		EndDate:          req.EndDate,
+		UsageLimit:       req.UsageLimit,
+		Active:           req.Active,
 	}
 
 	discount, err := h.discountUseCase.UpdateDiscount(uint(id), input)
 	if err != nil {
 		h.logger.Error("Failed to update discount: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ResponseDTO[interface{}]{
+			Success: false,
+			Message: "Failed to update discount",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
+	response := dto.ResponseDTO[dto.DiscountDTO]{
+		Success: true,
+		Message: "Discount updated successfully",
+		Data:    dto.ConvertToDiscountDTO(discount),
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(discount)
+	json.NewEncoder(w).Encode(response)
 }
 
 // DeleteDiscount handles deleting a discount (admin only)
@@ -104,11 +175,25 @@ func (h *DiscountHandler) DeleteDiscount(w http.ResponseWriter, r *http.Request)
 
 	if err := h.discountUseCase.DeleteDiscount(uint(id)); err != nil {
 		h.logger.Error("Failed to delete discount: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ResponseDTO[interface{}]{
+			Success: false,
+			Message: "Failed to delete discount",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	response := dto.ResponseDTO[interface{}]{
+		Success: true,
+		Message: "Discount deleted successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 // ListDiscounts handles listing all discounts (admin only)
@@ -122,12 +207,36 @@ func (h *DiscountHandler) ListDiscounts(w http.ResponseWriter, r *http.Request) 
 	discounts, err := h.discountUseCase.ListDiscounts(offset, limit)
 	if err != nil {
 		h.logger.Error("Failed to list discounts: %v", err)
-		http.Error(w, "Failed to list discounts", http.StatusInternalServerError)
+		response := dto.ResponseDTO[interface{}]{
+			Success: false,
+			Message: "Failed to list discounts",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
+	// Calculate page information
+	page := (offset / limit) + 1
+	if limit == 0 {
+		page = 1
+	}
+
+	response := dto.ListResponseDTO[dto.DiscountDTO]{
+		Success: true,
+		Message: "Discounts retrieved successfully",
+		Data:    dto.ConvertDiscountListToDTO(discounts),
+		Pagination: dto.PaginationDTO{
+			Page:     page,
+			PageSize: limit,
+			Total:    len(discounts), // Note: This is just the returned count, not total in DB
+		},
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(discounts)
+	json.NewEncoder(w).Encode(response)
 }
 
 // ListActiveDiscounts handles listing active discounts (public)
@@ -141,12 +250,36 @@ func (h *DiscountHandler) ListActiveDiscounts(w http.ResponseWriter, r *http.Req
 	discounts, err := h.discountUseCase.ListActiveDiscounts(offset, limit)
 	if err != nil {
 		h.logger.Error("Failed to list active discounts: %v", err)
-		http.Error(w, "Failed to list discounts", http.StatusInternalServerError)
+		response := dto.ResponseDTO[interface{}]{
+			Success: false,
+			Message: "Failed to list discounts",
+			Error:   err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
+	// Calculate page information
+	page := (offset / limit) + 1
+	if limit == 0 {
+		page = 1
+	}
+
+	response := dto.ListResponseDTO[dto.DiscountDTO]{
+		Success: true,
+		Message: "Active discounts retrieved successfully",
+		Data:    dto.ConvertDiscountListToDTO(discounts),
+		Pagination: dto.PaginationDTO{
+			Page:     page,
+			PageSize: limit,
+			Total:    len(discounts), // Note: This is just the returned count, not total in DB
+		},
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(discounts)
+	json.NewEncoder(w).Encode(response)
 }
 
 // ApplyDiscountToOrder handles applying a discount to an order
@@ -167,10 +300,8 @@ func (h *DiscountHandler) ApplyDiscountToOrder(w http.ResponseWriter, r *http.Re
 	}
 
 	// Parse request body
-	var input struct {
-		DiscountCode string `json:"discount_code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req dto.ApplyDiscountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -200,7 +331,7 @@ func (h *DiscountHandler) ApplyDiscountToOrder(w http.ResponseWriter, r *http.Re
 	// Apply discount to order
 	discountInput := usecase.ApplyDiscountToOrderInput{
 		OrderID:      uint(orderID),
-		DiscountCode: input.DiscountCode,
+		DiscountCode: req.DiscountCode,
 	}
 
 	updatedOrder, err := h.discountUseCase.ApplyDiscountToOrder(discountInput, order)
@@ -271,26 +402,30 @@ func (h *DiscountHandler) RemoveDiscountFromOrder(w http.ResponseWriter, r *http
 // ValidateDiscountCode handles validating a discount code without applying it
 func (h *DiscountHandler) ValidateDiscountCode(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input struct {
-		DiscountCode string `json:"discount_code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req dto.ValidateDiscountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Get discount by code
-	discount, err := h.discountUseCase.GetDiscountByCode(input.DiscountCode)
+	discount, err := h.discountUseCase.GetDiscountByCode(req.DiscountCode)
 	if err != nil {
-		http.Error(w, "Invalid discount code", http.StatusBadRequest)
+		response := dto.ValidateDiscountResponse{
+			Valid:  false,
+			Reason: "Invalid discount code",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	// Check if discount is valid
 	if !discount.IsValid() {
-		response := map[string]interface{}{
-			"valid":  false,
-			"reason": "Discount is not valid (expired, inactive, or usage limit reached)",
+		response := dto.ValidateDiscountResponse{
+			Valid:  false,
+			Reason: "Discount is not valid (expired, inactive, or usage limit reached)",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
@@ -298,8 +433,15 @@ func (h *DiscountHandler) ValidateDiscountCode(w http.ResponseWriter, r *http.Re
 	}
 
 	// Return discount details
-	response := map[string]interface{}{
-		"valid": true,
+	response := dto.ValidateDiscountResponse{
+		Valid:            true,
+		DiscountID:       discount.ID,
+		Code:             discount.Code,
+		Type:             string(discount.Type),
+		Method:           string(discount.Method),
+		Value:            discount.Value,
+		MinOrderValue:    float64(discount.MinOrderValue) / 100,    // Convert from cents to dollars
+		MaxDiscountValue: float64(discount.MaxDiscountValue) / 100, // Convert from cents to dollars
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
