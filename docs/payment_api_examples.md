@@ -27,7 +27,38 @@ Example response:
     "description": "Pay with credit or debit card",
     "enabled": true,
     "methods": ["credit_card"],
-    "supported_currencies": ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "BGN", "RON", "HRK", "ISK", "MXN", "BRL", "SGD", "HKD", "INR", "MYR", "PHP", "THB", "TWD", "KRW", "NZD", "ILS", "ZAR"]
+    "supported_currencies": [
+      "USD",
+      "EUR",
+      "GBP",
+      "JPY",
+      "CAD",
+      "AUD",
+      "CHF",
+      "SEK",
+      "NOK",
+      "DKK",
+      "PLN",
+      "CZK",
+      "HUF",
+      "BGN",
+      "RON",
+      "HRK",
+      "ISK",
+      "MXN",
+      "BRL",
+      "SGD",
+      "HKD",
+      "INR",
+      "MYR",
+      "PHP",
+      "THB",
+      "TWD",
+      "KRW",
+      "NZD",
+      "ILS",
+      "ZAR"
+    ]
   },
   {
     "type": "mobilepay",
@@ -51,185 +82,6 @@ This would return only payment providers that support Norwegian Krone (NOK), whi
 **Status Codes:**
 
 - `200 OK`: Providers retrieved successfully
-
-## Payment Processing Endpoints
-
-### Process Guest Payment
-
-```plaintext
-POST /api/guest/orders/{id}/payment
-```
-
-Process payment for a guest order. This endpoint requires different request bodies depending on the payment provider.
-
-#### Credit Card Payment (Stripe)
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "credit_card",
-  "payment_provider": "stripe",
-  "card_details": {
-    "card_number": "4242424242424242",
-    "expiry_month": 12,
-    "expiry_year": 2025,
-    "cvc": "123",
-    "card_holder_name": "John Smith"
-  },
-  "customer_email": "customer@example.com"
-}
-```
-
-#### PayPal Payment
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "paypal",
-  "payment_provider": "paypal",
-  "paypal_details": {
-    "return_url": "https://yourstore.com/checkout/success",
-    "cancel_url": "https://yourstore.com/checkout/cancel"
-  },
-  "customer_email": "customer@example.com"
-}
-```
-
-#### MobilePay Payment
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "wallet",
-  "payment_provider": "mobilepay",
-  "phone_number": "+4512345678",
-  "customer_email": "customer@example.com"
-}
-```
-
-Example response (successful payment):
-
-```json
-{
-  "id": 10,
-  "order_number": "ORD-20230625-000010",
-  "status": "paid",
-  "payment_id": "pi_3NJQDLGSwq9VmN8I0bmUrvYx",
-  "payment_provider": "stripe",
-  "requires_action": false,
-  "action_url": "",
-  "final_amount": 227.96,
-  "created_at": "2023-06-25T15:30:45Z",
-  "updated_at": "2023-06-25T15:35:20Z"
-}
-```
-
-Example response (payment requiring additional action):
-
-```json
-{
-  "id": 10,
-  "order_number": "ORD-20230625-000010",
-  "status": "pending_action",
-  "payment_id": "pi_3NJQDLGSwq9VmN8I0bmUrvYx",
-  "payment_provider": "stripe",
-  "requires_action": true,
-  "action_url": "https://hooks.stripe.com/3d_secure_2_eap/begin_test/src_1NJQDLGSwq9VmN8I0OOVbLwE/src_client_secret_CG9LMEyAnFQw9OdPvRD0NCmz",
-  "final_amount": 227.96,
-  "created_at": "2023-06-25T15:30:45Z",
-  "updated_at": "2023-06-25T15:35:20Z"
-}
-```
-
-**Status Codes:**
-
-- `200 OK`: Payment processed or requires additional action
-- `400 Bad Request`: Invalid payment details or order already paid
-- `401 Unauthorized`: Invalid session for guest order
-- `404 Not Found`: Order not found
-- `500 Internal Server Error`: Payment processing failed
-
-### Process User Payment
-
-```plaintext
-POST /api/orders/{id}/payment
-```
-
-Process payment for an authenticated user's order. This endpoint requires different request bodies depending on the payment provider, similar to the guest payment endpoint.
-
-#### Credit Card Payment (Stripe)
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "credit_card",
-  "payment_provider": "stripe",
-  "card_details": {
-    "card_number": "4242424242424242",
-    "expiry_month": 12,
-    "expiry_year": 2025,
-    "cvc": "123",
-    "card_holder_name": "Sarah Johnson"
-  }
-}
-```
-
-#### PayPal Payment
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "paypal",
-  "payment_provider": "paypal",
-  "paypal_details": {
-    "return_url": "https://yourstore.com/account/orders/success",
-    "cancel_url": "https://yourstore.com/account/orders/cancel"
-  }
-}
-```
-
-#### MobilePay Payment
-
-**Request Body:**
-
-```json
-{
-  "payment_method": "wallet",
-  "payment_provider": "mobilepay",
-  "phone_number": "+4587654321"
-}
-```
-
-Example response (payment requiring additional action):
-
-```json
-{
-  "id": 12,
-  "order_number": "ORD-20230626-000012",
-  "status": "pending_action",
-  "payment_id": "mp-123456789",
-  "payment_provider": "mobilepay",
-  "requires_action": true,
-  "action_url": "https://api.mobilepay.dk/v1/payments/mp-123456789/authorize",
-  "final_amount": 2514.97,
-  "created_at": "2023-06-26T10:15:30Z",
-  "updated_at": "2023-06-26T10:18:45Z"
-}
-```
-
-**Status Codes:**
-
-- `200 OK`: Payment processed or requires additional action
-- `400 Bad Request`: Invalid payment details or order already paid
-- `401 Unauthorized`: User not authenticated
-- `403 Forbidden`: User not authorized for this order
-- `404 Not Found`: Order not found
-- `500 Internal Server Error`: Payment processing failed
 
 ## Admin Payment Management Endpoints
 

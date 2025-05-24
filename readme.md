@@ -11,8 +11,6 @@ A robust, scalable e-commerce backend API built with Go, following clean archite
 - **Payment Integration**: Support for multiple payment providers (Stripe, MobilePay, etc.)
 - **Email Notifications**: Order confirmations, status updates
 
-> **Note**: The Cart API has been replaced by the Checkout System. See [Cart to Checkout Migration](/docs/cart_to_checkout_migration.md) for details.
->
 > **New**: The Checkout System now uses a session-based approach with cookies. See [Checkout Session Documentation](/docs/checkout_session.md) for details.
 
 ## Technology Stack
@@ -188,27 +186,8 @@ Authorization: Bearer <token>
 - `PUT /api/admin/products/{productId}/variants/{variantId}` - Update variant
 - `DELETE /api/admin/products/{productId}/variants/{variantId}` - Delete variant
 
-#### Shopping Cart
-
-- `GET /api/guest/cart` - Get guest cart
-- `POST /api/guest/cart/items` - Add item to guest cart
-<!-- Cart endpoints are deprecated - Use checkout endpoints instead -->
-<!-- 
-- `PUT /api/guest/cart/items/{productId}` - Update guest cart item
-- `DELETE /api/guest/cart/items/{productId}` - Remove item from guest cart
-- `DELETE /api/guest/cart` - Clear guest cart
-- `POST /api/guest/cart/convert` - Convert guest cart to user cart
-- `GET /api/cart` - Get authenticated user's cart
-- `POST /api/cart/items` - Add item to user cart
-- `PUT /api/cart/items/{productId}` - Update user cart item
-- `DELETE /api/cart/items/{productId}` - Remove item from user cart
-- `DELETE /api/cart` - Clear user cart
--->
-
 #### Orders
 
-- `POST /api/guest/orders` - Create guest order
-- `POST /api/guest/orders/{id}/payment` - Process payment for guest order
 - `POST /api/orders` - Create order for authenticated user
 - `GET /api/orders/{id}` - Get order details
 - `GET /api/orders` - List user's orders
@@ -266,11 +245,6 @@ The database consists of the following tables:
 - `categories` - Product categories with hierarchical structure
 - `products` - Product information including name, description, price, and stock
 - `product_variants` - Variations of products with different attributes (size, color, etc.)
-
-### Shopping
-
-- `carts` - Shopping carts for registered users
-- `cart_items` - Items in shopping carts with product and quantity
 
 ### Orders
 

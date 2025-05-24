@@ -599,6 +599,6 @@ This will return the product with prices in euros, either using the explicitly s
 
 1. Customers browse products by category or use the search function
 2. Customers can view detailed product information including available variants
-3. When adding to cart, customers select specific variants if the product has them
+3. When adding to checkout, customers select specific variants if the product has them
 4. Products and variants are displayed with current inventory levels
 5. Out-of-stock products or variants can be marked as unavailable for purchase

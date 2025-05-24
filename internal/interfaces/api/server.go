@@ -123,7 +123,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/checkout/discount", checkoutHandler.ApplyDiscount).Methods(http.MethodPost)
 	api.HandleFunc("/checkout/discount", checkoutHandler.RemoveDiscount).Methods(http.MethodDelete)
 	api.HandleFunc("/checkout/complete", checkoutHandler.CompleteOrder).Methods(http.MethodPost)
-	// api.HandleFunc("/guest/checkout/convert", checkoutHandler.ConvertGuestCheckoutToUserCheckout).Methods(http.MethodPost)
+	// api.HandleFunc("/checkout/convert", checkoutHandler.ConvertGuestCheckoutToUserCheckout).Methods(http.MethodPost)
 
 	// Setup payment provider webhooks
 	s.setupMobilePayWebhooks(api, webhookHandler)

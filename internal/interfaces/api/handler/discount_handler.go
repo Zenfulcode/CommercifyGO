@@ -7,7 +7,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
-	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -189,70 +188,6 @@ func (h *DiscountHandler) ApplyDiscountToOrder(w http.ResponseWriter, r *http.Re
 	// Check if the user is authorized to apply discount to this order
 	if order.UserID != userID && role != string(entity.RoleAdmin) {
 		http.Error(w, "Unauthorized", http.StatusForbidden)
-		return
-	}
-
-	// Check if order is in a state where discounts can be applied
-	if order.Status != entity.OrderStatusPending {
-		http.Error(w, "Discount can only be applied to pending orders", http.StatusBadRequest)
-		return
-	}
-
-	// Apply discount to order
-	discountInput := usecase.ApplyDiscountToOrderInput{
-		OrderID:      uint(orderID),
-		DiscountCode: input.DiscountCode,
-	}
-
-	updatedOrder, err := h.discountUseCase.ApplyDiscountToOrder(discountInput, order)
-	if err != nil {
-		h.logger.Error("Failed to apply discount: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Return updated order
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedOrder)
-}
-
-// ApplyDiscountToGuestOrder handles applying a discount to a guest order
-func (h *DiscountHandler) ApplyDiscountToGuestOrder(w http.ResponseWriter, r *http.Request) {
-	// Get session ID from cookie
-	cookie, err := r.Cookie(common.SessionCookieName)
-	if err != nil || cookie.Value == "" {
-		http.Error(w, "No session found", http.StatusUnauthorized)
-		return
-	}
-
-	// Get order ID from URL
-	vars := mux.Vars(r)
-	orderID, err := strconv.ParseUint(vars["orderId"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid order ID", http.StatusBadRequest)
-		return
-	}
-
-	// Parse request body
-	var input struct {
-		DiscountCode string `json:"discount_code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Get the order to verify ownership
-	order, err := h.orderUseCase.GetOrderByID(uint(orderID))
-	if err != nil {
-		h.logger.Error("Failed to get order: %v", err)
-		http.Error(w, "Order not found", http.StatusNotFound)
-		return
-	}
-
-	// Verify this is a guest order
-	if !order.IsGuestOrder {
-		http.Error(w, "Not a guest order", http.StatusBadRequest)
 		return
 	}
 

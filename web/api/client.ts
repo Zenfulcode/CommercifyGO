@@ -1,34 +1,53 @@
+/**
+ * @deprecated This client is deprecated. Use the new modular client from '../index.ts' instead.
+ *
+ * Migration example:
+ * ```typescript
+ * // Old way
+ * import { CommercifyClient } from './api/client';
+ * const client = new CommercifyClient('https://api.example.com', 'token');
+ *
+ * // New way
+ * import { createCommercifyClient } from '../index';
+ * const client = createCommercifyClient({
+ *   baseUrl: 'https://api.example.com',
+ *   token: 'token'
+ * });
+ *
+ * // Usage changes:
+ * // client.getProducts() -> client.products.getProducts()
+ * // client.signIn() -> client.auth.signIn()
+ * // client.getGuestCheckout() -> client.checkout.getGuestCheckout()
+ * ```
+ */
+
 import {
-  CartDTO,
-  OrderDTO,
-  ProductDTO,
-  UserDTO,
-  CreateOrderRequest,
-  AddToCartRequest,
-  UpdateUserRequest,
   ResponseDTO,
+  CreateOrderRequest,
+  OrderDTO,
   ListResponseDTO,
+  ProcessPaymentRequest,
+  ProductDTO,
+  CreateProductRequest,
+  UpdateProductRequest,
+  UserDTO,
+  UpdateUserRequest,
   UserLoginRequest,
   UserLoginResponse,
   CreateUserRequest,
-  CreateProductRequest,
-  UpdateProductRequest,
-  ProcessPaymentRequest,
-  UpdateCartItemRequest,
-} from "../types/api";
-import {
   CheckoutDTO,
-  CreateGuestCheckoutRequest,
-  CreateCheckoutRequest,
-  AddCheckoutItemRequest,
   UpdateCheckoutItemRequest,
   SetShippingAddressRequest,
   SetBillingAddressRequest,
   SetCustomerDetailsRequest,
   SetShippingMethodRequest,
   ApplyDiscountRequest,
-} from "../types/checkout";
+  AddToCheckoutRequest,
+} from "../types/api";
 
+/**
+ * @deprecated Use createCommercifyClient from '../index.ts' instead
+ */
 export class CommercifyClient {
   private baseUrl: string;
   private token?: string;
@@ -107,73 +126,11 @@ export class CommercifyClient {
     }
   }
 
-  // DEPRECATED: Cart endpoints - Use checkout endpoints instead
-  /**
-   * @deprecated The cart API is deprecated. Use getCheckout() instead.
-   */
-  async getCart(): Promise<ResponseDTO<CartDTO>> {
-    console.warn('DEPRECATED: getCart() is deprecated. Use getCheckout() instead.');
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart", {
-      method: "GET",
-    });
-  }
-
-  /**
-   * @deprecated The cart API is deprecated. Use addToCheckout() instead.
-   */
-  async addToCart(data: AddToCartRequest): Promise<ResponseDTO<CartDTO>> {
-    console.warn('DEPRECATED: addToCart() is deprecated. Use addToCheckout() instead.');
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart/items", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
-   * @deprecated The cart API is deprecated. Use updateCheckoutItem() instead.
-   */
-  async updateCartItem(
-    productId: string,
-    data: UpdateCartItemRequest
-  ): Promise<ResponseDTO<CartDTO>> {
-    console.warn('DEPRECATED: updateCartItem() is deprecated. Use updateCheckoutItem() instead.');
-    return this.request<ResponseDTO<CartDTO>>(
-      `/guest/cart/items/${productId}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }
-    );
-  }
-
-  /**
-   * @deprecated The cart API is deprecated. Use removeFromCheckout() instead.
-   */
-  async removeCartItem(productId: string): Promise<ResponseDTO<CartDTO>> {
-    console.warn('DEPRECATED: removeCartItem() is deprecated. Use removeFromCheckout() instead.');
-    return this.request<ResponseDTO<CartDTO>>(
-      `/guest/cart/items/${productId}`,
-      {
-        method: "DELETE",
-      }
-    );
-  }
-
-  /**
-   * @deprecated The cart API is deprecated. Use clearCheckout() instead.
-   */
-  async clearCart(): Promise<ResponseDTO<CartDTO>> {
-    console.warn('DEPRECATED: clearCart() is deprecated. Use clearCheckout() instead.');
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart", {
-      method: "DELETE",
-    });
-  }
-
   // Order endpoints
   async createOrder(
     orderData: CreateOrderRequest
   ): Promise<ResponseDTO<OrderDTO>> {
-    return this.request<ResponseDTO<OrderDTO>>("/guest/orders", {
+    return this.request<ResponseDTO<OrderDTO>>("/orders", {
       method: "POST",
       body: JSON.stringify(orderData),
     });
@@ -215,13 +172,10 @@ export class CommercifyClient {
     orderId: string,
     paymentData: ProcessPaymentRequest
   ): Promise<ResponseDTO<OrderDTO>> {
-    return this.request<ResponseDTO<OrderDTO>>(
-      `/guest/orders/${orderId}/payment`,
-      {
-        method: "POST",
-        body: JSON.stringify(paymentData),
-      }
-    );
+    return this.request<ResponseDTO<OrderDTO>>(`/orders/${orderId}/payment`, {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
   }
 
   async capturePayment(paymentId: string): Promise<ResponseDTO<OrderDTO>> {
@@ -355,26 +309,16 @@ export class CommercifyClient {
     });
   }
 
-  // Guest Checkout API
-  async createGuestCheckout(
-    data: CreateGuestCheckoutRequest
-  ): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/guest/checkout", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getGuestCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/guest/checkout", {
+  async getOrCreateCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
       method: "GET",
     });
   }
 
   async addCheckoutItem(
-    data: AddCheckoutItemRequest
+    data: AddToCheckoutRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/guest/checkout/items", {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/items", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -385,7 +329,7 @@ export class CommercifyClient {
     data: UpdateCheckoutItemRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      `/api/guest/checkout/items/${productId}`,
+      `/api/checkout/items/${productId}`,
       {
         method: "PUT",
         body: JSON.stringify(data),
@@ -397,7 +341,7 @@ export class CommercifyClient {
     productId: number
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      `/api/guest/checkout/items/${productId}`,
+      `/api/checkout/items/${productId}`,
       {
         method: "DELETE",
       }
@@ -405,7 +349,7 @@ export class CommercifyClient {
   }
 
   async clearCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/guest/checkout", {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
       method: "DELETE",
     });
   }
@@ -414,7 +358,7 @@ export class CommercifyClient {
     data: SetShippingAddressRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/shipping-address",
+      "/api/checkout/shipping-address",
       {
         method: "PUT",
         body: JSON.stringify(data),
@@ -426,7 +370,7 @@ export class CommercifyClient {
     data: SetBillingAddressRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/billing-address",
+      "/api/checkout/billing-address",
       {
         method: "PUT",
         body: JSON.stringify(data),
@@ -438,7 +382,7 @@ export class CommercifyClient {
     data: SetCustomerDetailsRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/customer-details",
+      "/api/checkout/customer-details",
       {
         method: "PUT",
         body: JSON.stringify(data),
@@ -450,7 +394,7 @@ export class CommercifyClient {
     data: SetShippingMethodRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
     return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/shipping-method",
+      "/api/checkout/shipping-method",
       {
         method: "PUT",
         body: JSON.stringify(data),
@@ -461,43 +405,21 @@ export class CommercifyClient {
   async applyCheckoutDiscount(
     data: ApplyDiscountRequest
   ): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/discount",
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-      }
-    );
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/discount", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 
   async removeCheckoutDiscount(): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>(
-      "/api/guest/checkout/discount",
-      {
-        method: "DELETE",
-      }
-    );
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/discount", {
+      method: "DELETE",
+    });
   }
 
   async convertCheckoutToOrder(): Promise<ResponseDTO<OrderDTO>> {
-    return this.request<ResponseDTO<OrderDTO>>("/api/guest/checkout/to-order", {
+    return this.request<ResponseDTO<OrderDTO>>("/api/checkout/to-order", {
       method: "POST",
-    });
-  }
-
-  // Authenticated Checkout API
-  async getUserCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
-      method: "GET",
-    });
-  }
-
-  async createCheckout(
-    data: CreateCheckoutRequest
-  ): Promise<ResponseDTO<CheckoutDTO>> {
-    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
-      method: "POST",
-      body: JSON.stringify(data),
     });
   }
 
