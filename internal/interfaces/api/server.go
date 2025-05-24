@@ -140,7 +140,6 @@ func (s *Server) setupRoutes() {
 	// Order routes
 	protected.HandleFunc("/orders/{orderId:[0-9]+}", orderHandler.GetOrder).Methods(http.MethodGet)
 	protected.HandleFunc("/orders", orderHandler.ListOrders).Methods(http.MethodGet)
-	protected.HandleFunc("/orders/{orderId:[0-9]+}/payment", orderHandler.ProcessPayment).Methods(http.MethodPost)
 
 	// Admin routes
 	admin := protected.PathPrefix("/admin").Subrouter()

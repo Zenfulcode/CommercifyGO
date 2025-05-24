@@ -9,7 +9,6 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"github.com/zenfulcode/commercify/internal/domain/service"
-	"github.com/zenfulcode/commercify/internal/dto"
 )
 
 // CheckoutInput defines the input for creating/adding to a checkout
@@ -45,7 +44,14 @@ type CheckoutUseCase struct {
 	paymentSvc         service.PaymentService
 }
 
-func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, data dto.PaymentData) (*entity.Order, error) {
+type ProcessPaymentInput struct {
+	PaymentProvider service.PaymentProviderType
+	PaymentMethod   service.PaymentMethod
+	CardDetails     *service.CardDetails `json:"card_details,omitempty"`
+	PhoneNumber     string               `json:"phone_number,omitempty"`
+}
+
+func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaymentInput) (*entity.Order, error) {
 	// Validate order
 	if order == nil {
 		return nil, errors.New("order cannot be nil")
@@ -59,6 +65,14 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, data dto.PaymentD
 		return nil, errors.New("order is not in a valid state for payment processing")
 	}
 
+	if order.CustomerDetails == nil || order.CustomerDetails.Email == "" {
+		return nil, errors.New("customer details are required for payment processing")
+	}
+
+	if order.ShippingMethodID == 0 {
+		return nil, errors.New("shipping method is required for payment processing")
+	}
+
 	// Check if order is already paid
 	if order.Status == entity.OrderStatusPaid ||
 		order.Status == entity.OrderStatusShipped ||
@@ -70,7 +84,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, data dto.PaymentD
 	availableProviders := uc.GetAvailablePaymentProviders()
 	providerValid := false
 	for _, p := range availableProviders {
-		if p.Type == service.PaymentProviderType(order.PaymentProvider) && p.Enabled {
+		if p.Type == input.PaymentProvider && p.Enabled {
 			providerValid = true
 			break
 		}
@@ -90,9 +104,15 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, data dto.PaymentD
 		OrderID:         order.ID,
 		Amount:          order.FinalAmount, // Use final amount (after discounts)
 		Currency:        defaultCurrency.Code,
-		PaymentMethod:   service.PaymentMethod(order.PaymentMethod),
-		PaymentProvider: service.PaymentProviderType(order.PaymentProvider),
+		PaymentMethod:   input.PaymentMethod,
+		PaymentProvider: input.PaymentProvider,
+		CardDetails:     input.CardDetails,
+		PhoneNumber:     input.PhoneNumber,
+		CustomerEmail:   order.CustomerDetails.Email,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to process payment: %w", err)
+	}
 
 	if paymentResult.RequiresAction && paymentResult.ActionURL != "" {
 		// Update order with payment ID, provider, and status
@@ -487,6 +507,10 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 
 	if checkout.CustomerDetails.Email == "" || checkout.CustomerDetails.FullName == "" {
 		return nil, errors.New("customer details are required")
+	}
+
+	if checkout.ShippingMethodID == 0 {
+		return nil, errors.New("shipping method is required")
 	}
 
 	// Convert checkout to order

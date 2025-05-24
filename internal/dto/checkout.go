@@ -146,8 +146,9 @@ type CheckoutCompleteResponse struct {
 
 // CompleteCheckoutRequest represents the data needed to convert a checkout to an order
 type CompleteCheckoutRequest struct {
-	PaymentData PaymentData `json:"payment_data"`
-	RedirectURL string      `json:"redirect_url"`
+	PaymentProvider string      `json:"payment_provider"`
+	PaymentData     PaymentData `json:"payment_data"`
+	// RedirectURL     string      `json:"redirect_url"`
 }
 
 type PaymentData struct {
@@ -157,9 +158,12 @@ type PaymentData struct {
 
 // CardDetailsDTO represents card details for payment processing
 type CardDetailsDTO struct {
-	CardNumber string `json:"card_number"`
-	ExpiryDate string `json:"expiry_date"`
-	CVV        string `json:"cvv"`
+	CardNumber     string `json:"card_number"`
+	ExpiryMonth    int    `json:"expiry_month"`
+	ExpiryYear     int    `json:"expiry_year"`
+	CVV            string `json:"cvv"`
+	CardholderName string `json:"cardholder_name"`
+	Token          string `json:"token,omitempty"` // Optional token for saved cards
 }
 
 // ConvertToCheckoutDTO converts a checkout entity to a DTO

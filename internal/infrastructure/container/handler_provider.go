@@ -124,6 +124,7 @@ func (p *handlerProvider) CheckoutHandler() *handler.CheckoutHandler {
 	if p.checkoutHandler == nil {
 		p.checkoutHandler = handler.NewCheckoutHandler(
 			p.container.UseCases().CheckoutUseCase(),
+			p.container.UseCases().OrderUseCase(),
 			p.container.Logger(),
 		)
 	}

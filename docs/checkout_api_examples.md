@@ -1,126 +1,39 @@
-# Checkout API Examples
+# Checkout API Documentation
 
-This document provides examples of using the Checkout API for Commercify.
+This document outlines the Checkout API endpoints for the Commercify e-commerce system.
 
-## Public Checkout Endpoints
+## Guest Checkout Endpoints
 
-### Get Guest Checkout
+The following endpoints support guest checkout functionality, allowing users to create and manage checkout sessions without authentication.
+
+### Get Current Checkout
 
 ```plaintext
-GET /api/guest/checkout
+GET /api/checkout
 ```
 
+Retrieves the current checkout session for a user. If no checkout exists, a new one will be created.
+
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "items": [
     {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 7,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Medium / Blue",
+      "sku": "TS-BL-M",
       "price": 24.99,
       "quantity": 2,
       "weight": 0.3,
       "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "shipping_method_id": 2,
-  "shipping_method": {
-    "id": 2,
-    "name": "Express Shipping",
-    "description": "Delivered within 2-3 business days",
-    "cost": 14.99
-  },
-  "payment_provider": "stripe",
-  "total_amount": 49.98,
-  "shipping_cost": 14.99,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
-  "currency": "USD",
-  "discount_code": "SUMMER2025",
-  "discount_amount": 5.00,
-  "final_amount": 59.97,
-  "applied_discount": {
-    "id": 3,
-    "code": "SUMMER2025",
-    "type": "basket",
-    "method": "fixed",
-    "value": 5.00,
-    "amount": 5.00
-  },
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:45:18Z",
-  "last_activity_at": "2025-05-22T15:45:18Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Checkout retrieved successfully
-- `404 Not Found`: Checkout not found
-
-### Add Item to Guest Checkout
-
-```plaintext
-POST /api/guest/checkout/items
-```
-
-**Request Body:**
-```json
-{
-  "product_id": 12,
-  "variant_id": 3,
-  "quantity": 2
-}
-```
-
-**Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:30:00Z"
     }
   ],
   "status": "active",
@@ -140,6 +53,9 @@ POST /api/guest/checkout/items
     "postal_code": "",
     "country": ""
   },
+  "shipping_method_id": 0,
+  "shipping_method": null,
+  "payment_provider": "",
   "total_amount": 49.98,
   "shipping_cost": 0,
   "total_weight": 0.6,
@@ -148,107 +64,181 @@ POST /api/guest/checkout/items
     "phone": "",
     "full_name": ""
   },
+  "currency": "USD",
+  "discount_code": "",
+  "discount_amount": 0,
+  "final_amount": 49.98,
+  "applied_discount": null,
+  "created_at": "2025-05-24T10:30:00Z",
+  "updated_at": "2025-05-24T10:30:00Z",
+  "last_activity_at": "2025-05-24T10:30:00Z",
+  "expires_at": "2025-05-24T11:30:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Checkout retrieved or created successfully
+- `500 Internal Server Error`: Server error
+
+### Add Item to Checkout
+
+```plaintext
+POST /api/checkout/items
+```
+
+Adds a product item to the current checkout session.
+
+**Request Body:**
+
+```json
+{
+  "product_id": 42,
+  "variant_id": 7,
+  "quantity": 1
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [
+    {
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 7,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Medium / Blue",
+      "sku": "TS-BL-M",
+      "price": 24.99,
+      "quantity": 1,
+      "weight": 0.3,
+      "subtotal": 24.99,
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:30:00Z"
+    }
+  ],
+  "status": "active",
+  "shipping_address": {
+    "address_line1": "",
+    "address_line2": "",
+    "city": "",
+    "state": "",
+    "postal_code": "",
+    "country": ""
+  },
+  "billing_address": {
+    "address_line1": "",
+    "address_line2": "",
+    "city": "",
+    "state": "",
+    "postal_code": "",
+    "country": ""
+  },
+  "total_amount": 24.99,
+  "shipping_cost": 0,
+  "total_weight": 0.3,
+  "currency": "USD",
+  "discount_amount": 0,
+  "final_amount": 24.99,
+  "created_at": "2025-05-24T10:30:00Z",
+  "updated_at": "2025-05-24T10:30:00Z",
+  "last_activity_at": "2025-05-24T10:30:00Z",
+  "expires_at": "2025-05-24T11:30:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Item added successfully
+- `400 Bad Request`: Invalid request body or product
+- `404 Not Found`: Product not found
+- `500 Internal Server Error`: Server error
+
+### Update Checkout Item
+
+```plaintext
+PUT /api/checkout/items/{productId}
+```
+
+Updates the quantity or variant of an item in the current checkout.
+
+**Path Parameters:**
+
+- `productId`: ID of the product to update
+
+**Request Body:**
+
+```json
+{
+  "quantity": 2,
+  "variant_id": 8
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [
+    {
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 8,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Large / Blue",
+      "sku": "TS-BL-L",
+      "price": 24.99,
+      "quantity": 2,
+      "weight": 0.35,
+      "subtotal": 49.98,
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:35:00Z"
+    }
+  ],
+  "status": "active",
+  "total_amount": 49.98,
+  "shipping_cost": 0,
+  "total_weight": 0.7,
   "currency": "USD",
   "discount_amount": 0,
   "final_amount": 49.98,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:30:22Z",
-  "last_activity_at": "2025-05-22T15:30:22Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "updated_at": "2025-05-24T10:35:00Z",
+  "last_activity_at": "2025-05-24T10:35:00Z",
+  "expires_at": "2025-05-24T11:35:00Z"
 }
 ```
 
 **Status Codes:**
-- `200 OK`: Item added successfully
-- `400 Bad Request`: Invalid request body
-- `404 Not Found`: Product or variant not found
 
-### Update Item in Guest Checkout
-
-```plaintext
-PUT /api/guest/checkout/items/{productId}
-```
-
-**Request Body:**
-```json
-{
-  "quantity": 3,
-  "variant_id": 4
-}
-```
-
-**Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 4,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, L",
-      "sku": "TS-BLK-L",
-      "price": 24.99,
-      "quantity": 3,
-      "weight": 0.3,
-      "subtotal": 74.97,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:35:18Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "total_amount": 74.97,
-  "shipping_cost": 0,
-  "total_weight": 0.9,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 74.97,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:35:18Z",
-  "last_activity_at": "2025-05-22T15:35:18Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
-
-**Status Codes:**
 - `200 OK`: Item updated successfully
 - `400 Bad Request`: Invalid request body
-- `404 Not Found`: Item, product, or variant not found
+- `404 Not Found`: Product not found in checkout
+- `500 Internal Server Error`: Server error
 
-### Remove Item from Guest Checkout
+### Remove Item from Checkout
 
 ```plaintext
-DELETE /api/guest/checkout/items/{productId}
+DELETE /api/checkout/items/{productId}
 ```
 
+Removes an item from the current checkout session.
+
+**Path Parameters:**
+
+- `productId`: ID of the product to remove
+
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "items": [],
   "status": "active",
   "shipping_address": {
@@ -270,36 +260,35 @@ DELETE /api/guest/checkout/items/{productId}
   "total_amount": 0,
   "shipping_cost": 0,
   "total_weight": 0,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
   "currency": "USD",
   "discount_amount": 0,
   "final_amount": 0,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:40:10Z",
-  "last_activity_at": "2025-05-22T15:40:10Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "updated_at": "2025-05-24T10:40:00Z",
+  "last_activity_at": "2025-05-24T10:40:00Z",
+  "expires_at": "2025-05-24T11:40:00Z"
 }
 ```
 
 **Status Codes:**
+
 - `200 OK`: Item removed successfully
-- `404 Not Found`: Item not found
+- `404 Not Found`: Product not found in checkout
+- `500 Internal Server Error`: Server error
 
-### Clear Guest Checkout
+### Clear Checkout
 
 ```plaintext
-DELETE /api/guest/checkout
+DELETE /api/checkout
 ```
 
+Removes all items from the current checkout session.
+
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "items": [],
   "status": "active",
   "shipping_address": {
@@ -321,70 +310,56 @@ DELETE /api/guest/checkout
   "total_amount": 0,
   "shipping_cost": 0,
   "total_weight": 0,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
   "currency": "USD",
   "discount_amount": 0,
   "final_amount": 0,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:41:15Z",
-  "last_activity_at": "2025-05-22T15:41:15Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "updated_at": "2025-05-24T10:45:00Z",
+  "last_activity_at": "2025-05-24T10:45:00Z",
+  "expires_at": "2025-05-24T11:45:00Z"
 }
 ```
 
 **Status Codes:**
-- `200 OK`: Checkout cleared successfully
 
-### Set Shipping Address for Guest Checkout
+- `200 OK`: Checkout cleared successfully
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
+
+### Set Shipping Address
 
 ```plaintext
-PUT /api/guest/checkout/shipping-address
+PUT /api/checkout/shipping-address
 ```
+
+Sets the shipping address for the current checkout.
 
 **Request Body:**
+
 ```json
 {
-  "address_line1": "123 Main St",
+  "address_line1": "123 Main Street",
   "address_line2": "Apt 4B",
-  "city": "San Francisco",
-  "state": "CA",
-  "postal_code": "94105",
+  "city": "Springfield",
+  "state": "IL",
+  "postal_code": "62704",
   "country": "US"
 }
 ```
 
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [],
   "status": "active",
   "shipping_address": {
-    "address_line1": "123 Main St",
+    "address_line1": "123 Main Street",
     "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
     "country": "US"
   },
   "billing_address": {
@@ -395,708 +370,629 @@ PUT /api/guest/checkout/shipping-address
     "postal_code": "",
     "country": ""
   },
-  "total_amount": 49.98,
+  "total_amount": 0,
   "shipping_cost": 0,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
+  "total_weight": 0,
   "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 49.98,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:42:30Z",
-  "last_activity_at": "2025-05-22T15:42:30Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "updated_at": "2025-05-24T10:50:00Z",
+  "last_activity_at": "2025-05-24T10:50:00Z",
+  "expires_at": "2025-05-24T11:50:00Z"
 }
 ```
 
 **Status Codes:**
+
 - `200 OK`: Shipping address set successfully
 - `400 Bad Request`: Invalid address data
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
 
-### Set Billing Address for Guest Checkout
+### Set Billing Address
 
 ```plaintext
-PUT /api/guest/checkout/billing-address
+PUT /api/checkout/billing-address
 ```
 
+Sets the billing address for the current checkout.
+
 **Request Body:**
+
 ```json
 {
-  "address_line1": "123 Main St",
-  "address_line2": "Apt 4B",
-  "city": "San Francisco",
-  "state": "CA",
-  "postal_code": "94105",
+  "address_line1": "456 Commerce Ave",
+  "address_line2": "Suite 300",
+  "city": "Springfield",
+  "state": "IL",
+  "postal_code": "62704",
   "country": "US"
 }
 ```
 
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [],
   "status": "active",
   "shipping_address": {
-    "address_line1": "123 Main St",
+    "address_line1": "123 Main Street",
     "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
     "country": "US"
   },
   "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
+    "address_line1": "456 Commerce Ave",
+    "address_line2": "Suite 300",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
     "country": "US"
   },
-  "total_amount": 49.98,
+  "total_amount": 0,
   "shipping_cost": 0,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
+  "total_weight": 0,
   "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 49.98,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:43:15Z",
-  "last_activity_at": "2025-05-22T15:43:15Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "updated_at": "2025-05-24T10:55:00Z",
+  "last_activity_at": "2025-05-24T10:55:00Z",
+  "expires_at": "2025-05-24T11:55:00Z"
 }
 ```
 
 **Status Codes:**
+
 - `200 OK`: Billing address set successfully
 - `400 Bad Request`: Invalid address data
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
 
-### Set Customer Details for Guest Checkout
+### Set Customer Details
 
 ```plaintext
-PUT /api/guest/checkout/customer-details
+PUT /api/checkout/customer-details
 ```
 
+Sets the customer contact information for the current checkout.
+
 **Request Body:**
+
 ```json
 {
   "email": "customer@example.com",
-  "phone": "+1-555-123-4567",
+  "phone": "+1234567890",
   "full_name": "John Doe"
 }
 ```
 
 **Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "total_amount": 49.98,
-  "shipping_cost": 0,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 49.98,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:44:05Z",
-  "last_activity_at": "2025-05-22T15:44:05Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
 
-**Status Codes:**
-- `200 OK`: Customer details set successfully
-- `400 Bad Request`: Invalid customer data
-
-### Set Shipping Method for Guest Checkout
-
-```plaintext
-PUT /api/guest/checkout/shipping-method
-```
-
-**Request Body:**
-```json
-{
-  "shipping_method_id": 2
-}
-```
-
-**Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "shipping_method_id": 2,
-  "shipping_method": {
-    "id": 2,
-    "name": "Express Shipping",
-    "description": "Delivered within 2-3 business days",
-    "cost": 14.99
-  },
-  "total_amount": 49.98,
-  "shipping_cost": 14.99,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 64.97,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:44:45Z",
-  "last_activity_at": "2025-05-22T15:44:45Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Shipping method set successfully
-- `400 Bad Request`: Invalid shipping method ID
-- `404 Not Found`: Shipping method not found
-
-### Apply Discount to Guest Checkout
-
-```plaintext
-POST /api/guest/checkout/discount
-```
-
-**Request Body:**
-```json
-{
-  "discount_code": "SUMMER2025"
-}
-```
-
-**Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "shipping_method_id": 2,
-  "shipping_method": {
-    "id": 2,
-    "name": "Express Shipping",
-    "description": "Delivered within 2-3 business days",
-    "cost": 14.99
-  },
-  "total_amount": 49.98,
-  "shipping_cost": 14.99,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
-  "currency": "USD",
-  "discount_code": "SUMMER2025",
-  "discount_amount": 5.00,
-  "final_amount": 59.97,
-  "applied_discount": {
-    "id": 3,
-    "code": "SUMMER2025",
-    "type": "basket",
-    "method": "fixed",
-    "value": 5.00,
-    "amount": 5.00
-  },
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:45:18Z",
-  "last_activity_at": "2025-05-22T15:45:18Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Discount applied successfully
-- `400 Bad Request`: Invalid discount code
-- `404 Not Found`: Discount not found
-- `409 Conflict`: Discount cannot be applied (e.g., minimum order value not met)
-
-### Remove Discount from Guest Checkout
-
-```plaintext
-DELETE /api/guest/checkout/discount
-```
-
-**Response Body:**
-```json
-{
-  "id": 5,
-  "session_id": "7f98a2c4-8f9d-4c3e-9f9a-3f4f5c6d7e8a",
-  "items": [
-    {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "shipping_method_id": 2,
-  "shipping_method": {
-    "id": 2,
-    "name": "Express Shipping",
-    "description": "Delivered within 2-3 business days",
-    "cost": 14.99
-  },
-  "total_amount": 49.98,
-  "shipping_cost": 14.99,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 64.97,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:46:05Z",
-  "last_activity_at": "2025-05-22T15:46:05Z",
-  "expires_at": "2025-05-23T15:30:22Z"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Discount removed successfully
-- `400 Bad Request`: No discount applied
-
-### Convert Guest Checkout to Order
-
-```plaintext
-POST /api/guest/checkout/to-order
-```
-
-**Response Body:**
 ```json
 {
   "id": 123,
-  "user_id": 0,
-  "order_number": "ORD-20250522-000123",
-  "items": [
-    {
-      "id": 187,
-      "product_id": 12,
-      "variant_id": 3,
-      "name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
-      "price": 24.99,
-      "quantity": 2,
-      "subtotal": 49.98
-    }
-  ],
-  "status": "pending",
-  "total_amount": 49.98,
-  "final_amount": 64.97,
-  "currency": "USD",
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [],
+  "status": "active",
   "shipping_address": {
-    "address_line1": "123 Main St",
+    "address_line1": "123 Main Street",
     "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
+    "city": "Springfield",
+    "state": "IL", 
+    "postal_code": "62704",
     "country": "US"
   },
   "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
+    "address_line1": "456 Commerce Ave",
+    "address_line2": "Suite 300",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
     "country": "US"
   },
-  "payment_details": {
-    "provider": "",
-    "method": "",
-    "id": "",
-    "status": "pending",
-    "captured": false,
-    "refunded": false
-  },
-  "shipping_details": {
-    "method_id": 2,
-    "method": "Express Shipping",
-    "cost": 14.99
-  },
-  "customer": {
+  "customer_details": {
     "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
+    "phone": "+1234567890",
     "full_name": "John Doe"
   },
-  "created_at": "2025-05-22T15:47:10Z",
-  "updated_at": "2025-05-22T15:47:10Z"
+  "total_amount": 0,
+  "shipping_cost": 0,
+  "total_weight": 0,
+  "currency": "USD",
+  "updated_at": "2025-05-24T11:00:00Z",
+  "last_activity_at": "2025-05-24T11:00:00Z",
+  "expires_at": "2025-05-24T12:00:00Z"
 }
 ```
 
 **Status Codes:**
-- `201 Created`: Order created successfully
-- `400 Bad Request`: Missing required fields (customer details, shipping address, etc.)
-- `409 Conflict`: No items in checkout or other validation errors
 
-## Authenticated Checkout Endpoints
+- `200 OK`: Customer details set successfully
+- `400 Bad Request`: Invalid customer data
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
 
-All endpoints above are also available for authenticated users by replacing `/guest/checkout` with `/checkout`. Additionally:
-
-### Convert Guest Checkout to User Checkout
+### Set Shipping Method
 
 ```plaintext
-POST /api/checkout/convert
+PUT /api/checkout/shipping-method
+```
+
+Sets the shipping method for the current checkout.
+
+**Request Body:**
+
+```json
+{
+  "shipping_method_id": 1
+}
 ```
 
 **Response Body:**
+
 ```json
 {
-  "id": 5,
-  "user_id": 42,
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [],
+  "status": "active",
+  "shipping_address": {
+    "address_line1": "123 Main Street",
+    "address_line2": "Apt 4B",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
+    "country": "US"
+  },
+  "billing_address": {
+    "address_line1": "456 Commerce Ave",
+    "address_line2": "Suite 300",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
+    "country": "US"
+  },
+  "shipping_method_id": 1,
+  "shipping_method": {
+    "id": 1,
+    "name": "Standard Shipping",
+    "description": "Delivery in 5-7 business days",
+    "cost": 5.99
+  },
+  "total_amount": 0,
+  "shipping_cost": 5.99,
+  "total_weight": 0,
+  "currency": "USD",
+  "final_amount": 5.99,
+  "updated_at": "2025-05-24T11:05:00Z",
+  "last_activity_at": "2025-05-24T11:05:00Z",
+  "expires_at": "2025-05-24T12:05:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Shipping method set successfully
+- `400 Bad Request`: Invalid shipping method
+- `404 Not Found`: Checkout or shipping method not found
+- `500 Internal Server Error`: Server error
+
+### Apply Discount
+
+```plaintext
+POST /api/checkout/discount
+```
+
+Applies a discount code to the current checkout.
+
+**Request Body:**
+
+```json
+{
+  "discount_code": "SUMMER25"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "items": [
     {
-      "id": 7,
-      "product_id": 12,
-      "variant_id": 3,
-      "product_name": "Premium T-shirt",
-      "variant_name": "Black, XL",
-      "sku": "TS-BLK-XL",
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 7,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Medium / Blue",
+      "sku": "TS-BL-M",
       "price": 24.99,
       "quantity": 2,
       "weight": 0.3,
       "subtotal": 49.98,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:30:22Z"
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:30:00Z"
     }
   ],
   "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "123 Main St",
-    "address_line2": "Apt 4B",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "US"
-  },
-  "shipping_method_id": 2,
+  "shipping_method_id": 1,
   "shipping_method": {
-    "id": 2,
-    "name": "Express Shipping",
-    "description": "Delivered within 2-3 business days",
-    "cost": 14.99
+    "id": 1,
+    "name": "Standard Shipping",
+    "description": "Delivery in 5-7 business days",
+    "cost": 5.99
   },
   "total_amount": 49.98,
-  "shipping_cost": 14.99,
+  "shipping_cost": 5.99,
   "total_weight": 0.6,
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1-555-123-4567",
-    "full_name": "John Doe"
-  },
   "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 64.97,
-  "created_at": "2025-05-22T15:30:22Z",
-  "updated_at": "2025-05-22T15:50:20Z",
-  "last_activity_at": "2025-05-22T15:50:20Z",
-  "expires_at": "2025-05-23T15:30:22Z"
+  "discount_code": "SUMMER25",
+  "discount_amount": 12.50,
+  "final_amount": 43.47,
+  "applied_discount": {
+    "id": 5,
+    "code": "SUMMER25",
+    "type": "basket",
+    "method": "percentage",
+    "value": 25,
+    "amount": 12.50
+  },
+  "updated_at": "2025-05-24T11:10:00Z",
+  "last_activity_at": "2025-05-24T11:10:00Z",
+  "expires_at": "2025-05-24T12:10:00Z"
 }
 ```
 
 **Status Codes:**
-- `200 OK`: Checkout converted successfully
-- `401 Unauthorized`: User not authenticated
-- `404 Not Found`: No guest checkout found for this session
+
+- `200 OK`: Discount applied successfully
+- `400 Bad Request`: Invalid or expired discount code
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
+
+### Remove Discount
+
+```plaintext
+DELETE /api/checkout/discount
+```
+
+Removes any applied discount code from the current checkout.
+
+**Response Body:**
+
+```json
+{
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [
+    {
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 7,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Medium / Blue",
+      "sku": "TS-BL-M",
+      "price": 24.99,
+      "quantity": 2,
+      "weight": 0.3,
+      "subtotal": 49.98,
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:30:00Z"
+    }
+  ],
+  "status": "active",
+  "shipping_method_id": 1,
+  "shipping_method": {
+    "id": 1,
+    "name": "Standard Shipping",
+    "description": "Delivery in 5-7 business days",
+    "cost": 5.99
+  },
+  "total_amount": 49.98,
+  "shipping_cost": 5.99,
+  "total_weight": 0.6,
+  "currency": "USD",
+  "discount_code": "",
+  "discount_amount": 0,
+  "final_amount": 55.97,
+  "applied_discount": null,
+  "updated_at": "2025-05-24T11:15:00Z",
+  "last_activity_at": "2025-05-24T11:15:00Z",
+  "expires_at": "2025-05-24T12:15:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Discount removed successfully
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
+
+### Complete Checkout
+
+```plaintext
+### Complete Checkout
+
+```plaintext
+POST /api/checkout/complete
+```
+
+**Request Body:**
+
+```json
+{
+  "payment_provider": "stripe",
+  "payment_data": {
+    "card_details": {
+      "card_number": "4111111111111111",
+      "expiry_month": 12,
+      "expiry_year": 2027,
+      "cvv": "123",
+      "cardholder_name": "John Doe",
+      "token": "tok_visa_2024"
+    }
+  },
+  "redirect_url": "https://example.com/order-confirmation"
+}
+```
+
+Alternatively, for mobile payment methods:
+
+```json
+{
+  "payment_provider": "mobilepay",
+  "payment_data": {
+    "phone_number": "+4512345678"
+  },
+  "redirect_url": "https://example.com/order-confirmation"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "message": "Order created successfully",
+  "data": {
+    "id": 456,
+    "user_id": 123,
+    "order_number": "ORD-2025-0001",
+    "status": "pending",
+    "total_amount": 49.95,
+    "final_amount": 49.95,
+    "currency": "USD",
+    "items": [
+      {
+        "id": 1,
+        "product_id": 42,
+        "variant_id": 7,
+        "product_name": "Organic Cotton T-Shirt",
+        "variant_name": "Medium / Blue",
+        "sku": "TS-BL-M",
+        "price": 24.99,
+        "quantity": 2,
+        "subtotal": 49.98
+      }
+    ],
+    "shipping_address": {
+      "address_line1": "123 Main Street",
+      "address_line2": "Apt 4B",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "billing_address": {
+      "address_line1": "456 Commerce Ave",
+      "address_line2": "Suite 300",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "customer_details": {
+      "email": "customer@example.com",
+      "phone": "+1234567890",
+      "full_name": "John Doe"
+    },
+    "shipping_method": "Standard Shipping",
+    "shipping_cost": 5.99,
+    "subtotal": 49.98,
+    "total": 55.97,
+    "discount_code": "",
+    "discount_amount": 0,
+    "final_amount": 55.97,
+    "currency": "USD",
+    "payment_provider": "stripe",
+    "payment_status": "pending",
+    "created_at": "2025-05-24T11:20:00Z"
+  },
+  "action_required": false,
+  "redirect_url": ""
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Order created and payment processed successfully
+- `400 Bad Request`: Invalid request body or payment processing failed
+- `401 Unauthorized`: Not authenticated
+- `404 Not Found`: Checkout session not found or expired
+- `409 Conflict`: Order already exists for this checkout session
+- `500 Internal Server Error`: Server error
+- `402 Payment Required`: Payment failed
+- `404 Not Found`: Checkout not found
+- `409 Conflict`: Checkout is already completed
+- `422 Unprocessable Entity`: Invalid payment data
+- `500 Internal Server Error`: Server error
 
 ## Admin Checkout Endpoints
 
-### List Checkouts (Admin Only)
+The following endpoints are available for administrative functions and require admin authentication.
+
+### List All Checkouts (Admin)
 
 ```plaintext
 GET /api/admin/checkouts
 ```
 
+Returns a paginated list of all checkout sessions in the system.
+
 **Query Parameters:**
-- `page` (optional): Page number (defaults to 1)
-- `page_size` (optional): Number of items per page (defaults to 10)
-- `status` (optional): Filter by status (active, completed, abandoned, expired)
+
+- `offset`: Starting index for pagination (default: 0)
+- `limit`: Maximum number of results to return (default: 20)
+- `status`: Filter by checkout status (optional)
 
 **Response Body:**
+
 ```json
 {
-  "success": true,
-  "data": [
+  "items": [
     {
-      "id": 5,
-      "user_id": 42,
-      "items": [
-        {
-          "id": 7,
-          "product_id": 12,
-          "variant_id": 3,
-          "product_name": "Premium T-shirt",
-          "variant_name": "Black, XL",
-          "sku": "TS-BLK-XL",
-          "price": 24.99,
-          "quantity": 2,
-          "weight": 0.3,
-          "subtotal": 49.98,
-          "created_at": "2025-05-22T15:30:22Z",
-          "updated_at": "2025-05-22T15:30:22Z"
-        }
-      ],
+      "id": 123,
+      "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "status": "active",
-      "shipping_address": {
-        "address_line1": "123 Main St",
-        "address_line2": "Apt 4B",
-        "city": "San Francisco",
-        "state": "CA",
-        "postal_code": "94105",
-        "country": "US"
-      },
-      "billing_address": {
-        "address_line1": "123 Main St",
-        "address_line2": "Apt 4B",
-        "city": "San Francisco",
-        "state": "CA",
-        "postal_code": "94105",
-        "country": "US"
-      },
-      "shipping_method_id": 2,
-      "shipping_method": {
-        "id": 2,
-        "name": "Express Shipping",
-        "description": "Delivered within 2-3 business days",
-        "cost": 14.99
-      },
       "total_amount": 49.98,
-      "shipping_cost": 14.99,
-      "total_weight": 0.6,
-      "customer_details": {
-        "email": "customer@example.com",
-        "phone": "+1-555-123-4567",
-        "full_name": "John Doe"
-      },
-      "currency": "USD",
       "discount_amount": 0,
-      "final_amount": 64.97,
-      "created_at": "2025-05-22T15:30:22Z",
-      "updated_at": "2025-05-22T15:50:20Z",
-      "last_activity_at": "2025-05-22T15:50:20Z",
-      "expires_at": "2025-05-23T15:30:22Z"
+      "final_amount": 55.97,
+      "currency": "USD",
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T11:20:00Z",
+      "expires_at": "2025-05-24T12:20:00Z"
+    },
+    {
+      "id": 122,
+      "session_id": "2cb94f54-6261-4522-a3fc-1b832f55ddd1",
+      "status": "completed",
+      "total_amount": 129.95,
+      "discount_amount": 25.99,
+      "final_amount": 110.94,
+      "currency": "USD",
+      "created_at": "2025-05-24T09:15:00Z",
+      "updated_at": "2025-05-24T09:45:00Z",
+      "expires_at": "2025-05-24T10:45:00Z",
+      "completed_at": "2025-05-24T09:45:00Z",
+      "converted_order_id": 455
     }
   ],
-  "pagination": {
-    "page": 1,
-    "page_size": 10,
-    "total": 1
-  }
+  "total": 52,
+  "offset": 0,
+  "limit": 20
 }
 ```
 
 **Status Codes:**
+
 - `200 OK`: Checkouts retrieved successfully
 - `401 Unauthorized`: Not authenticated
 - `403 Forbidden`: Not authorized (not an admin)
+- `500 Internal Server Error`: Server error
 
-## Example Workflow
+### Get Checkout by ID (Admin)
 
-### Guest Checkout Flow
+```plaintext
+GET /api/admin/checkouts/{checkoutId}
+```
 
-1. Guest adds items to their checkout
-   - `POST /api/guest/checkout/items`
-2. Guest provides shipping address
-   - `PUT /api/guest/checkout/shipping-address`
-3. Guest provides billing address
-   - `PUT /api/guest/checkout/billing-address`
-4. Guest provides customer details
-   - `PUT /api/guest/checkout/customer-details`
-5. Guest selects shipping method
-   - `PUT /api/guest/checkout/shipping-method`
-6. Guest applies discount code (optional)
-   - `POST /api/guest/checkout/discount`
-7. Guest converts checkout to order
-   - `POST /api/guest/checkout/to-order`
-8. Guest processes payment for the order
-   - `POST /api/guest/orders/{id}/payment`
+Returns detailed information about a specific checkout session.
 
-### Authenticated User Checkout Flow
+**Path Parameters:**
 
-1. User logs in
-   - `POST /api/auth/signin`
-2. User converts guest checkout to user checkout (optional)
-   - `POST /api/checkout/convert`
-3. User adds items to their checkout
-   - `POST /api/checkout/items`
-4. User provides shipping address
-   - `PUT /api/checkout/shipping-address`
-5. User provides billing address
-   - `PUT /api/checkout/billing-address`
-6. User provides customer details
-   - `PUT /api/checkout/customer-details`
-7. User selects shipping method
-   - `PUT /api/checkout/shipping-method`
-8. User applies discount code (optional)
-   - `POST /api/checkout/discount`
-9. User converts checkout to order
-   - `POST /api/checkout/to-order`
-10. User processes payment for the order
-    - `POST /api/orders/{id}/payment`
+- `checkoutId`: The unique identifier of the checkout
+
+**Response Body:**
+
+```json
+{
+  "id": 123,
+  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "items": [
+    {
+      "id": 1,
+      "product_id": 42,
+      "variant_id": 7,
+      "product_name": "Organic Cotton T-Shirt",
+      "variant_name": "Medium / Blue",
+      "sku": "TS-BL-M",
+      "price": 24.99,
+      "quantity": 2,
+      "weight": 0.3,
+      "subtotal": 49.98,
+      "created_at": "2025-05-24T10:30:00Z",
+      "updated_at": "2025-05-24T10:30:00Z"
+    }
+  ],
+  "status": "active",
+  "shipping_address": {
+    "address_line1": "123 Main Street",
+    "address_line2": "Apt 4B",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
+    "country": "US"
+  },
+  "billing_address": {
+    "address_line1": "456 Commerce Ave",
+    "address_line2": "Suite 300",
+    "city": "Springfield",
+    "state": "IL",
+    "postal_code": "62704",
+    "country": "US"
+  },
+  "shipping_method_id": 1,
+  "shipping_method": {
+    "id": 1,
+    "name": "Standard Shipping",
+    "description": "Delivery in 5-7 business days",
+    "cost": 5.99
+  },
+  "total_amount": 49.98,
+  "shipping_cost": 5.99,
+  "total_weight": 0.6,
+  "customer_details": {
+    "email": "customer@example.com",
+    "phone": "+1234567890",
+    "full_name": "John Doe"
+  },
+  "currency": "USD",
+  "discount_code": "",
+  "discount_amount": 0,
+  "final_amount": 55.97,
+  "created_at": "2025-05-24T10:30:00Z",
+  "updated_at": "2025-05-24T11:20:00Z",
+  "last_activity_at": "2025-05-24T11:20:00Z",
+  "expires_at": "2025-05-24T12:20:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Checkout retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error
+
+### Delete Checkout (Admin)
+
+```plaintext
+DELETE /api/admin/checkouts/{checkoutId}
+```
+
+Deletes a specific checkout session from the system.
+
+**Path Parameters:**
+
+- `checkoutId`: The unique identifier of the checkout
+
+**Status Codes:**
+
+- `204 No Content`: Checkout deleted successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Checkout not found
+- `500 Internal Server Error`: Server error

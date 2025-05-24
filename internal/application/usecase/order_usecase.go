@@ -49,179 +49,6 @@ func (uc *OrderUseCase) GetAvailablePaymentProviders() []service.PaymentProvider
 	return uc.paymentSvc.GetAvailableProviders()
 }
 
-// ProcessPaymentInput contains the data needed to process a payment
-type ProcessPaymentInput struct {
-	OrderID         uint
-	PaymentMethod   service.PaymentMethod
-	PaymentProvider service.PaymentProviderType
-	CardDetails     *service.CardDetails
-	PayPalDetails   *service.PayPalDetails
-	BankDetails     *service.BankDetails
-	CustomerEmail   string
-	PhoneNumber     string
-}
-
-// ProcessPayment processes payment for an order
-func (uc *OrderUseCase) ProcessPayment(input ProcessPaymentInput) (*entity.Order, error) {
-	// Get order
-	order, err := uc.orderRepo.GetByID(input.OrderID)
-	if err != nil {
-		return nil, errors.New("order not found")
-	}
-
-	// Check if order is already paid
-	if order.Status == entity.OrderStatusPaid ||
-		order.Status == entity.OrderStatusShipped ||
-		order.Status == entity.OrderStatusDelivered {
-		return nil, errors.New("order is already paid")
-	}
-
-	// Validate payment provider
-	availableProviders := uc.GetAvailablePaymentProviders()
-	providerValid := false
-	for _, p := range availableProviders {
-		if p.Type == input.PaymentProvider && p.Enabled {
-			providerValid = true
-			break
-		}
-	}
-	if !providerValid {
-		return nil, errors.New("payment provider not available")
-	}
-
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default currency: %w", err)
-	}
-
-	// Process payment
-	paymentResult, err := uc.paymentSvc.ProcessPayment(service.PaymentRequest{
-		OrderID:         order.ID,
-		Amount:          order.FinalAmount, // Use final amount (after discounts)
-		Currency:        defaultCurrency.Code,
-		PaymentMethod:   input.PaymentMethod,
-		PaymentProvider: input.PaymentProvider,
-		CardDetails:     input.CardDetails,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Handle payment results that require additional action (like redirects)
-	if paymentResult.RequiresAction && paymentResult.ActionURL != "" {
-		// Update order with payment ID, provider, and status
-		if err := order.SetPaymentID(paymentResult.TransactionID); err != nil {
-			return nil, err
-		}
-		if err := order.SetPaymentProvider(string(paymentResult.Provider)); err != nil {
-			return nil, err
-		}
-		if err := order.SetActionURL(paymentResult.ActionURL); err != nil {
-			return nil, err
-		}
-		if err := order.UpdateStatus(entity.OrderStatusPendingAction); err != nil {
-			return nil, err
-		}
-
-		// Update order in repository
-		if err := uc.orderRepo.Update(order); err != nil {
-			return nil, err
-		}
-
-		// Record the pending authorization transaction
-		txn, err := entity.NewPaymentTransaction(
-			order.ID,
-			paymentResult.TransactionID,
-			entity.TransactionTypeAuthorize,
-			entity.TransactionStatusPending,
-			order.FinalAmount,
-			defaultCurrency.Code,
-			string(paymentResult.Provider),
-		)
-		if err != nil {
-			// Log the error but don't fail the payment process
-			log.Printf("Failed to create payment transaction record: %v", err)
-		} else {
-			// Add metadata
-			txn.AddMetadata("payment_method", string(input.PaymentMethod))
-			txn.AddMetadata("requires_action", "true")
-			txn.AddMetadata("action_url", paymentResult.ActionURL)
-
-			if err := uc.paymentTxnRepo.Create(txn); err != nil {
-				// Log error but don't fail the payment process
-				log.Printf("Failed to save payment transaction: %v\n", err)
-			}
-		}
-
-		return order, nil
-	}
-
-	if !paymentResult.Success {
-		// Record the failed transaction
-		txn, err := entity.NewPaymentTransaction(
-			order.ID,
-			paymentResult.TransactionID,
-			entity.TransactionTypeAuthorize,
-			entity.TransactionStatusFailed,
-			order.FinalAmount,
-			defaultCurrency.Code,
-			string(paymentResult.Provider),
-		)
-		if err == nil {
-			txn.AddMetadata("payment_method", string(input.PaymentMethod))
-			txn.AddMetadata("error_message", paymentResult.ErrorMessage)
-
-			if err := uc.paymentTxnRepo.Create(txn); err != nil {
-				// Log error but don't fail the process
-				log.Printf("Failed to save failed payment transaction: %v\n", err)
-			}
-		}
-
-		return nil, errors.New(paymentResult.ErrorMessage)
-	}
-
-	// Update order with payment ID, provider, and status
-	if err := order.SetPaymentID(paymentResult.TransactionID); err != nil {
-		return nil, err
-	}
-	if err := order.SetPaymentProvider(string(paymentResult.Provider)); err != nil {
-		return nil, err
-	}
-	if err := order.SetPaymentMethod(string(input.PaymentMethod)); err != nil {
-		return nil, err
-	}
-	if err := order.UpdateStatus(entity.OrderStatusPaid); err != nil {
-		return nil, err
-	}
-
-	// Update order in repository
-	if err := uc.orderRepo.Update(order); err != nil {
-		return nil, err
-	}
-
-	// Record the successful authorization transaction
-	txn, err := entity.NewPaymentTransaction(
-		order.ID,
-		paymentResult.TransactionID,
-		entity.TransactionTypeAuthorize,
-		entity.TransactionStatusSuccessful,
-		order.FinalAmount,
-		defaultCurrency.Code,
-		string(paymentResult.Provider),
-	)
-	if err == nil {
-		txn.AddMetadata("payment_method", string(input.PaymentMethod))
-
-		if err := uc.paymentTxnRepo.Create(txn); err != nil {
-			log.Printf("Failed to save payment transaction: %v\n", err)
-		}
-	}
-
-	return order, nil
-}
-
 // UpdateOrderStatusInput contains the data needed to update an order status
 type UpdateOrderStatusInput struct {
 	OrderID uint               `json:"order_id"`
@@ -285,6 +112,31 @@ func (uc *OrderUseCase) GetUserOrders(userID uint, offset, limit int) ([]*entity
 
 func (uc *OrderUseCase) ListOrdersByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error) {
 	return uc.orderRepo.ListByStatus(status, offset, limit)
+}
+
+func (uc *OrderUseCase) FailOrder(orderId uint) error {
+	// Get the order by ID
+	order, err := uc.orderRepo.GetByID(orderId)
+	if err != nil {
+		return fmt.Errorf("failed to get order by ID: %w", err)
+	}
+
+	// Update the order status to failed
+	if err := order.UpdateStatus(entity.OrderStatusFailed); err != nil {
+		return fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	// Save the updated order in the repository
+	if err := uc.orderRepo.Update(order); err != nil {
+		return fmt.Errorf("failed to save updated order: %w", err)
+	}
+
+	// Save the updated order with metadata
+	if err := uc.orderRepo.Update(order); err != nil {
+		return fmt.Errorf("failed to save order metadata: %w", err)
+	}
+
+	return nil
 }
 
 // CapturePayment captures an authorized payment

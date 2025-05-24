@@ -343,7 +343,7 @@ func (c *Checkout) recalculateTotals() {
 	c.TotalAmount = totalAmount
 	c.TotalWeight = totalWeight
 
-	// Calculate final amount
+	// Calculate final amount with explicit calculation to avoid floating point inconsistencies
 	c.FinalAmount = max(totalAmount+c.ShippingCost-c.DiscountAmount, 0)
 }
 
@@ -363,9 +363,12 @@ func (c *Checkout) ToOrder() *Order {
 		}
 	}
 
+	// Determine if this is a guest order
+	isGuestOrder := c.UserID == 0
+
 	// Create the order
 	order := &Order{
-		UserID:            c.UserID,
+		UserID:            c.UserID, // This will be 0 for guest orders
 		Items:             items,
 		TotalAmount:       c.TotalAmount,
 		TotalWeight:       c.TotalWeight,
@@ -375,10 +378,11 @@ func (c *Checkout) ToOrder() *Order {
 		Status:            OrderStatusPending,
 		ShippingAddr:      c.ShippingAddr,
 		BillingAddr:       c.BillingAddr,
-		CustomerDetails:   c.CustomerDetails,
+		CustomerDetails:   &c.CustomerDetails,
 		ShippingMethodID:  c.ShippingMethodID,
 		ShippingMethod:    c.ShippingMethod,
 		PaymentProvider:   c.PaymentProvider,
+		IsGuestOrder:      isGuestOrder,
 		PaymentMethod:     "wallet", // Default payment method
 		AppliedDiscount:   c.AppliedDiscount,
 		CheckoutSessionID: c.SessionID,

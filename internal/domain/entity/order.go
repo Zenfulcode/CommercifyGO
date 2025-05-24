@@ -19,6 +19,7 @@ const (
 	OrderStatusDelivered     OrderStatus = "delivered"
 	OrderStatusCancelled     OrderStatus = "cancelled"
 	OrderStatusRefunded      OrderStatus = "refunded"
+	OrderStatusFailed        OrderStatus = "failed"
 )
 
 // Order represents an order entity
@@ -42,8 +43,8 @@ type Order struct {
 	CheckoutSessionID string // Tracks which checkout session created this order
 
 	// Guest information (only used for guest orders where UserID is 0)
-	CustomerDetails CustomerDetails `json:"customer_details"`
-	IsGuestOrder    bool            `json:"is_guest_order"`
+	CustomerDetails *CustomerDetails `json:"customer_details"`
+	IsGuestOrder    bool             `json:"is_guest_order"`
 
 	// Shipping information
 	ShippingMethodID uint            `json:"shipping_method_id,omitempty"`
@@ -129,7 +130,7 @@ func NewOrder(userID uint, items []OrderItem, shippingAddr, billingAddr Address,
 		BillingAddr:     billingAddr,
 		CreatedAt:       now,
 		UpdatedAt:       now,
-		CustomerDetails: customerDetails,
+		CustomerDetails: &customerDetails,
 		IsGuestOrder:    false,
 	}, nil
 }
@@ -175,7 +176,7 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 		UpdatedAt:      now,
 
 		// Guest-specific information
-		CustomerDetails: customerDetails,
+		CustomerDetails: &customerDetails,
 		IsGuestOrder:    true,
 	}, nil
 }

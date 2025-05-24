@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -22,9 +24,10 @@ type CheckoutHandler struct {
 }
 
 // NewCheckoutHandler creates a new CheckoutHandler
-func NewCheckoutHandler(checkoutUseCase *usecase.CheckoutUseCase, logger logger.Logger) *CheckoutHandler {
+func NewCheckoutHandler(checkoutUseCase *usecase.CheckoutUseCase, orderUseCase *usecase.OrderUseCase, logger logger.Logger) *CheckoutHandler {
 	return &CheckoutHandler{
 		checkoutUseCase: checkoutUseCase,
+		orderUseCase:    orderUseCase,
 		logger:          logger,
 	}
 }
@@ -66,7 +69,7 @@ func (h *CheckoutHandler) GetCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -86,7 +89,7 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
 	// Try to find checkout by checkout session ID first
-	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
+	checkout, err := h.checkoutUseCase.GetOrCreateCheckout(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -110,7 +113,7 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -160,7 +163,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -204,7 +207,7 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -232,7 +235,7 @@ func (h *CheckoutHandler) ClearCheckout(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return empty checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -275,7 +278,7 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -318,7 +321,7 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -360,7 +363,7 @@ func (h *CheckoutHandler) SetCustomerDetails(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -393,7 +396,7 @@ func (h *CheckoutHandler) SetShippingMethod(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -425,7 +428,7 @@ func (h *CheckoutHandler) ApplyDiscount(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -451,7 +454,7 @@ func (h *CheckoutHandler) RemoveDiscount(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Convert entity to DTO
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -463,15 +466,23 @@ func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Reques
 	// Parse request body
 	var paymentInput dto.CompleteCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentInput); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		h.logger.Error("Failed to parse checkout completion request: %v", err)
+
+		errResponse := dto.ResponseDTO[any]{
+			Success: false,
+			Error:   fmt.Sprintf("Invalid request format: %v", err),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errResponse)
 		return
 	}
 
 	// Get checkout session ID
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
-	h.logger.Info("Converting checkout to order. Authenticated: %v, UserID: %d, CheckoutSessionID: %s",
-		false, 0, checkoutSessionID)
+	h.logger.Info("Converting checkout to order. CheckoutSessionID: %s", checkoutSessionID)
 
 	var order *entity.Order
 	var err error
@@ -479,8 +490,31 @@ func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Reques
 	// Try to find checkout by checkout session ID first
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
-		h.logger.Error("Failed to get checkout: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.logger.Error("Failed to get checkout with session ID %s: %v", checkoutSessionID, err)
+
+		errResponse := dto.ResponseDTO[any]{
+			Success: false,
+			Error:   "Checkout session not found or expired. Please restart the checkout process.",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(errResponse)
+		return
+	}
+
+	// Check if checkout has items
+	if checkout == nil || len(checkout.Items) == 0 {
+		h.logger.Error("Checkout %s has no items", checkoutSessionID)
+
+		errResponse := dto.ResponseDTO[any]{
+			Success: false,
+			Error:   "Checkout has no items. Please add items to your cart first.",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errResponse)
 		return
 	}
 
@@ -494,14 +528,64 @@ func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Reques
 
 	// Validate payment data
 	if paymentInput.PaymentData.CardDetails == nil && paymentInput.PaymentData.PhoneNumber == "" {
-		http.Error(w, "Payment data is required", http.StatusBadRequest)
+		h.logger.Error("Missing payment data: both CardDetails and PhoneNumber are empty")
+		http.Error(w, "Payment data is required: provide either card details or phone number", http.StatusBadRequest)
 		return
 	}
+
+	// Validate that the payment provider is specified
+	if paymentInput.PaymentProvider == "" {
+		h.logger.Error("Missing payment provider")
+		http.Error(w, "Payment provider is required", http.StatusBadRequest)
+		return
+	}
+
+	// Determine the payment method based on provided data
+	paymentMethod := service.PaymentMethodWallet
+	if paymentInput.PaymentData.CardDetails != nil {
+		paymentMethod = service.PaymentMethodCreditCard
+	}
+
+	processInput := usecase.ProcessPaymentInput{
+		PaymentProvider: service.PaymentProviderType(paymentInput.PaymentProvider),
+		PaymentMethod:   paymentMethod,
+		PhoneNumber:     paymentInput.PaymentData.PhoneNumber,
+	}
+
+	// Only add card details if they were provided
+	if paymentInput.PaymentData.CardDetails != nil {
+		processInput.CardDetails = &service.CardDetails{
+			CardNumber:     paymentInput.PaymentData.CardDetails.CardNumber,
+			ExpiryMonth:    paymentInput.PaymentData.CardDetails.ExpiryMonth,
+			ExpiryYear:     paymentInput.PaymentData.CardDetails.ExpiryYear,
+			CVV:            paymentInput.PaymentData.CardDetails.CVV,
+			CardholderName: paymentInput.PaymentData.CardDetails.CardholderName,
+			Token:          paymentInput.PaymentData.CardDetails.Token,
+		}
+	}
+
 	// Process payment
-	order, err = h.checkoutUseCase.ProcessPayment(order, paymentInput.PaymentData)
+	h.logger.Debug("Processing payment for order %d with provider %s and method %s",
+		order.ID, processInput.PaymentProvider, processInput.PaymentMethod)
+
+	processedOrder, err := h.checkoutUseCase.ProcessPayment(order, processInput)
 	if err != nil {
-		h.logger.Error("Failed to process payment: %v", err)
-		http.Error(w, "Failed to process payment", http.StatusBadRequest)
+		// print order
+		h.logger.Debug("Order details: %+v", order)
+
+		h.orderUseCase.FailOrder(order.ID)
+
+		h.logger.Error("Failed to process payment for order %d: %v", order.ID, err)
+
+		// Return a more informative error to the client
+		errResponse := dto.ResponseDTO[any]{
+			Success: false,
+			Error:   fmt.Sprintf("Payment processing failed: %v", err),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errResponse)
 		return
 	}
 
@@ -510,10 +594,14 @@ func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusCreated)
 
 	// Create response
-	response := dto.ResponseDTO[dto.OrderDTO]{
+	response := dto.ResponseDTO[dto.CheckoutCompleteResponse]{
 		Success: true,
 		Message: "Order created successfully",
-		Data:    convertToOrderDTO(order),
+		Data: dto.CheckoutCompleteResponse{
+			Order:          convertToOrderDTO(processedOrder),
+			ActionRequired: order.Status == entity.OrderStatusPendingAction,
+			ActionURL:      order.ActionURL,
+		},
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -549,7 +637,7 @@ func (h *CheckoutHandler) ListAdminCheckouts(w http.ResponseWriter, r *http.Requ
 	// Convert checkouts to DTOs
 	checkoutDTOs := make([]dto.CheckoutDTO, len(checkouts))
 	for i, checkout := range checkouts {
-		checkoutDTOs[i] = convertToCheckoutDTO(checkout)
+		checkoutDTOs[i] = dto.ConvertToCheckoutDTO(checkout)
 	}
 
 	// Create response
@@ -594,7 +682,7 @@ func (h *CheckoutHandler) GetAdminCheckout(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Convert checkout to DTO and return response
-	checkoutDTO := convertToCheckoutDTO(checkout)
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
 	response := dto.ResponseDTO[dto.CheckoutDTO]{
 		Success: true,
 		Data:    checkoutDTO,
@@ -630,106 +718,4 @@ func (h *CheckoutHandler) DeleteAdminCheckout(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
-
-// Helper function to convert checkout entity to DTO
-func convertToCheckoutDTO(checkout *entity.Checkout) dto.CheckoutDTO {
-	// Convert checkout items
-	items := make([]dto.CheckoutItemDTO, len(checkout.Items))
-	for i, item := range checkout.Items {
-		items[i] = dto.CheckoutItemDTO{
-			ID:          item.ID,
-			ProductID:   item.ProductID,
-			VariantID:   item.ProductVariantID,
-			ProductName: item.ProductName,
-			VariantName: item.VariantName,
-			SKU:         item.SKU,
-			Price:       float64(item.Price) / 100, // Convert cents to currency units
-			Quantity:    item.Quantity,
-			Weight:      item.Weight,
-			Subtotal:    float64(item.Price*int64(item.Quantity)) / 100, // Convert cents to currency units
-			CreatedAt:   item.CreatedAt,
-			UpdatedAt:   item.UpdatedAt,
-		}
-	}
-
-	// Convert shipping method if exists
-	var shippingMethod *dto.ShippingMethodDTO
-	if checkout.ShippingMethod != nil {
-		shippingMethod = &dto.ShippingMethodDTO{
-			ID:          checkout.ShippingMethod.ID,
-			Name:        checkout.ShippingMethod.Name,
-			Description: checkout.ShippingMethod.Description,
-			Cost:        float64(checkout.ShippingCost) / 100, // Use checkout.ShippingCost instead of ShippingMethod.Cost
-		}
-	}
-
-	// Convert applied discount if exists
-	var appliedDiscount *dto.AppliedDiscountDTO
-	if checkout.AppliedDiscount != nil {
-		// Based on the code we've seen, it looks like AppliedDiscount has these fields:
-		// DiscountID, DiscountCode, DiscountAmount
-		appliedDiscount = &dto.AppliedDiscountDTO{
-			ID:     checkout.AppliedDiscount.DiscountID,
-			Code:   checkout.AppliedDiscount.DiscountCode,
-			Type:   "",                                                     // We don't have this info in the AppliedDiscount entity
-			Method: "",                                                     // We don't have this info in the AppliedDiscount entity
-			Value:  0,                                                      // We don't have this info in the AppliedDiscount entity
-			Amount: float64(checkout.AppliedDiscount.DiscountAmount) / 100, // Convert cents to currency units
-		}
-	}
-
-	// Convert addresses
-	shippingAddress := dto.AddressDTO{
-		AddressLine1: checkout.ShippingAddr.Street,
-		AddressLine2: "", // Entity doesn't have AddressLine2
-		City:         checkout.ShippingAddr.City,
-		State:        checkout.ShippingAddr.State,
-		PostalCode:   checkout.ShippingAddr.PostalCode,
-		Country:      checkout.ShippingAddr.Country,
-	}
-
-	billingAddress := dto.AddressDTO{
-		AddressLine1: checkout.BillingAddr.Street,
-		AddressLine2: "", // Entity doesn't have AddressLine2
-		City:         checkout.BillingAddr.City,
-		State:        checkout.BillingAddr.State,
-		PostalCode:   checkout.BillingAddr.PostalCode,
-		Country:      checkout.BillingAddr.Country,
-	}
-
-	// Convert customer details
-	customerDetails := dto.CustomerDetailsDTO{
-		Email:    checkout.CustomerDetails.Email,
-		Phone:    checkout.CustomerDetails.Phone,
-		FullName: checkout.CustomerDetails.FullName,
-	}
-
-	return dto.CheckoutDTO{
-		ID:               checkout.ID,
-		UserID:           checkout.UserID,
-		SessionID:        checkout.SessionID,
-		Items:            items,
-		Status:           string(checkout.Status),
-		ShippingAddress:  shippingAddress,
-		BillingAddress:   billingAddress,
-		ShippingMethodID: checkout.ShippingMethodID,
-		ShippingMethod:   shippingMethod,
-		PaymentProvider:  checkout.PaymentProvider,
-		TotalAmount:      float64(checkout.TotalAmount) / 100,  // Convert cents to currency units
-		ShippingCost:     float64(checkout.ShippingCost) / 100, // Convert cents to currency units
-		TotalWeight:      checkout.TotalWeight,
-		CustomerDetails:  customerDetails,
-		Currency:         checkout.Currency,
-		DiscountCode:     checkout.DiscountCode,
-		DiscountAmount:   float64(checkout.DiscountAmount) / 100, // Convert cents to currency units
-		FinalAmount:      float64(checkout.FinalAmount) / 100,    // Convert cents to currency units
-		AppliedDiscount:  appliedDiscount,
-		CreatedAt:        checkout.CreatedAt,
-		UpdatedAt:        checkout.UpdatedAt,
-		LastActivityAt:   checkout.LastActivityAt,
-		ExpiresAt:        checkout.ExpiresAt,
-		CompletedAt:      checkout.CompletedAt,
-		ConvertedOrderID: checkout.ConvertedOrderID,
-	}
 }
