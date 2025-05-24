@@ -17,7 +17,7 @@ export interface CheckoutDTO {
   shipping_address: AddressDTO;
   billing_address: AddressDTO;
   shipping_method_id?: number /* uint */;
-  shipping_method?: ShippingMethodDTO;
+  shipping_method?: ShippingMethodDetailDTO;
   payment_provider?: string;
   total_amount: number /* float64 */;
   shipping_cost: number /* float64 */;
@@ -51,15 +51,6 @@ export interface CheckoutItemDTO {
   subtotal: number /* float64 */;
   created_at: string;
   updated_at: string;
-}
-/**
- * ShippingMethodDTO represents a shipping method in the checkout
- */
-export interface ShippingMethodDTO {
-  id: number /* uint */;
-  name: string;
-  description: string;
-  cost: number /* float64 */;
 }
 /**
  * CustomerDetailsDTO represents customer information for a checkout
@@ -225,6 +216,84 @@ export interface AddressDTO {
   state: string;
   postal_code: string;
   country: string;
+}
+
+//////////
+// source: discount.go
+
+/**
+ * DiscountDTO represents a discount in the system
+ */
+export interface DiscountDTO {
+  id: number /* uint */;
+  code: string;
+  type: string;
+  method: string;
+  value: number /* float64 */;
+  min_order_value: number /* float64 */;
+  max_discount_value: number /* float64 */;
+  product_ids?: number /* uint */[];
+  category_ids?: number /* uint */[];
+  start_date: string;
+  end_date: string;
+  usage_limit: number /* int */;
+  current_usage: number /* int */;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateDiscountRequest represents the data needed to create a new discount
+ */
+export interface CreateDiscountRequest {
+  code: string;
+  type: string;
+  method: string;
+  value: number /* float64 */;
+  min_order_value: number /* float64 */;
+  max_discount_value: number /* float64 */;
+  product_ids?: number /* uint */[];
+  category_ids?: number /* uint */[];
+  start_date: string;
+  end_date: string;
+  usage_limit: number /* int */;
+}
+/**
+ * UpdateDiscountRequest represents the data needed to update a discount
+ */
+export interface UpdateDiscountRequest {
+  code?: string;
+  type?: string;
+  method?: string;
+  value?: number /* float64 */;
+  min_order_value?: number /* float64 */;
+  max_discount_value?: number /* float64 */;
+  product_ids?: number /* uint */[];
+  category_ids?: number /* uint */[];
+  start_date?: string;
+  end_date?: string;
+  usage_limit?: number /* int */;
+  active: boolean;
+}
+/**
+ * ValidateDiscountRequest represents the data needed to validate a discount code
+ */
+export interface ValidateDiscountRequest {
+  discount_code: string;
+}
+/**
+ * ValidateDiscountResponse represents the response for discount validation
+ */
+export interface ValidateDiscountResponse {
+  valid: boolean;
+  reason?: string;
+  discount_id?: number /* uint */;
+  code?: string;
+  type?: string;
+  method?: string;
+  value?: number /* float64 */;
+  min_order_value?: number /* float64 */;
+  max_discount_value?: number /* float64 */;
 }
 
 //////////
@@ -456,6 +525,193 @@ export interface UpdateProductRequest {
  */
 export interface ProductListResponse {
   ListResponseDTO: ListResponseDTO<ProductDTO>;
+}
+
+//////////
+// source: shipping.go
+
+/**
+ * ShippingMethodDetailDTO represents a shipping method in the system with full details
+ */
+export interface ShippingMethodDetailDTO {
+  id: number /* uint */;
+  name: string;
+  description: string;
+  estimated_delivery_days: number /* int */;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateShippingMethodRequest represents the data needed to create a new shipping method
+ */
+export interface CreateShippingMethodRequest {
+  name: string;
+  description: string;
+  estimated_delivery_days: number /* int */;
+}
+/**
+ * UpdateShippingMethodRequest represents the data needed to update a shipping method
+ */
+export interface UpdateShippingMethodRequest {
+  name?: string;
+  description?: string;
+  estimated_delivery_days?: number /* int */;
+  active: boolean;
+}
+/**
+ * ShippingZoneDTO represents a shipping zone in the system
+ */
+export interface ShippingZoneDTO {
+  id: number /* uint */;
+  name: string;
+  description: string;
+  countries: string[];
+  states: string[];
+  zip_codes: string[];
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateShippingZoneRequest represents the data needed to create a new shipping zone
+ */
+export interface CreateShippingZoneRequest {
+  name: string;
+  description: string;
+  countries: string[];
+  states: string[];
+  zip_codes: string[];
+}
+/**
+ * UpdateShippingZoneRequest represents the data needed to update a shipping zone
+ */
+export interface UpdateShippingZoneRequest {
+  name?: string;
+  description?: string;
+  countries?: string[];
+  states?: string[];
+  zip_codes?: string[];
+  active: boolean;
+}
+/**
+ * ShippingRateDTO represents a shipping rate in the system
+ */
+export interface ShippingRateDTO {
+  id: number /* uint */;
+  shipping_method_id: number /* uint */;
+  shipping_method?: ShippingMethodDetailDTO;
+  shipping_zone_id: number /* uint */;
+  shipping_zone?: ShippingZoneDTO;
+  base_rate: number /* float64 */;
+  min_order_value: number /* float64 */;
+  free_shipping_threshold?: number /* float64 */;
+  weight_based_rates?: WeightBasedRateDTO[];
+  value_based_rates?: ValueBasedRateDTO[];
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateShippingRateRequest represents the data needed to create a new shipping rate
+ */
+export interface CreateShippingRateRequest {
+  shipping_method_id: number /* uint */;
+  shipping_zone_id: number /* uint */;
+  base_rate: number /* float64 */;
+  min_order_value: number /* float64 */;
+  free_shipping_threshold?: number /* float64 */;
+  active: boolean;
+}
+/**
+ * UpdateShippingRateRequest represents the data needed to update a shipping rate
+ */
+export interface UpdateShippingRateRequest {
+  base_rate?: number /* float64 */;
+  min_order_value?: number /* float64 */;
+  free_shipping_threshold?: number /* float64 */;
+  active: boolean;
+}
+/**
+ * WeightBasedRateDTO represents a weight-based rate in the system
+ */
+export interface WeightBasedRateDTO {
+  id: number /* uint */;
+  shipping_rate_id: number /* uint */;
+  min_weight: number /* float64 */;
+  max_weight: number /* float64 */;
+  rate: number /* float64 */;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateWeightBasedRateRequest represents the data needed to create a weight-based rate
+ */
+export interface CreateWeightBasedRateRequest {
+  shipping_rate_id: number /* uint */;
+  min_weight: number /* float64 */;
+  max_weight: number /* float64 */;
+  rate: number /* float64 */;
+}
+/**
+ * ValueBasedRateDTO represents a value-based rate in the system
+ */
+export interface ValueBasedRateDTO {
+  id: number /* uint */;
+  shipping_rate_id: number /* uint */;
+  min_order_value: number /* float64 */;
+  max_order_value: number /* float64 */;
+  rate: number /* float64 */;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateValueBasedRateRequest represents the data needed to create a value-based rate
+ */
+export interface CreateValueBasedRateRequest {
+  shipping_rate_id: number /* uint */;
+  min_order_value: number /* float64 */;
+  max_order_value: number /* float64 */;
+  rate: number /* float64 */;
+}
+/**
+ * ShippingOptionDTO represents a shipping option with calculated cost
+ */
+export interface ShippingOptionDTO {
+  shipping_rate_id: number /* uint */;
+  shipping_method_id: number /* uint */;
+  name: string;
+  description: string;
+  estimated_delivery_days: number /* int */;
+  cost: number /* float64 */;
+  free_shipping: boolean;
+}
+/**
+ * CalculateShippingOptionsRequest represents the request to calculate shipping options
+ */
+export interface CalculateShippingOptionsRequest {
+  address: AddressDTO;
+  order_value: number /* float64 */;
+  order_weight: number /* float64 */;
+}
+/**
+ * CalculateShippingOptionsResponse represents the response with available shipping options
+ */
+export interface CalculateShippingOptionsResponse {
+  options: ShippingOptionDTO[];
+}
+/**
+ * CalculateShippingCostRequest represents the request to calculate shipping cost for a specific rate
+ */
+export interface CalculateShippingCostRequest {
+  order_value: number /* float64 */;
+  order_weight: number /* float64 */;
+}
+/**
+ * CalculateShippingCostResponse represents the response with calculated shipping cost
+ */
+export interface CalculateShippingCostResponse {
+  cost: number /* float64 */;
 }
 
 //////////

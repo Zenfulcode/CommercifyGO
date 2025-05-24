@@ -8,31 +8,31 @@ import (
 
 // CheckoutDTO represents a checkout session in the system
 type CheckoutDTO struct {
-	ID               uint                `json:"id"`
-	UserID           uint                `json:"user_id,omitempty"`
-	SessionID        string              `json:"session_id,omitempty"`
-	Items            []CheckoutItemDTO   `json:"items"`
-	Status           string              `json:"status"`
-	ShippingAddress  AddressDTO          `json:"shipping_address"`
-	BillingAddress   AddressDTO          `json:"billing_address"`
-	ShippingMethodID uint                `json:"shipping_method_id,omitempty"`
-	ShippingMethod   *ShippingMethodDTO  `json:"shipping_method,omitempty"`
-	PaymentProvider  string              `json:"payment_provider,omitempty"`
-	TotalAmount      float64             `json:"total_amount"`
-	ShippingCost     float64             `json:"shipping_cost"`
-	TotalWeight      float64             `json:"total_weight"`
-	CustomerDetails  CustomerDetailsDTO  `json:"customer_details"`
-	Currency         string              `json:"currency"`
-	DiscountCode     string              `json:"discount_code,omitempty"`
-	DiscountAmount   float64             `json:"discount_amount"`
-	FinalAmount      float64             `json:"final_amount"`
-	AppliedDiscount  *AppliedDiscountDTO `json:"applied_discount,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
-	LastActivityAt   time.Time           `json:"last_activity_at"`
-	ExpiresAt        time.Time           `json:"expires_at"`
-	CompletedAt      *time.Time          `json:"completed_at,omitempty"`
-	ConvertedOrderID uint                `json:"converted_order_id,omitempty"`
+	ID               uint                     `json:"id"`
+	UserID           uint                     `json:"user_id,omitempty"`
+	SessionID        string                   `json:"session_id,omitempty"`
+	Items            []CheckoutItemDTO        `json:"items"`
+	Status           string                   `json:"status"`
+	ShippingAddress  AddressDTO               `json:"shipping_address"`
+	BillingAddress   AddressDTO               `json:"billing_address"`
+	ShippingMethodID uint                     `json:"shipping_method_id,omitempty"`
+	ShippingMethod   *ShippingMethodDetailDTO `json:"shipping_method,omitempty"`
+	PaymentProvider  string                   `json:"payment_provider,omitempty"`
+	TotalAmount      float64                  `json:"total_amount"`
+	ShippingCost     float64                  `json:"shipping_cost"`
+	TotalWeight      float64                  `json:"total_weight"`
+	CustomerDetails  CustomerDetailsDTO       `json:"customer_details"`
+	Currency         string                   `json:"currency"`
+	DiscountCode     string                   `json:"discount_code,omitempty"`
+	DiscountAmount   float64                  `json:"discount_amount"`
+	FinalAmount      float64                  `json:"final_amount"`
+	AppliedDiscount  *AppliedDiscountDTO      `json:"applied_discount,omitempty"`
+	CreatedAt        time.Time                `json:"created_at"`
+	UpdatedAt        time.Time                `json:"updated_at"`
+	LastActivityAt   time.Time                `json:"last_activity_at"`
+	ExpiresAt        time.Time                `json:"expires_at"`
+	CompletedAt      *time.Time               `json:"completed_at,omitempty"`
+	ConvertedOrderID uint                     `json:"converted_order_id,omitempty"`
 }
 
 // CheckoutItemDTO represents an item in a checkout
@@ -49,14 +49,6 @@ type CheckoutItemDTO struct {
 	Subtotal    float64   `json:"subtotal"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// ShippingMethodDTO represents a shipping method in the checkout
-type ShippingMethodDTO struct {
-	ID          uint    `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Cost        float64 `json:"cost"`
 }
 
 // CustomerDetailsDTO represents customer information for a checkout
@@ -217,12 +209,8 @@ func ConvertToCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
 
 	// Convert shipping method if present
 	if checkout.ShippingMethod != nil {
-		dto.ShippingMethod = &ShippingMethodDTO{
-			ID:          checkout.ShippingMethod.ID,
-			Name:        checkout.ShippingMethod.Name,
-			Description: checkout.ShippingMethod.Description,
-			Cost:        float64(checkout.ShippingCost) / 100,
-		}
+		shippingMethodDTO := ConvertToShippingMethodDetailDTO(checkout.ShippingMethod)
+		dto.ShippingMethod = &shippingMethodDTO
 	}
 
 	// Convert shipping address
