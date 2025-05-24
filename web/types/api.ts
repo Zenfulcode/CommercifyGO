@@ -219,6 +219,147 @@ export interface AddressDTO {
 }
 
 //////////
+// source: currency.go
+
+/**
+ * CurrencyDTO represents a currency entity
+ */
+export interface CurrencyDTO {
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate: number /* float64 */;
+  is_enabled: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CurrencyDetailDTO represents detailed currency information
+ */
+export interface CurrencyDetailDTO {
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate: number /* float64 */;
+  is_enabled: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CurrencySummaryDTO represents a simplified currency view
+ */
+export interface CurrencySummaryDTO {
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate: number /* float64 */;
+  is_default: boolean;
+}
+/**
+ * CreateCurrencyRequest represents a request to create a new currency
+ */
+export interface CreateCurrencyRequest {
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate: number /* float64 */;
+  is_enabled: boolean;
+  is_default: boolean;
+}
+/**
+ * UpdateCurrencyRequest represents a request to update an existing currency
+ */
+export interface UpdateCurrencyRequest {
+  name: string;
+  symbol: string;
+  exchange_rate: number /* float64 */;
+  is_enabled?: boolean;
+  is_default?: boolean;
+}
+/**
+ * ConvertAmountRequest represents a request to convert an amount between currencies
+ */
+export interface ConvertAmountRequest {
+  amount: number /* float64 */;
+  from_currency: string;
+  to_currency: string;
+}
+/**
+ * SetDefaultCurrencyRequest represents a request to set a currency as default
+ */
+export interface SetDefaultCurrencyRequest {
+  code: string;
+}
+/**
+ * CreateCurrencyResponse represents the response after creating a currency
+ */
+export interface CreateCurrencyResponse {
+  currency: CurrencyDetailDTO;
+}
+/**
+ * UpdateCurrencyResponse represents the response after updating a currency
+ */
+export interface UpdateCurrencyResponse {
+  currency: CurrencyDetailDTO;
+}
+/**
+ * GetCurrencyResponse represents the response for getting a currency
+ */
+export interface GetCurrencyResponse {
+  currency: CurrencyDetailDTO;
+}
+/**
+ * ListCurrenciesResponse represents the response for listing currencies
+ */
+export interface ListCurrenciesResponse {
+  currencies: CurrencyDTO[];
+  total: number /* int */;
+}
+/**
+ * ListEnabledCurrenciesResponse represents the response for listing enabled currencies
+ */
+export interface ListEnabledCurrenciesResponse {
+  currencies: CurrencySummaryDTO[];
+  total: number /* int */;
+}
+/**
+ * GetDefaultCurrencyResponse represents the response for getting the default currency
+ */
+export interface GetDefaultCurrencyResponse {
+  currency: CurrencyDetailDTO;
+}
+/**
+ * SetDefaultCurrencyResponse represents the response after setting default currency
+ */
+export interface SetDefaultCurrencyResponse {
+  currency: CurrencyDetailDTO;
+}
+/**
+ * ConvertAmountResponse represents the response for currency conversion
+ */
+export interface ConvertAmountResponse {
+  from: ConvertedAmountDTO;
+  to: ConvertedAmountDTO;
+}
+/**
+ * ConvertedAmountDTO represents an amount in a specific currency
+ */
+export interface ConvertedAmountDTO {
+  currency: string;
+  amount: number /* float64 */;
+  cents: number /* int64 */;
+}
+/**
+ * DeleteCurrencyResponse represents the response after deleting a currency
+ */
+export interface DeleteCurrencyResponse {
+  status: string;
+  message: string;
+}
+
+//////////
 // source: discount.go
 
 /**
