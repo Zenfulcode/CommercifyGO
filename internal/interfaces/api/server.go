@@ -119,9 +119,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/checkout/billing-address", checkoutHandler.SetBillingAddress).Methods(http.MethodPut)
 	api.HandleFunc("/checkout/customer-details", checkoutHandler.SetCustomerDetails).Methods(http.MethodPut)
 	api.HandleFunc("/checkout/shipping-method", checkoutHandler.SetShippingMethod).Methods(http.MethodPut)
+	api.HandleFunc("/checkout/currency", checkoutHandler.SetCurrency).Methods(http.MethodPut)
 	api.HandleFunc("/checkout/discount", checkoutHandler.ApplyDiscount).Methods(http.MethodPost)
 	api.HandleFunc("/checkout/discount", checkoutHandler.RemoveDiscount).Methods(http.MethodDelete)
-	api.HandleFunc("/checkout/complete", checkoutHandler.CompleteCheckout).Methods(http.MethodPost)
+	api.HandleFunc("/checkout/complete", checkoutHandler.CompleteOrder).Methods(http.MethodPost)
 	// api.HandleFunc("/guest/checkout/convert", checkoutHandler.ConvertGuestCheckoutToUserCheckout).Methods(http.MethodPost)
 
 	// Setup payment provider webhooks

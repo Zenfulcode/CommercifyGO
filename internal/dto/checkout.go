@@ -121,6 +121,11 @@ type SetShippingMethodRequest struct {
 	ShippingMethodID uint `json:"shipping_method_id"`
 }
 
+// SetCurrencyRequest represents the data needed to change checkout currency
+type SetCurrencyRequest struct {
+	Currency string `json:"currency"`
+}
+
 // ApplyDiscountRequest represents the data needed to apply a discount
 type ApplyDiscountRequest struct {
 	DiscountCode string `json:"discount_code"`

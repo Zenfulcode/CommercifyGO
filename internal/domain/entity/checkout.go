@@ -243,6 +243,33 @@ func (c *Checkout) SetPaymentProvider(provider string) {
 	c.LastActivityAt = time.Now()
 }
 
+// SetCurrency changes the currency of the checkout and converts all prices
+func (c *Checkout) SetCurrency(newCurrency string, fromCurrency *Currency, toCurrency *Currency) {
+	if c.Currency == newCurrency {
+		// No change needed
+		return
+	}
+
+	// Convert all item prices
+	for i := range c.Items {
+		c.Items[i].Price = fromCurrency.ConvertAmount(c.Items[i].Price, toCurrency)
+	}
+
+	// Convert shipping cost
+	c.ShippingCost = fromCurrency.ConvertAmount(c.ShippingCost, toCurrency)
+
+	// Convert discount amount
+	c.DiscountAmount = fromCurrency.ConvertAmount(c.DiscountAmount, toCurrency)
+
+	// Update currency
+	c.Currency = newCurrency
+
+	// Recalculate totals with new currency prices
+	c.recalculateTotals()
+	c.UpdatedAt = time.Now()
+	c.LastActivityAt = time.Now()
+}
+
 // ApplyDiscount applies a discount to the checkout
 func (c *Checkout) ApplyDiscount(discount *Discount) {
 	if discount == nil {

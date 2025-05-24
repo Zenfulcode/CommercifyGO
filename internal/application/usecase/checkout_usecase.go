@@ -766,3 +766,55 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 
 	return checkout, nil
 }
+
+// ChangeCurrency changes the currency of a checkout and converts all prices
+func (uc *CheckoutUseCase) ChangeCurrency(checkout *entity.Checkout, newCurrencyCode string) (*entity.Checkout, error) {
+	// Validate that the new currency exists and is enabled
+	toCurrency, err := uc.currencyRepo.GetByCode(newCurrencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("currency %s not found: %w", newCurrencyCode, err)
+	}
+
+	if !toCurrency.IsEnabled {
+		return nil, fmt.Errorf("currency %s is not enabled", newCurrencyCode)
+	}
+
+	// Get the current currency
+	fromCurrency, err := uc.currencyRepo.GetByCode(checkout.Currency)
+	if err != nil {
+		return nil, fmt.Errorf("current currency %s not found: %w", checkout.Currency, err)
+	}
+
+	// Convert the checkout currency and all prices
+	checkout.SetCurrency(newCurrencyCode, fromCurrency, toCurrency)
+
+	// Update checkout in repository
+	err = uc.checkoutRepo.Update(checkout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update checkout: %w", err)
+	}
+
+	return checkout, nil
+}
+
+// ChangeCurrencyBySessionID changes the currency of a checkout by session ID
+func (uc *CheckoutUseCase) ChangeCurrencyBySessionID(sessionID string, newCurrencyCode string) (*entity.Checkout, error) {
+	// Get checkout by session ID
+	checkout, err := uc.checkoutRepo.GetBySessionID(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("checkout not found for session %s: %w", sessionID, err)
+	}
+
+	return uc.ChangeCurrency(checkout, newCurrencyCode)
+}
+
+// ChangeCurrencyByUserID changes the currency of a checkout by user ID
+func (uc *CheckoutUseCase) ChangeCurrencyByUserID(userID uint, newCurrencyCode string) (*entity.Checkout, error) {
+	// Get checkout by user ID
+	checkout, err := uc.checkoutRepo.GetByUserID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("checkout not found for user %d: %w", userID, err)
+	}
+
+	return uc.ChangeCurrency(checkout, newCurrencyCode)
+}

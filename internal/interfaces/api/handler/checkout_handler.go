@@ -445,7 +445,9 @@ func (h *CheckoutHandler) RemoveDiscount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.checkoutUseCase.RemoveDiscountCode(checkout)
+	checkout.ApplyDiscount(nil)
+
+	checkout, err = h.checkoutUseCase.UpdateCheckout(checkout)
 
 	if err != nil {
 		h.logger.Error("Failed to remove discount: %v", err)
@@ -461,8 +463,39 @@ func (h *CheckoutHandler) RemoveDiscount(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(checkoutDTO)
 }
 
+// SetCurrency handles changing the currency for a checkout
+func (h *CheckoutHandler) SetCurrency(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var request dto.SetCurrencyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate currency code
+	if request.Currency == "" {
+		http.Error(w, "Currency code is required", http.StatusBadRequest)
+		return
+	}
+
+	checkoutSessionID := h.getCheckoutSessionID(w, r)
+	checkout, err := h.checkoutUseCase.ChangeCurrencyBySessionID(checkoutSessionID, request.Currency)
+	if err != nil {
+		h.logger.Error("Failed to change checkout currency: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Convert entity to DTO
+	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
+
+	// Return updated checkout
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(checkoutDTO)
+}
+
 // CompleteOrder handles converting a checkout to an order
-func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Request) {
+func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var paymentInput dto.CompleteCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentInput); err != nil {
