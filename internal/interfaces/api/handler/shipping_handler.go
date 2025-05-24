@@ -7,8 +7,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
-	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
 
@@ -29,22 +29,18 @@ func NewShippingHandler(shippingUseCase *usecase.ShippingUseCase, logger logger.
 // CalculateShippingOptions handles calculating available shipping options for an address and order details
 func (h *ShippingHandler) CalculateShippingOptions(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var requestBody struct {
-		Address     entity.Address `json:"address"`
-		OrderValue  float64        `json:"order_value"`
-		OrderWeight float64        `json:"order_weight"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	var request dto.CalculateShippingOptionsRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Calculate shipping options
-	options, err := h.shippingUseCase.CalculateShippingOptions(
-		requestBody.Address,
-		money.ToCents(requestBody.OrderValue),
-		requestBody.OrderWeight,
+	// Convert to domain address and calculate shipping options
+	address := request.Address.ToDomainAddress()
+	shippingOptions, err := h.shippingUseCase.CalculateShippingOptions(
+		address,
+		money.ToCents(request.OrderValue),
+		request.OrderWeight,
 	)
 	if err != nil {
 		h.logger.Error("Failed to calculate shipping options: %v", err)
@@ -52,9 +48,14 @@ func (h *ShippingHandler) CalculateShippingOptions(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// Convert to DTO response
+	response := dto.CalculateShippingOptionsResponse{
+		Options: dto.ConvertShippingOptionListToDTO(shippingOptions.Options),
+	}
+
 	// Return shipping options
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(options)
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetShippingMethodByID handles retrieving a shipping method by ID
@@ -75,9 +76,10 @@ func (h *ShippingHandler) GetShippingMethodByID(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Return shipping method
+	// Convert to DTO and return
+	methodDTO := dto.ConvertToShippingMethodDetailDTO(method)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(method)
+	json.NewEncoder(w).Encode(methodDTO)
 }
 
 // ListShippingMethods handles listing all shipping methods
@@ -93,21 +95,23 @@ func (h *ShippingHandler) ListShippingMethods(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Return shipping methods
+	// Convert to DTOs and return
+	methodDTOs := dto.ConvertShippingMethodListToDTO(methods)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(methods)
+	json.NewEncoder(w).Encode(methodDTOs)
 }
 
 // CreateShippingMethod handles creating a new shipping method (admin only)
 func (h *ShippingHandler) CreateShippingMethod(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CreateShippingMethodInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateShippingMethodRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Create shipping method
+	// Convert to use case input and create shipping method
+	input := request.ToCreateShippingMethodInput()
 	method, err := h.shippingUseCase.CreateShippingMethod(input)
 	if err != nil {
 		h.logger.Error("Failed to create shipping method: %v", err)
@@ -115,10 +119,11 @@ func (h *ShippingHandler) CreateShippingMethod(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Return created shipping method
+	// Convert to DTO and return
+	methodDTO := dto.ConvertToShippingMethodDetailDTO(method)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(method)
+	json.NewEncoder(w).Encode(methodDTO)
 }
 
 // UpdateShippingMethod handles updating a shipping method (admin only)
@@ -132,16 +137,14 @@ func (h *ShippingHandler) UpdateShippingMethod(w http.ResponseWriter, r *http.Re
 	}
 
 	// Parse request body
-	var input usecase.UpdateShippingMethodInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.UpdateShippingMethodRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Set ID from URL
-	input.ID = uint(id)
-
-	// Update shipping method
+	// Convert to use case input and update shipping method
+	input := request.ToUpdateShippingMethodInput(uint(id))
 	method, err := h.shippingUseCase.UpdateShippingMethod(input)
 	if err != nil {
 		h.logger.Error("Failed to update shipping method: %v", err)
@@ -149,21 +152,23 @@ func (h *ShippingHandler) UpdateShippingMethod(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Return updated shipping method
+	// Convert to DTO and return
+	methodDTO := dto.ConvertToShippingMethodDetailDTO(method)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(method)
+	json.NewEncoder(w).Encode(methodDTO)
 }
 
 // CreateShippingZone handles creating a new shipping zone (admin only)
 func (h *ShippingHandler) CreateShippingZone(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CreateShippingZoneInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateShippingZoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Create shipping zone
+	// Convert to use case input and create shipping zone
+	input := request.ToCreateShippingZoneInput()
 	zone, err := h.shippingUseCase.CreateShippingZone(input)
 	if err != nil {
 		h.logger.Error("Failed to create shipping zone: %v", err)
@@ -171,10 +176,11 @@ func (h *ShippingHandler) CreateShippingZone(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Return created shipping zone
+	// Convert to DTO and return
+	zoneDTO := dto.ConvertToShippingZoneDTO(zone)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(zone)
+	json.NewEncoder(w).Encode(zoneDTO)
 }
 
 // GetShippingZoneByID handles retrieving a shipping zone by ID
@@ -195,9 +201,10 @@ func (h *ShippingHandler) GetShippingZoneByID(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Return shipping zone
+	// Convert to DTO and return
+	zoneDTO := dto.ConvertToShippingZoneDTO(zone)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(zone)
+	json.NewEncoder(w).Encode(zoneDTO)
 }
 
 // ListShippingZones handles listing all shipping zones
@@ -213,9 +220,10 @@ func (h *ShippingHandler) ListShippingZones(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Return shipping zones
+	// Convert to DTOs and return
+	zoneDTOs := dto.ConvertShippingZoneListToDTO(zones)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(zones)
+	json.NewEncoder(w).Encode(zoneDTOs)
 }
 
 // UpdateShippingZone handles updating a shipping zone (admin only)
@@ -229,16 +237,14 @@ func (h *ShippingHandler) UpdateShippingZone(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var input usecase.UpdateShippingZoneInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.UpdateShippingZoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Set ID from URL
-	input.ID = uint(id)
-
-	// Update shipping zone
+	// Convert to use case input and update shipping zone
+	input := request.ToUpdateShippingZoneInput(uint(id))
 	zone, err := h.shippingUseCase.UpdateShippingZone(input)
 	if err != nil {
 		h.logger.Error("Failed to update shipping zone: %v", err)
@@ -246,21 +252,23 @@ func (h *ShippingHandler) UpdateShippingZone(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Return updated shipping zone
+	// Convert to DTO and return
+	zoneDTO := dto.ConvertToShippingZoneDTO(zone)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(zone)
+	json.NewEncoder(w).Encode(zoneDTO)
 }
 
 // CreateShippingRate handles creating a new shipping rate (admin only)
 func (h *ShippingHandler) CreateShippingRate(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CreateShippingRateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateShippingRateRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Create shipping rate
+	// Convert to use case input and create shipping rate
+	input := request.ToCreateShippingRateInput()
 	rate, err := h.shippingUseCase.CreateShippingRate(input)
 	if err != nil {
 		h.logger.Error("Failed to create shipping rate: %v", err)
@@ -268,10 +276,11 @@ func (h *ShippingHandler) CreateShippingRate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Return created shipping rate
+	// Convert to DTO and return
+	rateDTO := dto.ConvertToShippingRateDTO(rate)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(rate)
+	json.NewEncoder(w).Encode(rateDTO)
 }
 
 // GetShippingRateByID handles retrieving a shipping rate by ID
@@ -292,9 +301,10 @@ func (h *ShippingHandler) GetShippingRateByID(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Return shipping rate
+	// Convert to DTO and return
+	rateDTO := dto.ConvertToShippingRateDTO(rate)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rate)
+	json.NewEncoder(w).Encode(rateDTO)
 }
 
 // UpdateShippingRate handles updating a shipping rate (admin only)
@@ -308,16 +318,14 @@ func (h *ShippingHandler) UpdateShippingRate(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var input usecase.UpdateShippingRateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.UpdateShippingRateRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Set ID from URL
-	input.ID = uint(id)
-
-	// Update shipping rate
+	// Convert to use case input and update shipping rate
+	input := request.ToUpdateShippingRateInput(uint(id))
 	rate, err := h.shippingUseCase.UpdateShippingRate(input)
 	if err != nil {
 		h.logger.Error("Failed to update shipping rate: %v", err)
@@ -325,21 +333,23 @@ func (h *ShippingHandler) UpdateShippingRate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Return updated shipping rate
+	// Convert to DTO and return
+	rateDTO := dto.ConvertToShippingRateDTO(rate)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rate)
+	json.NewEncoder(w).Encode(rateDTO)
 }
 
 // CreateWeightBasedRate handles creating a new weight-based shipping rate (admin only)
 func (h *ShippingHandler) CreateWeightBasedRate(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CreateWeightBasedRateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateWeightBasedRateRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Create weight-based rate
+	// Convert to use case input and create weight-based rate
+	input := request.ToCreateWeightBasedRateInput()
 	rate, err := h.shippingUseCase.CreateWeightBasedRate(input)
 	if err != nil {
 		h.logger.Error("Failed to create weight-based rate: %v", err)
@@ -347,22 +357,24 @@ func (h *ShippingHandler) CreateWeightBasedRate(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Return created weight-based rate
+	// Convert to DTO and return
+	rateDTO := dto.ConvertToWeightBasedRateDTO(rate)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(rate)
+	json.NewEncoder(w).Encode(rateDTO)
 }
 
 // CreateValueBasedRate handles creating a new value-based shipping rate (admin only)
 func (h *ShippingHandler) CreateValueBasedRate(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CreateValueBasedRateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateValueBasedRateRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Create value-based rate
+	// Convert to use case input and create value-based rate
+	input := request.ToCreateValueBasedRateInput()
 	rate, err := h.shippingUseCase.CreateValueBasedRate(input)
 	if err != nil {
 		h.logger.Error("Failed to create value-based rate: %v", err)
@@ -370,10 +382,11 @@ func (h *ShippingHandler) CreateValueBasedRate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Return created value-based rate
+	// Convert to DTO and return
+	rateDTO := dto.ConvertToValueBasedRateDTO(rate)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(rate)
+	json.NewEncoder(w).Encode(rateDTO)
 }
 
 // GetShippingCost handles calculating shipping cost for a specific shipping rate
@@ -387,12 +400,8 @@ func (h *ShippingHandler) GetShippingCost(w http.ResponseWriter, r *http.Request
 	}
 
 	// Parse request body
-	var requestBody struct {
-		OrderValue  float64 `json:"order_value"`
-		OrderWeight float64 `json:"order_weight"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	var request dto.CalculateShippingCostRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -400,8 +409,8 @@ func (h *ShippingHandler) GetShippingCost(w http.ResponseWriter, r *http.Request
 	// Calculate shipping cost
 	cost, err := h.shippingUseCase.GetShippingCost(
 		uint(id),
-		money.ToCents(requestBody.OrderValue),
-		requestBody.OrderWeight,
+		money.ToCents(request.OrderValue),
+		request.OrderWeight,
 	)
 	if err != nil {
 		h.logger.Error("Failed to calculate shipping cost: %v", err)
@@ -409,9 +418,9 @@ func (h *ShippingHandler) GetShippingCost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Return shipping cost
-	response := map[string]float64{
-		"cost": money.FromCents(cost),
+	// Convert to DTO response and return
+	response := dto.CalculateShippingCostResponse{
+		Cost: money.FromCents(cost),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)

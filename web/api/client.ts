@@ -1,22 +1,53 @@
+/**
+ * @deprecated This client is deprecated. Use the new modular client from '../index.ts' instead.
+ *
+ * Migration example:
+ * ```typescript
+ * // Old way
+ * import { CommercifyClient } from './api/client';
+ * const client = new CommercifyClient('https://api.example.com', 'token');
+ *
+ * // New way
+ * import { createCommercifyClient } from '../index';
+ * const client = createCommercifyClient({
+ *   baseUrl: 'https://api.example.com',
+ *   token: 'token'
+ * });
+ *
+ * // Usage changes:
+ * // client.getProducts() -> client.products.getProducts()
+ * // client.signIn() -> client.auth.signIn()
+ * // client.getGuestCheckout() -> client.checkout.getGuestCheckout()
+ * ```
+ */
+
 import {
-  CartDTO,
-  OrderDTO,
-  ProductDTO,
-  UserDTO,
-  CreateOrderRequest,
-  AddToCartRequest,
-  UpdateUserRequest,
   ResponseDTO,
+  CreateOrderRequest,
+  OrderDTO,
   ListResponseDTO,
+  ProcessPaymentRequest,
+  ProductDTO,
+  CreateProductRequest,
+  UpdateProductRequest,
+  UserDTO,
+  UpdateUserRequest,
   UserLoginRequest,
   UserLoginResponse,
   CreateUserRequest,
-  CreateProductRequest,
-  UpdateProductRequest,
-  ProcessPaymentRequest,
-  UpdateCartItemRequest,
+  CheckoutDTO,
+  UpdateCheckoutItemRequest,
+  SetShippingAddressRequest,
+  SetBillingAddressRequest,
+  SetCustomerDetailsRequest,
+  SetShippingMethodRequest,
+  ApplyDiscountRequest,
+  AddToCheckoutRequest,
 } from "../types/api";
 
+/**
+ * @deprecated Use createCommercifyClient from '../index.ts' instead
+ */
 export class CommercifyClient {
   private baseUrl: string;
   private token?: string;
@@ -54,65 +85,52 @@ export class CommercifyClient {
     };
 
     const url = this.buildUrl(endpoint, params);
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+
+        // Create a more detailed error message
+        const errorMessage =
+          errorData?.error?.message || response.statusText || "Unknown error";
+        const error = new Error(`API request failed: ${errorMessage}`);
+
+        // Attach additional properties for error handling
+        (error as any).status = response.status;
+        (error as any).statusText = response.statusText;
+        (error as any).errorData = errorData;
+
+        throw error;
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      // If the error is already formatted by our code above, just rethrow it
+      if ((error as any).status) {
+        throw error;
+      }
+
+      // Otherwise, it's likely a network error or other issue
+      console.error("API Request Error:", error);
+      throw new Error(
+        `API request failed: ${
+          error instanceof Error ? error.message : "Network error"
+        }`
+      );
     }
-
-    return response.json();
-  }
-
-  // Cart endpoints
-  async getCart(): Promise<ResponseDTO<CartDTO>> {
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart", {
-      method: "GET",
-    });
-  }
-
-  async addToCart(data: AddToCartRequest): Promise<ResponseDTO<CartDTO>> {
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart/items", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCartItem(
-    productId: string,
-    data: UpdateCartItemRequest
-  ): Promise<ResponseDTO<CartDTO>> {
-    return this.request<ResponseDTO<CartDTO>>(
-      `/guest/cart/items/${productId}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }
-    );
-  }
-
-  async removeCartItem(productId: string): Promise<ResponseDTO<CartDTO>> {
-    return this.request<ResponseDTO<CartDTO>>(
-      `/guest/cart/items/${productId}`,
-      {
-        method: "DELETE",
-      }
-    );
-  }
-
-  async clearCart(): Promise<ResponseDTO<CartDTO>> {
-    return this.request<ResponseDTO<CartDTO>>("/guest/cart", {
-      method: "DELETE",
-    });
   }
 
   // Order endpoints
   async createOrder(
     orderData: CreateOrderRequest
   ): Promise<ResponseDTO<OrderDTO>> {
-    return this.request<ResponseDTO<OrderDTO>>("/guest/orders", {
+    return this.request<ResponseDTO<OrderDTO>>("/orders", {
       method: "POST",
       body: JSON.stringify(orderData),
     });
@@ -154,13 +172,10 @@ export class CommercifyClient {
     orderId: string,
     paymentData: ProcessPaymentRequest
   ): Promise<ResponseDTO<OrderDTO>> {
-    return this.request<ResponseDTO<OrderDTO>>(
-      `/guest/orders/${orderId}/payment`,
-      {
-        method: "POST",
-        body: JSON.stringify(paymentData),
-      }
-    );
+    return this.request<ResponseDTO<OrderDTO>>(`/orders/${orderId}/payment`, {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
   }
 
   async capturePayment(paymentId: string): Promise<ResponseDTO<OrderDTO>> {
@@ -292,6 +307,194 @@ export class CommercifyClient {
       method: "POST",
       body: JSON.stringify(userData),
     });
+  }
+
+  async getOrCreateCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
+      method: "GET",
+    });
+  }
+
+  async addCheckoutItem(
+    data: AddToCheckoutRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/items", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCheckoutItem(
+    productId: number,
+    data: UpdateCheckoutItemRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      `/api/checkout/items/${productId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async removeCheckoutItem(
+    productId: number
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      `/api/checkout/items/${productId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
+  async clearCheckout(): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout", {
+      method: "DELETE",
+    });
+  }
+
+  async setShippingAddress(
+    data: SetShippingAddressRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      "/api/checkout/shipping-address",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async setBillingAddress(
+    data: SetBillingAddressRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      "/api/checkout/billing-address",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async setCustomerDetails(
+    data: SetCustomerDetailsRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      "/api/checkout/customer-details",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async setShippingMethod(
+    data: SetShippingMethodRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      "/api/checkout/shipping-method",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async applyCheckoutDiscount(
+    data: ApplyDiscountRequest
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/discount", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeCheckoutDiscount(): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/discount", {
+      method: "DELETE",
+    });
+  }
+
+  async convertCheckoutToOrder(): Promise<ResponseDTO<OrderDTO>> {
+    return this.request<ResponseDTO<OrderDTO>>("/api/checkout/to-order", {
+      method: "POST",
+    });
+  }
+
+  async convertGuestCheckoutToUserCheckout(): Promise<
+    ResponseDTO<CheckoutDTO>
+  > {
+    return this.request<ResponseDTO<CheckoutDTO>>("/api/checkout/convert", {
+      method: "POST",
+    });
+  }
+
+  // Admin checkout endpoints
+  async getAdminCheckouts(params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+  }): Promise<ListResponseDTO<CheckoutDTO>> {
+    return this.request<ListResponseDTO<CheckoutDTO>>(
+      "/api/admin/checkouts",
+      {},
+      params
+    );
+  }
+
+  async getAdminCheckoutById(
+    checkoutId: number
+  ): Promise<ResponseDTO<CheckoutDTO>> {
+    return this.request<ResponseDTO<CheckoutDTO>>(
+      `/api/admin/checkouts/${checkoutId}`,
+      {
+        method: "GET",
+      }
+    );
+  }
+
+  async deleteAdminCheckout(checkoutId: number): Promise<ResponseDTO<string>> {
+    return this.request<ResponseDTO<string>>(
+      `/api/admin/checkouts/${checkoutId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
+  async getCheckoutsByUser(
+    userId: number,
+    params?: {
+      page?: number;
+      page_size?: number;
+      status?: string;
+    }
+  ): Promise<ListResponseDTO<CheckoutDTO>> {
+    return this.request<ListResponseDTO<CheckoutDTO>>(
+      `/api/admin/users/${userId}/checkouts`,
+      {},
+      params
+    );
+  }
+
+  async getAbandonedCheckouts(): Promise<ListResponseDTO<CheckoutDTO>> {
+    return this.request<ListResponseDTO<CheckoutDTO>>(
+      `/api/admin/checkouts/abandoned`,
+      {
+        method: "GET",
+      }
+    );
+  }
+
+  async getExpiredCheckouts(): Promise<ListResponseDTO<CheckoutDTO>> {
+    return this.request<ListResponseDTO<CheckoutDTO>>(
+      `/api/admin/checkouts/expired`,
+      {
+        method: "GET",
+      }
+    );
   }
 }
 

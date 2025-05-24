@@ -22,18 +22,18 @@ type OrderDTO struct {
 	ShippingDetails ShippingDetails `json:"shipping_details"`
 	DiscountDetails DiscountDetails `json:"discount_details"`
 	Customer        CustomerDetails `json:"customer"`
-	ActionURL       string          `json:"action_url,omitempty"`
+	CheckoutID      string          `json:"checkout_id,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
 type PaymentDetails struct {
-	Provider PaymentProvider `json:"provider"`
-	Method   PaymentMethod   `json:"method"`
-	ID       string          `json:"id"`
-	Status   string          `json:"status"`
-	Captured bool            `json:"captured"`
-	Refunded bool            `json:"refunded"`
+	PaymentID string          `json:"payment_id"`
+	Provider  PaymentProvider `json:"provider"`
+	Method    PaymentMethod   `json:"method"`
+	Status    string          `json:"status"`
+	Captured  bool            `json:"captured"`
+	Refunded  bool            `json:"refunded"`
 }
 
 type ShippingDetails struct {
@@ -67,16 +67,6 @@ type OrderItemDTO struct {
 	TotalPrice  float64   `json:"total_price"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// AddressDTO represents a shipping or billing address
-type AddressDTO struct {
-	AddressLine1 string `json:"address_line1"`
-	AddressLine2 string `json:"address_line2,omitempty"`
-	City         string `json:"city"`
-	State        string `json:"state"`
-	PostalCode   string `json:"postal_code"`
-	Country      string `json:"country"`
 }
 
 // CreateOrderRequest represents the data needed to create a new order

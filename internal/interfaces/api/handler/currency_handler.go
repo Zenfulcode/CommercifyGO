@@ -7,6 +7,7 @@ import (
 
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
 
@@ -34,9 +35,12 @@ func (h *CurrencyHandler) ListCurrencies(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.CreateListCurrenciesResponse(currencies)
+
 	// Return currencies
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currencies)
+	json.NewEncoder(w).Encode(response)
 }
 
 // ListEnabledCurrencies handles listing all enabled currencies
@@ -49,9 +53,12 @@ func (h *CurrencyHandler) ListEnabledCurrencies(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.CreateListEnabledCurrenciesResponse(currencies)
+
 	// Return currencies
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currencies)
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetCurrency handles retrieving a currency by code
@@ -71,9 +78,14 @@ func (h *CurrencyHandler) GetCurrency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.GetCurrencyResponse{
+		Currency: dto.FromCurrencyEntityDetail(currency),
+	}
+
 	// Return currency
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currency)
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetDefaultCurrency handles retrieving the default currency
@@ -86,19 +98,27 @@ func (h *CurrencyHandler) GetDefaultCurrency(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.GetDefaultCurrencyResponse{
+		Currency: dto.FromCurrencyEntityDetail(currency),
+	}
+
 	// Return currency
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currency)
+	json.NewEncoder(w).Encode(response)
 }
 
 // CreateCurrency handles creating a new currency (admin only)
 func (h *CurrencyHandler) CreateCurrency(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var input usecase.CurrencyInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.CreateCurrencyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Convert to use case input
+	input := request.ToUseCaseInput()
 
 	// Create currency
 	currency, err := h.currencyUseCase.CreateCurrency(input)
@@ -108,10 +128,15 @@ func (h *CurrencyHandler) CreateCurrency(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.CreateCurrencyResponse{
+		Currency: dto.FromCurrencyEntityDetail(currency),
+	}
+
 	// Return created currency
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(currency)
+	json.NewEncoder(w).Encode(response)
 }
 
 // UpdateCurrency handles updating a currency (admin only)
@@ -124,11 +149,14 @@ func (h *CurrencyHandler) UpdateCurrency(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Parse request body
-	var input usecase.CurrencyInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var request dto.UpdateCurrencyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Convert to use case input
+	input := request.ToUseCaseInput()
 
 	// Update currency
 	currency, err := h.currencyUseCase.UpdateCurrency(code, input)
@@ -138,9 +166,14 @@ func (h *CurrencyHandler) UpdateCurrency(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.UpdateCurrencyResponse{
+		Currency: dto.FromCurrencyEntityDetail(currency),
+	}
+
 	// Return updated currency
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currency)
+	json.NewEncoder(w).Encode(response)
 }
 
 // DeleteCurrency handles deleting a currency (admin only)
@@ -173,12 +206,13 @@ func (h *CurrencyHandler) DeleteCurrency(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.CreateDeleteCurrencyResponse()
+
 	// Return success
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Currency deleted successfully",
-	})
+	json.NewEncoder(w).Encode(response)
 }
 
 // SetDefaultCurrency handles setting a currency as the default (admin only)
@@ -206,64 +240,54 @@ func (h *CurrencyHandler) SetDefaultCurrency(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Convert to response DTO
+	response := dto.SetDefaultCurrencyResponse{
+		Currency: dto.FromCurrencyEntityDetail(currency),
+	}
+
 	// Return updated currency
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(currency)
+	json.NewEncoder(w).Encode(response)
 }
 
 // ConvertAmount handles converting an amount from one currency to another
 func (h *CurrencyHandler) ConvertAmount(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
-	var requestBody struct {
-		Amount       float64 `json:"amount"`
-		FromCurrency string  `json:"from_currency"`
-		ToCurrency   string  `json:"to_currency"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	var request dto.ConvertAmountRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
-	if requestBody.Amount <= 0 {
+	if request.Amount <= 0 {
 		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(requestBody.FromCurrency) == "" {
+	if strings.TrimSpace(request.FromCurrency) == "" {
 		http.Error(w, "From currency is required", http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(requestBody.ToCurrency) == "" {
+	if strings.TrimSpace(request.ToCurrency) == "" {
 		http.Error(w, "To currency is required", http.StatusBadRequest)
 		return
 	}
 
 	// Convert amount
-	fromCents := money.ToCents(requestBody.Amount)
-	toCents, err := h.currencyUseCase.ConvertPrice(fromCents, requestBody.FromCurrency, requestBody.ToCurrency)
+	fromCents := money.ToCents(request.Amount)
+	toCents, err := h.currencyUseCase.ConvertPrice(fromCents, request.FromCurrency, request.ToCurrency)
 	if err != nil {
 		h.logger.Error("Failed to convert amount: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Return converted amount
-	response := map[string]interface{}{
-		"from": map[string]interface{}{
-			"currency": requestBody.FromCurrency,
-			"amount":   requestBody.Amount,
-			"cents":    fromCents,
-		},
-		"to": map[string]interface{}{
-			"currency": requestBody.ToCurrency,
-			"amount":   money.FromCents(toCents),
-			"cents":    toCents,
-		},
-	}
+	// Create response DTO
+	response := dto.CreateConvertAmountResponse(request.FromCurrency, request.Amount, request.ToCurrency, toCents)
 
+	// Return converted amount
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

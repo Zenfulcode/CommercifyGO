@@ -1,0 +1,1142 @@
+{
+	"info": {
+		"_postman_id": "e9c5a1db-354d-472e-b8c8-62fd14b97c6e",
+		"name": "Commercify Checkout Flow",
+		"description": "This collection tests the complete checkout flow in the Commercify e-commerce system from adding items to cart to payment processing.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Get Current Checkout (Initial)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Response contains checkout data\", function () {",
+							"    pm.expect(response).to.have.property('id');",
+							"    pm.expect(response).to.have.property('session_id');",
+							"    pm.expect(response).to.have.property('items');",
+							"    pm.expect(response.items).to.be.an('array');",
+							"});",
+							"",
+							"// Save checkout ID for later use",
+							"pm.collectionVariables.set('checkout_id', response.id);",
+							"",
+							"// Test cookies were set properly",
+							"pm.test(\"Checkout session cookie was set\", function () {",
+							"    const cookieJar = pm.cookies.jar();",
+							"    cookieJar.getAll(pm.request.url, function (error, cookies) {",
+							"        if (!error) {",
+							"            const checkoutCookie = cookies.find(cookie => cookie.name === 'checkout_session_id');",
+							"            pm.expect(checkoutCookie).to.not.be.undefined;",
+							"        }",
+							"    });",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout"
+					]
+				},
+				"description": "Retrieves the current checkout session. If none exists, creates a new one and returns it."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Add Item to Checkout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Item was added to checkout\", function () {",
+							"    pm.expect(response.items).to.be.an('array');",
+							"    pm.expect(response.items.length).to.be.greaterThan(0);",
+							"    ",
+							"    // Check if the item we added is in the cart",
+							"    const addedItem = response.items.find(item => item.product_id === parseInt(pm.collectionVariables.get('product_id')));",
+							"    pm.expect(addedItem).to.not.be.undefined;",
+							"    pm.expect(addedItem.quantity).to.equal(1);",
+							"    ",
+							"    // Store the first item's product_id for later updates",
+							"    if (response.items.length > 0) {",
+							"        pm.collectionVariables.set('first_item_product_id', response.items[0].product_id);",
+							"    }",
+							"});",
+							"",
+							"pm.test(\"Checkout totals are correct\", function () {",
+							"    // Basic validation of calculation fields",
+							"    pm.expect(response.total_amount).to.be.greaterThan(0);",
+							"    pm.expect(response.final_amount).to.be.greaterThan(0);",
+							"    ",
+							"    // Total should match sum of item subtotals",
+							"    const calculatedTotal = response.items.reduce((total, item) => total + item.subtotal, 0);",
+							"    pm.expect(response.total_amount).to.equal(calculatedTotal);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"product_id\": {{product_id}},\n    \"variant_id\": {{variant_id}},\n    \"quantity\": 1\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/items",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"items"
+					]
+				},
+				"description": "Adds a product item to the current checkout session."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Update Checkout Item",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"const productId = pm.collectionVariables.get('first_item_product_id');",
+							"",
+							"pm.test(\"Item quantity was updated\", function () {",
+							"    const updatedItem = response.items.find(item => item.product_id === parseInt(productId));",
+							"    pm.expect(updatedItem).to.not.be.undefined;",
+							"    pm.expect(updatedItem.quantity).to.equal(2);",
+							"});",
+							"",
+							"pm.test(\"Checkout totals are updated\", function () {",
+							"    // Basic validation of calculation fields",
+							"    pm.expect(response.total_amount).to.be.greaterThan(0);",
+							"    pm.expect(response.final_amount).to.be.greaterThan(0);",
+							"    ",
+							"    // Total should match sum of item subtotals",
+							"    const calculatedTotal = response.items.reduce((total, item) => total + item.subtotal, 0);",
+							"    pm.expect(response.total_amount).to.equal(calculatedTotal);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"quantity\": 2\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/items/{{first_item_product_id}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"items",
+						"{{first_item_product_id}}"
+					]
+				},
+				"description": "Updates the quantity of an item in the checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Add Second Item to Checkout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Second item was added to checkout\", function () {",
+							"    pm.expect(response.items).to.be.an('array');",
+							"    pm.expect(response.items.length).to.be.greaterThan(1);",
+							"    ",
+							"    // Check if the second item we added is in the cart",
+							"    const secondItem = response.items.find(item => item.product_id === parseInt(pm.collectionVariables.get('second_product_id')));",
+							"    pm.expect(secondItem).to.not.be.undefined;",
+							"    pm.expect(secondItem.quantity).to.equal(1);",
+							"    ",
+							"    // Store the second item id for later use",
+							"    pm.collectionVariables.set('second_item_product_id', secondItem.product_id);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"product_id\": {{second_product_id}},\n    \"variant_id\": {{second_variant_id}},\n    \"quantity\": 1\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/items",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"items"
+					]
+				},
+				"description": "Adds a second product item to the current checkout session."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Set Customer Details",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Customer details were updated\", function () {",
+							"    pm.expect(response.customer_details).to.not.be.undefined;",
+							"    pm.expect(response.customer_details.email).to.equal(\"customer@example.com\");",
+							"    pm.expect(response.customer_details.phone).to.equal(\"+1234567890\");",
+							"    pm.expect(response.customer_details.full_name).to.equal(\"John Doe\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+1234567890\",\n    \"full_name\": \"John Doe\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/customer-details",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"customer-details"
+					]
+				},
+				"description": "Sets the customer details for the current checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "6. Set Shipping Address",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Shipping address was updated\", function () {",
+							"    pm.expect(response.shipping_address).to.not.be.undefined;",
+							"    pm.expect(response.shipping_address.address_line1).to.equal(\"123 Main Street\");",
+							"    pm.expect(response.shipping_address.city).to.equal(\"Springfield\");",
+							"    pm.expect(response.shipping_address.state).to.equal(\"IL\");",
+							"    pm.expect(response.shipping_address.postal_code).to.equal(\"62704\");",
+							"    pm.expect(response.shipping_address.country).to.equal(\"USA\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"address_line1\": \"123 Main Street\",\n    \"address_line2\": \"Apt 4B\",\n    \"city\": \"Springfield\",\n    \"state\": \"IL\",\n    \"postal_code\": \"62704\",\n    \"country\": \"USA\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/shipping-address",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"shipping-address"
+					]
+				},
+				"description": "Sets the shipping address for the current checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "7. Set Billing Address",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Billing address was updated\", function () {",
+							"    pm.expect(response.billing_address).to.not.be.undefined;",
+							"    pm.expect(response.billing_address.address_line1).to.equal(\"456 Commerce Ave\");",
+							"    pm.expect(response.billing_address.city).to.equal(\"Springfield\");",
+							"    pm.expect(response.billing_address.state).to.equal(\"IL\");",
+							"    pm.expect(response.billing_address.postal_code).to.equal(\"62704\");",
+							"    pm.expect(response.billing_address.country).to.equal(\"USA\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"address_line1\": \"456 Commerce Ave\",\n    \"address_line2\": \"Suite 300\",\n    \"city\": \"Springfield\",\n    \"state\": \"IL\",\n    \"postal_code\": \"62704\",\n    \"country\": \"USA\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/billing-address",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"billing-address"
+					]
+				},
+				"description": "Sets the billing address for the current checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "8. Set Shipping Method",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Shipping method was set\", function () {",
+							"    pm.expect(response.shipping_method).to.not.be.undefined;",
+							"    pm.expect(response.shipping_method_id).to.equal(parseInt(pm.collectionVariables.get('shipping_method_id')));",
+							"    pm.expect(response.shipping_cost).to.be.greaterThan(0);",
+							"});",
+							"",
+							"pm.test(\"Final amount includes shipping cost\", function () {",
+							"    const totalWithoutShipping = response.total_amount;",
+							"    const shipping = response.shipping_cost;",
+							"    ",
+							"    // Final amount should be total + shipping - discount",
+							"    const expectedFinal = totalWithoutShipping + shipping - response.discount_amount;",
+							"    pm.expect(response.final_amount).to.equal(expectedFinal);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"shipping_method_id\": {{shipping_method_id}}\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/shipping-method",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"shipping-method"
+					]
+				},
+				"description": "Sets the shipping method for the current checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "9. Apply Discount",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Discount was applied\", function () {",
+							"    pm.expect(response.discount_code).to.equal(pm.collectionVariables.get('discount_code'));",
+							"    pm.expect(response.discount_amount).to.be.greaterThan(0);",
+							"    pm.expect(response.applied_discount).to.not.be.undefined;",
+							"});",
+							"",
+							"pm.test(\"Final amount reflects discount\", function () {",
+							"    const totalWithoutShipping = response.total_amount;",
+							"    const shipping = response.shipping_cost;",
+							"    const discount = response.discount_amount;",
+							"    ",
+							"    // Final amount should be total + shipping - discount",
+							"    const expectedFinal = totalWithoutShipping + shipping - discount;",
+							"    ",
+							"    // Use a small epsilon for floating point comparison",
+							"    const epsilon = 0.01;",
+							"    pm.expect(Math.abs(response.final_amount - expectedFinal)).to.be.lessThan(epsilon);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"discount_code\": \"{{discount_code}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/discount",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"discount"
+					]
+				},
+				"description": "Applies a discount code to the checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "10. Remove Discount (Optional)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Discount was removed\", function () {",
+							"    pm.expect(response.discount_code).to.be.empty;",
+							"    pm.expect(response.discount_amount).to.equal(0);",
+							"    pm.expect(response.applied_discount).to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Final amount no longer reflects discount\", function () {",
+							"    const totalWithoutShipping = response.total_amount;",
+							"    const shipping = response.shipping_cost;",
+							"    ",
+							"    // Final amount should be total + shipping since discount is removed",
+							"    const expectedFinal = totalWithoutShipping + shipping;",
+							"    pm.expect(response.final_amount).to.equal(expectedFinal);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/discount",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"discount"
+					]
+				},
+				"description": "Removes the applied discount from the checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "11. Re-Apply Discount",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Discount was re-applied\", function () {",
+							"    pm.expect(response.discount_code).to.equal(pm.collectionVariables.get('discount_code'));",
+							"    pm.expect(response.discount_amount).to.be.greaterThan(0);",
+							"    pm.expect(response.applied_discount).to.not.be.undefined;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"discount_code\": \"{{discount_code}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/discount",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"discount"
+					]
+				},
+				"description": "Re-applies a discount code to the checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "12. Remove Item from Checkout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"const removedProductId = pm.collectionVariables.get('second_item_product_id');",
+							"",
+							"pm.test(\"Item was removed from checkout\", function () {",
+							"    const removedItem = response.items.find(item => item.product_id === parseInt(removedProductId));",
+							"    pm.expect(removedItem).to.be.undefined;",
+							"    ",
+							"    // Check we still have one item left",
+							"    pm.expect(response.items.length).to.equal(1);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/items/{{second_item_product_id}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"items",
+						"{{second_item_product_id}}"
+					]
+				},
+				"description": "Removes a specific item from the checkout."
+			},
+			"response": []
+		},
+		{
+			"name": "13. Complete Checkout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Response structure is correct\", function () {",
+							"    pm.expect(response.success).to.be.true;",
+							"    pm.expect(response.message).to.equal(\"Order created successfully\");",
+							"    pm.expect(response.data).to.not.be.undefined;",
+							"});",
+							"",
+							"pm.test(\"Order was created\", function () {",
+							"    pm.expect(response.data).to.not.be.undefined;",
+							"    pm.expect(response.data.id).to.be.greaterThan(0);",
+							"    pm.expect(response.data.order_number).to.not.be.empty;",
+							"    pm.expect(response.data.status).to.be.oneOf(['pending', 'processing', 'paid']);",
+							"    ",
+							"    // Save the order ID for potential future use",
+							"    pm.collectionVariables.set('order_id', response.data.id);",
+							"});",
+							"",
+							"pm.test(\"Order items match checkout items\", function () {",
+							"    pm.expect(response.data.items).to.be.an('array');",
+							"    pm.expect(response.data.items.length).to.be.greaterThan(0);",
+							"});",
+							"",
+							"pm.test(\"Payment details were created\", function () {",
+							"    pm.expect(response.data.payment_details).to.not.be.undefined;",
+							"    pm.expect(response.data.payment_details.provider).to.equal('stripe');",
+							"    pm.expect(response.data.payment_details.status).to.not.be.empty;",
+							"});",
+							"",
+							"pm.test(\"Customer information is included\", function () {",
+							"    pm.expect(response.data.customer).to.not.be.undefined;",
+							"    pm.expect(response.data.customer.email).to.not.be.empty;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"payment_provider\": \"stripe\",\n    \"payment_data\": {\n        \"card_details\": {\n            \"card_number\": \"4111111111111111\",\n            \"expiry_month\": 12,\n            \"expiry_year\": 2027,\n            \"cvv\": \"123\",\n            \"cardholder_name\": \"John Doe\"\n        }\n    },\n    \"redirect_url\": \"https://example.com/order-confirmation\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/complete",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"complete"
+					]
+				},
+				"description": "Completes the checkout process, creating an order and processing payment."
+			},
+			"response": []
+		},
+		{
+			"name": "13b. Complete Checkout with Mobile Payment",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"Response structure is correct\", function () {",
+							"    pm.expect(response.success).to.be.true;",
+							"    pm.expect(response.message).to.equal(\"Order created successfully\");",
+							"    pm.expect(response.data).to.not.be.undefined;",
+							"});",
+							"",
+							"pm.test(\"Order was created\", function () {",
+							"    pm.expect(response.data).to.not.be.undefined;",
+							"    pm.expect(response.data.id).to.be.greaterThan(0);",
+							"    pm.expect(response.data.order_number).to.not.be.empty;",
+							"    pm.expect(response.data.status).to.be.oneOf(['pending', 'processing', 'paid']);",
+							"});",
+							"",
+							"pm.test(\"Payment details were created\", function () {",
+							"    pm.expect(response.data.payment_details).to.not.be.undefined;",
+							"    pm.expect(response.data.payment_details.provider).to.equal('mobilepay');",
+							"    pm.expect(response.data.payment_details.method).to.equal('wallet');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"payment_provider\": \"mobilepay\",\n    \"payment_data\": {\n        \"phone_number\": \"+4512345678\"\n    },\n    \"redirect_url\": \"https://example.com/order-confirmation\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout/complete",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout",
+						"complete"
+					]
+				},
+				"description": "Completes the checkout process using a mobile payment method."
+			},
+			"response": []
+		},
+		{
+			"name": "14. Check Post-Checkout Status",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"const response = pm.response.json();",
+							"",
+							"pm.test(\"New checkout was created\", function () {",
+							"    // The previous checkout should have been completed and a new one created",
+							"    pm.expect(response.id).to.not.equal(pm.collectionVariables.get('checkout_id'));",
+							"    pm.expect(response.items).to.be.an('array');",
+							"    pm.expect(response.items.length).to.equal(0);",
+							"    pm.expect(response.status).to.equal('active');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/checkout",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"checkout"
+					]
+				},
+				"description": "Checks that after completing a checkout, a new empty checkout is created."
+			},
+			"response": []
+		},
+		{
+			"name": "15. Error Test Cases",
+			"item": [
+				{
+					"name": "Missing Payment Provider",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"Error response is correctly structured\", function () {",
+									"    pm.expect(response).to.have.property('error');",
+									"    // Check for either error message as the validation order may vary",
+									"    const errorMsg = response.error || response;",
+									"    const validErrors = [",
+									"        'Payment provider is required',",
+									"        'shipping address is required'",
+									"    ];",
+									"    const hasValidError = validErrors.some(msg => errorMsg.includes(msg));",
+									"    pm.expect(hasValidError).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_data\": {\n        \"card_details\": {\n            \"card_number\": \"4111111111111111\",\n            \"expiry_month\": 12,\n            \"expiry_year\": 2027,\n            \"cvv\": \"123\",\n            \"cardholder_name\": \"John Doe\"\n        }\n    },\n    \"redirect_url\": \"https://example.com/order-confirmation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/checkout/complete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"checkout",
+								"complete"
+							]
+						},
+						"description": "Tests error handling when payment provider is missing."
+					},
+					"response": []
+				},
+				{
+					"name": "Missing Payment Data",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"Error response is correctly structured\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response.success).to.be.false;",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error).to.include('Payment data is required');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_provider\": \"stripe\",\n    \"payment_data\": {\n    },\n    \"redirect_url\": \"https://example.com/order-confirmation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/checkout/complete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"checkout",
+								"complete"
+							]
+						},
+						"description": "Tests error handling when payment data is missing."
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Checkout Session",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Cookie cleared\", function () {",
+									"    pm.expect(pm.cookies.has('checkout_session_id')).to.be.false;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Cookie",
+								"value": "checkout_session_id=;Max-Age=0",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/checkout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"checkout"
+							]
+						},
+						"description": "Clears the checkout session cookie to test missing session scenarios."
+					},
+					"response": []
+				},
+				{
+					"name": "Empty Checkout Session Error",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404 Not Found\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"",
+									"pm.test(\"Error response is correctly structured\", function () {",
+									"    pm.expect(response).to.have.property('success');",
+									"    pm.expect(response.success).to.be.false;",
+									"    pm.expect(response).to.have.property('error');",
+									"    pm.expect(response.error).to.include('Checkout session not found or expired');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Cookie",
+								"value": "checkout_session_id=invalid-session-id",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_provider\": \"stripe\",\n    \"payment_data\": {\n        \"card_details\": {\n            \"card_number\": \"4111111111111111\",\n            \"expiry_month\": 12,\n            \"expiry_year\": 2027,\n            \"cvv\": \"123\",\n            \"cardholder_name\": \"John Doe\"\n        }\n    },\n    \"redirect_url\": \"https://example.com/order-confirmation\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/checkout/complete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"checkout",
+								"complete"
+							]
+						},
+						"description": "Tests error handling when checkout session is invalid or expired."
+					},
+					"response": []
+				}
+			],
+			"description": "Tests various error scenarios for the checkout completion endpoint."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:6091",
+			"type": "string"
+		},
+		{
+			"key": "checkout_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "product_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "variant_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "second_product_id",
+			"value": "2",
+			"type": "string"
+		},
+		{
+			"key": "second_variant_id",
+			"value": "10",
+			"type": "string"
+		},
+		{
+			"key": "first_item_product_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "second_item_product_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "shipping_method_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "discount_code",
+			"value": "WELCOME10",
+			"type": "string"
+		},
+		{
+			"key": "order_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
