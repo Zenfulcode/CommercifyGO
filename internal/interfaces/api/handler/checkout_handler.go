@@ -580,7 +580,7 @@ func (h *CheckoutHandler) CompleteCheckout(w http.ResponseWriter, r *http.Reques
 		// Return a more informative error to the client
 		errResponse := dto.ResponseDTO[any]{
 			Success: false,
-			Error:   fmt.Sprintf("Payment processing failed: %v", err),
+			Error:   err.Error(),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
