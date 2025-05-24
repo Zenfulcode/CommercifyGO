@@ -80,8 +80,14 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New("order is already paid")
 	}
 
-	// Validate payment provider
-	availableProviders := uc.GetAvailablePaymentProviders()
+	// Get default currency
+	defaultCurrency, err := uc.currencyRepo.GetDefault()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default currency: %w", err)
+	}
+
+	// Validate payment provider supports the currency
+	availableProviders := uc.GetAvailablePaymentProvidersForCurrency(defaultCurrency.Code)
 	providerValid := false
 	for _, p := range availableProviders {
 		if p.Type == input.PaymentProvider && p.Enabled {
@@ -90,13 +96,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		}
 	}
 	if !providerValid {
-		return nil, errors.New("payment provider not available")
-	}
-
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default currency: %w", err)
+		return nil, fmt.Errorf("payment provider %s does not support currency %s", input.PaymentProvider, defaultCurrency.Code)
 	}
 
 	// Process payment
@@ -231,6 +231,11 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 // GetAvailablePaymentProviders returns a list of available payment providers
 func (uc *CheckoutUseCase) GetAvailablePaymentProviders() []service.PaymentProvider {
 	return uc.paymentSvc.GetAvailableProviders()
+}
+
+// GetAvailablePaymentProvidersForCurrency returns a list of available payment providers that support the given currency
+func (uc *CheckoutUseCase) GetAvailablePaymentProvidersForCurrency(currency string) []service.PaymentProvider {
+	return uc.paymentSvc.GetAvailableProvidersForCurrency(currency)
 }
 
 // NewCheckoutUseCase creates a new checkout use case

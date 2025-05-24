@@ -20,13 +20,31 @@ func NewMockPaymentService() *MockPaymentService {
 func (s *MockPaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:        service.PaymentProviderMock,
-			Name:        "Test Payment",
-			Description: "For testing purposes only",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard},
-			Enabled:     true,
+			Type:                service.PaymentProviderMock,
+			Name:                "Test Payment",
+			Description:         "For testing purposes only",
+			Methods:             []service.PaymentMethod{service.PaymentMethodCreditCard},
+			Enabled:             true,
+			SupportedCurrencies: []string{"USD", "EUR", "GBP", "NOK", "DKK"},
 		},
 	}
+}
+
+// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+func (s *MockPaymentService) GetAvailableProvidersForCurrency(currency string) []service.PaymentProvider {
+	providers := s.GetAvailableProviders()
+	var supportedProviders []service.PaymentProvider
+
+	for _, provider := range providers {
+		for _, supportedCurrency := range provider.SupportedCurrencies {
+			if supportedCurrency == currency {
+				supportedProviders = append(supportedProviders, provider)
+				break
+			}
+		}
+	}
+
+	return supportedProviders
 }
 
 // ProcessPayment processes a payment request

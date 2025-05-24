@@ -41,8 +41,30 @@ func (s *StripePaymentService) GetAvailableProviders() []service.PaymentProvider
 			IconURL:     "/assets/images/stripe-logo.png",
 			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard},
 			Enabled:     true,
+			SupportedCurrencies: []string{
+				"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "SEK", "NOK", "DKK",
+				"PLN", "CZK", "HUF", "BGN", "RON", "HRK", "ISK", "MXN", "BRL", "SGD",
+				"HKD", "INR", "MYR", "PHP", "THB", "TWD", "KRW", "NZD", "ILS", "ZAR",
+			},
 		},
 	}
+}
+
+// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+func (s *StripePaymentService) GetAvailableProvidersForCurrency(currency string) []service.PaymentProvider {
+	providers := s.GetAvailableProviders()
+	var supportedProviders []service.PaymentProvider
+
+	for _, provider := range providers {
+		for _, supportedCurrency := range provider.SupportedCurrencies {
+			if supportedCurrency == currency {
+				supportedProviders = append(supportedProviders, provider)
+				break
+			}
+		}
+	}
+
+	return supportedProviders
 }
 
 // createPaymentMethodFromCard creates a payment method from card details

@@ -8,9 +8,14 @@ This document provides example request bodies for the payment system API endpoin
 
 ```plaintext
 GET /api/payment/providers
+GET /api/payment/providers?currency=<currency_code>
 ```
 
-Retrieves the list of available payment providers for the store.
+Retrieves the list of available payment providers for the store. Optionally filter by currency to get only providers that support the specified currency.
+
+**Query Parameters:**
+
+- `currency` (optional): Three-letter ISO currency code (e.g., "USD", "EUR", "NOK") to filter providers by supported currency
 
 Example response:
 
@@ -18,30 +23,30 @@ Example response:
 [
   {
     "type": "stripe",
-    "name": "Credit Card (Stripe)",
-    "description": "Pay securely with your credit or debit card",
+    "name": "Stripe",
+    "description": "Pay with credit or debit card",
     "enabled": true,
     "methods": ["credit_card"],
-    "supports_3d_secure": true
-  },
-  {
-    "type": "paypal",
-    "name": "PayPal",
-    "description": "Pay with your PayPal account",
-    "enabled": true,
-    "methods": ["paypal"],
-    "supports_3d_secure": false
+    "supported_currencies": ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "BGN", "RON", "HRK", "ISK", "MXN", "BRL", "SGD", "HKD", "INR", "MYR", "PHP", "THB", "TWD", "KRW", "NZD", "ILS", "ZAR"]
   },
   {
     "type": "mobilepay",
     "name": "MobilePay",
-    "description": "Pay with MobilePay",
+    "description": "Pay with MobilePay app",
     "enabled": true,
     "methods": ["wallet"],
-    "supports_3d_secure": false
+    "supported_currencies": ["NOK", "DKK", "EUR"]
   }
 ]
 ```
+
+Example request filtering by currency:
+
+```plaintext
+GET /api/payment/providers?currency=NOK
+```
+
+This would return only payment providers that support Norwegian Krone (NOK), which would include Stripe and MobilePay but exclude providers that don't support NOK.
 
 **Status Codes:**
 

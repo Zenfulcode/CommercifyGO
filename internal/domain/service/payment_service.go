@@ -19,12 +19,13 @@ const (
 
 // PaymentProvider represents information about a payment provider
 type PaymentProvider struct {
-	Type        PaymentProviderType `json:"type"`
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	IconURL     string              `json:"icon_url,omitempty"`
-	Methods     []PaymentMethod     `json:"methods"`
-	Enabled     bool                `json:"enabled"`
+	Type                PaymentProviderType `json:"type"`
+	Name                string              `json:"name"`
+	Description         string              `json:"description"`
+	IconURL             string              `json:"icon_url,omitempty"`
+	Methods             []PaymentMethod     `json:"methods"`
+	Enabled             bool                `json:"enabled"`
+	SupportedCurrencies []string            `json:"supported_currencies,omitempty"`
 }
 
 // PaymentRequest represents a request to process a payment
@@ -76,6 +77,9 @@ type PaymentResult struct {
 type PaymentService interface {
 	// GetAvailableProviders returns a list of available payment providers
 	GetAvailableProviders() []PaymentProvider
+
+	// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+	GetAvailableProvidersForCurrency(currency string) []PaymentProvider
 
 	// ProcessPayment processes a payment request
 	ProcessPayment(request PaymentRequest) (*PaymentResult, error)

@@ -54,45 +54,28 @@ func NewMultiProviderPaymentService(cfg *config.Config, logger logger.Logger) *M
 
 // GetAvailableProviders returns a list of available payment providers
 func (s *MultiProviderPaymentService) GetAvailableProviders() []service.PaymentProvider {
-	providers := []service.PaymentProvider{
-		{
-			Type:        service.PaymentProviderStripe,
-			Name:        "Stripe",
-			Description: "Pay with credit or debit card",
-			IconURL:     "/assets/images/stripe-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard},
-			Enabled:     s.config.Stripe.Enabled,
-		},
-		{
-			Type:        service.PaymentProviderMobilePay,
-			Name:        "MobilePay",
-			Description: "Pay with MobilePay app",
-			IconURL:     "/assets/images/mobilepay-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodWallet},
-			Enabled:     s.config.MobilePay.Enabled,
-		},
-	}
-
-	// Only return enabled providers
 	var enabledProviders []service.PaymentProvider
-	for _, p := range providers {
-		if p.Enabled {
-			enabledProviders = append(enabledProviders, p)
-		}
-	}
 
-	// Always include mock provider in development environments
-	if s.config.Payment.EnabledProviders != nil && contains(s.config.Payment.EnabledProviders, "mock") {
-		enabledProviders = append(enabledProviders, service.PaymentProvider{
-			Type:        service.PaymentProviderMock,
-			Name:        "Test Payment",
-			Description: "For testing purposes only",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard, service.PaymentMethodWallet},
-			Enabled:     true,
-		})
+	// Collect providers from all enabled payment services
+	for _, providerService := range s.providers {
+		providers := providerService.GetAvailableProviders()
+		enabledProviders = append(enabledProviders, providers...)
 	}
 
 	return enabledProviders
+}
+
+// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+func (s *MultiProviderPaymentService) GetAvailableProvidersForCurrency(currency string) []service.PaymentProvider {
+	var supportedProviders []service.PaymentProvider
+
+	// Collect providers from all enabled payment services that support the currency
+	for _, providerService := range s.providers {
+		providers := providerService.GetAvailableProvidersForCurrency(currency)
+		supportedProviders = append(supportedProviders, providers...)
+	}
+
+	return supportedProviders
 }
 
 // Helper function to check if a slice contains a string

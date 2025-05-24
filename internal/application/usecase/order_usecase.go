@@ -49,6 +49,11 @@ func (uc *OrderUseCase) GetAvailablePaymentProviders() []service.PaymentProvider
 	return uc.paymentSvc.GetAvailableProviders()
 }
 
+// GetAvailablePaymentProvidersForCurrency returns a list of available payment providers that support the given currency
+func (uc *OrderUseCase) GetAvailablePaymentProvidersForCurrency(currency string) []service.PaymentProvider {
+	return uc.paymentSvc.GetAvailableProvidersForCurrency(currency)
+}
+
 // UpdateOrderStatusInput contains the data needed to update an order status
 type UpdateOrderStatusInput struct {
 	OrderID uint               `json:"order_id"`
