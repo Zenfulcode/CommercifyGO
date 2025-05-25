@@ -154,7 +154,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 	}
 
 	checkout.UpdateItem(updateInput.ProductID, updateInput.VariantID, updateInput.Quantity)
-	h.checkoutUseCase.UpdateCheckout(checkout)
+	checkout, err = h.checkoutUseCase.UpdateCheckout(checkout)
 
 	if err != nil {
 		h.logger.Error("Failed to update checkout item: %v", err)
