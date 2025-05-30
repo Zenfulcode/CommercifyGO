@@ -157,6 +157,16 @@ Authorization: Bearer <token>
 
 ### API Endpoints
 
+#### Checkout
+
+- `GET /api/checkout` - Retrieves the current checkout session for a user. If no checkout exists, a new one will be created.
+- `POST /api/checkout/items` - Adds a product item to the current checkout session.
+- `PUT /api/checkout/items/{productId}` Updates the quantity or variant of an item in the current checkout.
+- `DELETE /api/checkout/items/{productId}` - Removes an item from the current checkout session.
+- `DELETE /api/checkout` - Removes all items from the current checkout session.
+- `PUT /api/checkout/shipping-addres` - Sets the shipping address for the current checkout.
+- `PUT /api/checkout/billing-address` - Sets the billing address for the current checkout.
+
 #### Users
 
 - `POST /api/users/register` - Register a new user

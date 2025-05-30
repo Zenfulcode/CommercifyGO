@@ -44,6 +44,7 @@ export interface CheckoutItemDTO {
   variant_id?: number /* uint */;
   product_name: string;
   variant_name?: string;
+  image_url: string;
   sku: string;
   price: number /* float64 */;
   quantity: number /* int */;

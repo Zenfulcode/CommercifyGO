@@ -42,6 +42,7 @@ type CheckoutItemDTO struct {
 	VariantID   uint      `json:"variant_id,omitempty"`
 	ProductName string    `json:"product_name"`
 	VariantName string    `json:"variant_name,omitempty"`
+	ImageURL    string    `json:"image_url"`
 	SKU         string    `json:"sku"`
 	Price       float64   `json:"price"`
 	Quantity    int       `json:"quantity"`
@@ -196,6 +197,7 @@ func ConvertToCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
 			VariantID:   item.ProductVariantID,
 			ProductName: item.ProductName,
 			VariantName: item.VariantName,
+			ImageURL:    item.ImageURL,
 			SKU:         item.SKU,
 			Price:       float64(item.Price) / 100, // Convert cents to currency units
 			Quantity:    item.Quantity,

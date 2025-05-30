@@ -58,6 +58,7 @@ type CheckoutItem struct {
 	CheckoutID       uint      `json:"checkout_id"`
 	ProductID        uint      `json:"product_id"`
 	ProductVariantID uint      `json:"product_variant_id,omitempty"`
+	ImageURL         string    `json:"image_url,omitempty"`
 	Quantity         int       `json:"quantity"`
 	Price            int64     `json:"price"` // stored in cents
 	Weight           float64   `json:"weight"`
