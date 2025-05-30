@@ -2,7 +2,6 @@ package payment
 
 import (
 	"fmt"
-
 	"slices"
 
 	"github.com/zenfulcode/commercify/config"
@@ -35,13 +34,6 @@ func NewMultiProviderPaymentService(cfg *config.Config, logger logger.Logger) *M
 				providers[service.PaymentProviderStripe] = NewStripePaymentService(cfg.Stripe, logger)
 				logger.Info("Stripe payment provider initialized")
 			}
-		case string(service.PaymentProviderPayPal):
-			if cfg.PayPal.Enabled {
-				// This would be a real PayPal implementation in production
-				// For now, we'll use the mock service
-				providers[service.PaymentProviderPayPal] = NewMockPaymentService()
-				logger.Info("PayPal payment provider initialized (mock)")
-			}
 		case string(service.PaymentProviderMobilePay):
 			if cfg.MobilePay.Enabled {
 				providers[service.PaymentProviderMobilePay] = NewMobilePayPaymentService(cfg.MobilePay, logger)
@@ -62,53 +54,33 @@ func NewMultiProviderPaymentService(cfg *config.Config, logger logger.Logger) *M
 
 // GetAvailableProviders returns a list of available payment providers
 func (s *MultiProviderPaymentService) GetAvailableProviders() []service.PaymentProvider {
-	providers := []service.PaymentProvider{
-		{
-			Type:        service.PaymentProviderStripe,
-			Name:        "Stripe",
-			Description: "Pay with credit or debit card",
-			IconURL:     "/assets/images/stripe-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard},
-			Enabled:     s.config.Stripe.Enabled,
-		},
-		{
-			Type:        service.PaymentProviderPayPal,
-			Name:        "PayPal",
-			Description: "Pay with your PayPal account",
-			IconURL:     "/assets/images/paypal-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodPayPal},
-			Enabled:     s.config.PayPal.Enabled,
-		},
-		{
-			Type:        service.PaymentProviderMobilePay,
-			Name:        "MobilePay",
-			Description: "Pay with MobilePay app",
-			IconURL:     "/assets/images/mobilepay-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodWallet},
-			Enabled:     s.config.MobilePay.Enabled,
-		},
-	}
-
-	// Only return enabled providers
 	var enabledProviders []service.PaymentProvider
-	for _, p := range providers {
-		if p.Enabled {
-			enabledProviders = append(enabledProviders, p)
-		}
-	}
 
-	// Always include mock provider in development environments
-	if s.config.Payment.EnabledProviders != nil && contains(s.config.Payment.EnabledProviders, "mock") {
-		enabledProviders = append(enabledProviders, service.PaymentProvider{
-			Type:        service.PaymentProviderMock,
-			Name:        "Test Payment",
-			Description: "For testing purposes only",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard, service.PaymentMethodPayPal, service.PaymentMethodBankTransfer},
-			Enabled:     true,
-		})
+	// Collect providers from all enabled payment services
+	for _, providerService := range s.providers {
+		providers := providerService.GetAvailableProviders()
+		enabledProviders = append(enabledProviders, providers...)
 	}
 
 	return enabledProviders
+}
+
+// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+func (s *MultiProviderPaymentService) GetAvailableProvidersForCurrency(currency string) []service.PaymentProvider {
+	var supportedProviders []service.PaymentProvider
+
+	// Collect providers from all enabled payment services that support the currency
+	for _, providerService := range s.providers {
+		providers := providerService.GetAvailableProvidersForCurrency(currency)
+		supportedProviders = append(supportedProviders, providers...)
+	}
+
+	return supportedProviders
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	return slices.Contains(slice, item)
 }
 
 // GetProviders returns all configured payment providers
@@ -179,11 +151,6 @@ func (s *MultiProviderPaymentService) CancelPayment(transactionID string, provid
 	}
 
 	return paymentProvider.CancelPayment(transactionID, provider)
-}
-
-// Helper function to check if a slice contains a string
-func contains(slice []string, item string) bool {
-	return slices.Contains(slice, item)
 }
 
 func (s *MultiProviderPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {

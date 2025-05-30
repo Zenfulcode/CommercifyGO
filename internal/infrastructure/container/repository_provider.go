@@ -14,7 +14,7 @@ type RepositoryProvider interface {
 	ProductVariantRepository() repository.ProductVariantRepository
 	CategoryRepository() repository.CategoryRepository
 	OrderRepository() repository.OrderRepository
-	CartRepository() repository.CartRepository
+	CheckoutRepository() repository.CheckoutRepository
 	DiscountRepository() repository.DiscountRepository
 	WebhookRepository() repository.WebhookRepository
 	PaymentTransactionRepository() repository.PaymentTransactionRepository
@@ -36,7 +36,7 @@ type repositoryProvider struct {
 	productRepo        repository.ProductRepository
 	categoryRepo       repository.CategoryRepository
 	orderRepo          repository.OrderRepository
-	cartRepo           repository.CartRepository
+	checkoutRepo       repository.CheckoutRepository
 	discountRepo       repository.DiscountRepository
 	webhookRepo        repository.WebhookRepository
 	paymentTrxRepo     repository.PaymentTransactionRepository
@@ -113,15 +113,15 @@ func (p *repositoryProvider) OrderRepository() repository.OrderRepository {
 	return p.orderRepo
 }
 
-// CartRepository returns the cart repository
-func (p *repositoryProvider) CartRepository() repository.CartRepository {
+// CheckoutRepository returns the checkout repository
+func (p *repositoryProvider) CheckoutRepository() repository.CheckoutRepository {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.cartRepo == nil {
-		p.cartRepo = postgres.NewCartRepository(p.container.DB())
+	if p.checkoutRepo == nil {
+		p.checkoutRepo = postgres.NewCheckoutRepository(p.container.DB())
 	}
-	return p.cartRepo
+	return p.checkoutRepo
 }
 
 // DiscountRepository returns the discount repository

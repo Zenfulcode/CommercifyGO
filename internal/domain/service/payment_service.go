@@ -5,29 +5,27 @@ type PaymentProviderType string
 
 const (
 	PaymentProviderStripe    PaymentProviderType = "stripe"
-	PaymentProviderPayPal    PaymentProviderType = "paypal"
-	PaymentProviderMock      PaymentProviderType = "mock"
 	PaymentProviderMobilePay PaymentProviderType = "mobilepay"
+	PaymentProviderMock      PaymentProviderType = "mock"
 )
 
 // PaymentMethod represents a payment method type
 type PaymentMethod string
 
 const (
-	PaymentMethodCreditCard   PaymentMethod = "credit_card"
-	PaymentMethodPayPal       PaymentMethod = "paypal"
-	PaymentMethodBankTransfer PaymentMethod = "bank_transfer"
-	PaymentMethodWallet       PaymentMethod = "wallet"
+	PaymentMethodCreditCard PaymentMethod = "credit_card"
+	PaymentMethodWallet     PaymentMethod = "wallet"
 )
 
 // PaymentProvider represents information about a payment provider
 type PaymentProvider struct {
-	Type        PaymentProviderType `json:"type"`
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	IconURL     string              `json:"icon_url,omitempty"`
-	Methods     []PaymentMethod     `json:"methods"`
-	Enabled     bool                `json:"enabled"`
+	Type                PaymentProviderType `json:"type"`
+	Name                string              `json:"name"`
+	Description         string              `json:"description"`
+	IconURL             string              `json:"icon_url,omitempty"`
+	Methods             []PaymentMethod     `json:"methods"`
+	Enabled             bool                `json:"enabled"`
+	SupportedCurrencies []string            `json:"supported_currencies,omitempty"`
 }
 
 // PaymentRequest represents a request to process a payment
@@ -38,10 +36,8 @@ type PaymentRequest struct {
 	PaymentMethod   PaymentMethod
 	PaymentProvider PaymentProviderType
 	CardDetails     *CardDetails
-	PayPalDetails   *PayPalDetails
-	BankDetails     *BankDetails
-	CustomerEmail   string
 	PhoneNumber     string
+	CustomerEmail   string
 }
 
 // CardDetails represents credit card payment details
@@ -81,6 +77,9 @@ type PaymentResult struct {
 type PaymentService interface {
 	// GetAvailableProviders returns a list of available payment providers
 	GetAvailableProviders() []PaymentProvider
+
+	// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+	GetAvailableProvidersForCurrency(currency string) []PaymentProvider
 
 	// ProcessPayment processes a payment request
 	ProcessPayment(request PaymentRequest) (*PaymentResult, error)

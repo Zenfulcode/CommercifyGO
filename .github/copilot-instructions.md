@@ -47,7 +47,6 @@ Commercify follows **Clean Architecture** principles with clear separation of co
 - Keep functions small and focused
 - Document all exported functions, types, and constants
 - Use meaningful variable and function names
-- Avoid global variables
 - Handle all errors explicitly
 
 ### Naming Conventions
@@ -81,15 +80,14 @@ if err != nil {
 ### Migrations
 
 To create new migrations, run the following command in the CLI:  
-`migrate create -ext sql -dir migrations -seq "<name>"`  
- 
+`migrate create -ext sql -dir migrations -seq "<name>"`
+
 Note: Replace `<name>` with the desired migration name. Use quotes around the name if it contains spaces or special characters. For example: `"add_friendly_numbers"`.
 
 ### Queries
 
 - Use prepared statements for all database queries
 - Never concatenate user input into SQL strings
-- Add indexes for columns used in WHERE clauses
 - Use transactions for operations that affect multiple tables
 
 ## API Design
@@ -130,12 +128,6 @@ Note: Replace `<name>` with the desired migration name. Use quotes around the na
 - Use table-driven tests for testing multiple cases
 - Use mocks for external dependencies
 
-### Integration Tests
-
-- Set up test databases for integration testing
-- Clean up test data after tests run
-- Use test fixtures or factories for test data
-
 ## Documentation
 
 ### Code Documentation
@@ -146,7 +138,7 @@ Note: Replace `<name>` with the desired migration name. Use quotes around the na
 
 ### API Documentation
 
-- Keep RESTAPI.md updated with all endpoint changes
+- Keep /docs/<filename>.md up to date
 - Include request/response examples
 - Document authentication requirements
 
@@ -242,7 +234,6 @@ POST /api/discounts
 - `403 Forbidden`: Not authorized (not an admin)
 - `409 Conflict`: Discount code already exists
 
-```
 
 ## Commit Messages
 
@@ -251,17 +242,6 @@ POST /api/discounts
 - Optionally provide more detailed description after summary
 - Reference issue numbers if applicable
 
-## Deployment
-
-- Use environment variables for configuration
-- Never commit sensitive information to the repository
-- Use semantic versioning for releases
-
-## Identifier Standards
-
-- **Order Numbers**: Use format `ORD-YYYYMMDD-000001`
-- **Product Numbers**: Use format `PROD-000001`
-
 ## Email Templates
 
 - Keep HTML email templates responsive
@@ -269,4 +249,3 @@ POST /api/discounts
 - Provide both HTML and plain text versions
 
 By following these guidelines, we'll maintain a high-quality, consistent codebase that is easy to understand, extend, and maintain.
-```
