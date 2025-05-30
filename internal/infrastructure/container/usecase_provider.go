@@ -10,7 +10,7 @@ import (
 type UseCaseProvider interface {
 	UserUseCase() *usecase.UserUseCase
 	ProductUseCase() *usecase.ProductUseCase
-	CartUseCase() *usecase.CartUseCase
+	CheckoutUseCase() *usecase.CheckoutUseCase
 	OrderUseCase() *usecase.OrderUseCase
 	DiscountUseCase() *usecase.DiscountUseCase
 	WebhookUseCase() *usecase.WebhookUseCase
@@ -25,7 +25,7 @@ type useCaseProvider struct {
 
 	userUseCase     *usecase.UserUseCase
 	productUseCase  *usecase.ProductUseCase
-	cartUseCase     *usecase.CartUseCase
+	checkoutUseCase *usecase.CheckoutUseCase
 	orderUseCase    *usecase.OrderUseCase
 	discountUseCase *usecase.DiscountUseCase
 	webhookUseCase  *usecase.WebhookUseCase
@@ -69,18 +69,26 @@ func (p *useCaseProvider) ProductUseCase() *usecase.ProductUseCase {
 	return p.productUseCase
 }
 
-// CartUseCase returns the cart use case
-func (p *useCaseProvider) CartUseCase() *usecase.CartUseCase {
+// CheckoutUseCase returns the checkout use case
+func (p *useCaseProvider) CheckoutUseCase() *usecase.CheckoutUseCase {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.cartUseCase == nil {
-		p.cartUseCase = usecase.NewCartUseCase(
-			p.container.Repositories().CartRepository(),
+	if p.checkoutUseCase == nil {
+		p.checkoutUseCase = usecase.NewCheckoutUseCase(
+			p.container.Repositories().CheckoutRepository(),
 			p.container.Repositories().ProductRepository(),
+			p.container.Repositories().ProductVariantRepository(),
+			p.container.Repositories().ShippingMethodRepository(),
+			p.container.Repositories().ShippingRateRepository(),
+			p.container.Repositories().DiscountRepository(),
+			p.container.Repositories().OrderRepository(),
+			p.container.Repositories().CurrencyRepository(),
+			p.container.Repositories().PaymentTransactionRepository(),
+			p.container.Services().PaymentService(),
 		)
 	}
-	return p.cartUseCase
+	return p.checkoutUseCase
 }
 
 // OrderUseCase returns the order use case
@@ -91,13 +99,11 @@ func (p *useCaseProvider) OrderUseCase() *usecase.OrderUseCase {
 	if p.orderUseCase == nil {
 		p.orderUseCase = usecase.NewOrderUseCase(
 			p.container.Repositories().OrderRepository(),
-			p.container.Repositories().CartRepository(),
 			p.container.Repositories().ProductRepository(),
 			p.container.Repositories().UserRepository(),
 			p.container.Services().PaymentService(),
 			p.container.Services().EmailService(),
 			p.container.Repositories().PaymentTransactionRepository(),
-			p.ShippingUsecase(), // Use non-locking helper method
 			p.container.Repositories().CurrencyRepository(),
 		)
 	}

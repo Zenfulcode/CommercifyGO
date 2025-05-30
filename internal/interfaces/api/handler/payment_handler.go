@@ -8,6 +8,7 @@ import (
 
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
 
@@ -27,8 +28,17 @@ func NewPaymentHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger)
 
 // GetAvailablePaymentProviders returns a list of available payment providers
 func (h *PaymentHandler) GetAvailablePaymentProviders(w http.ResponseWriter, r *http.Request) {
-	// Get available payment providers
-	providers := h.orderUseCase.GetAvailablePaymentProviders()
+	// Check for currency parameter
+	currency := r.URL.Query().Get("currency")
+
+	var providers []service.PaymentProvider
+	if currency != "" {
+		// Get providers that support the specific currency
+		providers = h.orderUseCase.GetAvailablePaymentProvidersForCurrency(currency)
+	} else {
+		// Get all available payment providers
+		providers = h.orderUseCase.GetAvailablePaymentProviders()
+	}
 
 	// Return providers
 	w.Header().Set("Content-Type", "application/json")
