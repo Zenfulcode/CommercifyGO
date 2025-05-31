@@ -10,7 +10,7 @@ import (
 type HandlerProvider interface {
 	UserHandler() *handler.UserHandler
 	ProductHandler() *handler.ProductHandler
-	CartHandler() *handler.CartHandler
+	CheckoutHandler() *handler.CheckoutHandler
 	OrderHandler() *handler.OrderHandler
 	PaymentHandler() *handler.PaymentHandler
 	WebhookHandler() *handler.WebhookHandler
@@ -26,7 +26,7 @@ type handlerProvider struct {
 
 	userHandler     *handler.UserHandler
 	productHandler  *handler.ProductHandler
-	cartHandler     *handler.CartHandler
+	checkoutHandler *handler.CheckoutHandler
 	orderHandler    *handler.OrderHandler
 	paymentHandler  *handler.PaymentHandler
 	webhookHandler  *handler.WebhookHandler
@@ -72,20 +72,6 @@ func (p *handlerProvider) ProductHandler() *handler.ProductHandler {
 	return p.productHandler
 }
 
-// CartHandler returns the cart handler
-func (p *handlerProvider) CartHandler() *handler.CartHandler {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.cartHandler == nil {
-		p.cartHandler = handler.NewCartHandler(
-			p.container.UseCases().CartUseCase(),
-			p.container.Logger(),
-		)
-	}
-	return p.cartHandler
-}
-
 // OrderHandler returns the order handler
 func (p *handlerProvider) OrderHandler() *handler.OrderHandler {
 	p.mu.Lock()
@@ -128,6 +114,21 @@ func (p *handlerProvider) WebhookHandler() *handler.WebhookHandler {
 		)
 	}
 	return p.webhookHandler
+}
+
+// CheckoutHandler returns the checkout handler
+func (p *handlerProvider) CheckoutHandler() *handler.CheckoutHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.checkoutHandler == nil {
+		p.checkoutHandler = handler.NewCheckoutHandler(
+			p.container.UseCases().CheckoutUseCase(),
+			p.container.UseCases().OrderUseCase(),
+			p.container.Logger(),
+		)
+	}
+	return p.checkoutHandler
 }
 
 // DiscountHandler returns the discount handler

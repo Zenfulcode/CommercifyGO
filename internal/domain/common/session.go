@@ -1,6 +1,6 @@
 package common
 
 const (
-	SessionCookieName = "guest_session_id"
-	SessionCookieAge  = 86400 * 30 // 30 days in seconds
+	CheckoutSessionCookie = "checkout_session_id"
+	CheckoutSessionMaxAge = 86400 * 7 // 7 days in seconds
 )

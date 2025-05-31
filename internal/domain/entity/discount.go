@@ -203,10 +203,3 @@ func (d *Discount) IncrementUsage() {
 	d.CurrentUsage++
 	d.UpdatedAt = time.Now()
 }
-
-// AppliedDiscount represents a discount applied to an order
-type AppliedDiscount struct {
-	DiscountID     uint   `json:"discount_id"`
-	DiscountCode   string `json:"discount_code"`
-	DiscountAmount int64  `json:"discount_amount"` // stored in cents
-}

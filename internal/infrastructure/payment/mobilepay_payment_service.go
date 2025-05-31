@@ -47,14 +47,32 @@ func NewMobilePayPaymentService(config config.MobilePayConfig, logger logger.Log
 func (s *MobilePayPaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:        service.PaymentProviderMobilePay,
-			Name:        "MobilePay",
-			Description: "Pay with MobilePay app",
-			IconURL:     "/assets/images/mobilepay-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodWallet},
-			Enabled:     true,
+			Type:                service.PaymentProviderMobilePay,
+			Name:                "MobilePay",
+			Description:         "Pay with MobilePay app",
+			IconURL:             "/assets/images/mobilepay-logo.png",
+			Methods:             []service.PaymentMethod{service.PaymentMethodWallet},
+			Enabled:             true,
+			SupportedCurrencies: []string{"NOK", "DKK", "EUR"},
 		},
 	}
+}
+
+// GetAvailableProvidersForCurrency returns a list of available payment providers that support the given currency
+func (s *MobilePayPaymentService) GetAvailableProvidersForCurrency(currency string) []service.PaymentProvider {
+	providers := s.GetAvailableProviders()
+	var supportedProviders []service.PaymentProvider
+
+	for _, provider := range providers {
+		for _, supportedCurrency := range provider.SupportedCurrencies {
+			if supportedCurrency == currency {
+				supportedProviders = append(supportedProviders, provider)
+				break
+			}
+		}
+	}
+
+	return supportedProviders
 }
 
 // ProcessPayment processes a payment request using MobilePay
@@ -91,10 +109,17 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 	// Generate a unique reference for this payment
 	reference := fmt.Sprintf("order-%d-%s", request.OrderID, uuid.New().String())
 
+	// MobilePay only supports specific currencies (NOK, DKK, EUR)
+	// Use the configured market currency instead of the request currency
+	mobilePayCurrency := s.config.Market
+	if mobilePayCurrency == "" {
+		mobilePayCurrency = "NOK" // Default to NOK if not configured
+	}
+
 	// Construct the payment request
 	paymentRequest := models.CreatePaymentRequest{
 		Amount: models.Amount{
-			Currency: request.Currency,
+			Currency: mobilePayCurrency,
 			Value:    int(request.Amount),
 		},
 		Customer: &models.Customer{
@@ -155,10 +180,17 @@ func (s *MobilePayPaymentService) RefundPayment(transactionID string, amount int
 		return errors.New("invalid payment provider")
 	}
 
+	// MobilePay only supports specific currencies (NOK, DKK, EUR)
+	// Use the configured market currency
+	mobilePayCurrency := s.config.Market
+	if mobilePayCurrency == "" {
+		mobilePayCurrency = "NOK" // Default to NOK if not configured
+	}
+
 	// Prepare refund request
 	refundRequest := models.ModificationRequest{
 		ModificationAmount: models.Amount{
-			Currency: "DKK",
+			Currency: mobilePayCurrency,
 			Value:    int(amount),
 		},
 	}
@@ -182,10 +214,17 @@ func (s *MobilePayPaymentService) CapturePayment(transactionID string, amount in
 		return errors.New("transaction ID is required")
 	}
 
+	// MobilePay only supports specific currencies (NOK, DKK, EUR)
+	// Use the configured market currency
+	mobilePayCurrency := s.config.Market
+	if mobilePayCurrency == "" {
+		mobilePayCurrency = "NOK" // Default to NOK if not configured
+	}
+
 	// Prepare capture request
 	captureRequest := models.ModificationRequest{
 		ModificationAmount: models.Amount{
-			Currency: "DKK",
+			Currency: mobilePayCurrency,
 			Value:    int(amount),
 		},
 	}

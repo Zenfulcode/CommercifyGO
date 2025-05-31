@@ -26,8 +26,6 @@ func main() {
 	productVariantsFlag := flag.Bool("product-variants", false, "Seed product variants data")
 	discountsFlag := flag.Bool("discounts", false, "Seed discounts data")
 	ordersFlag := flag.Bool("orders", false, "Seed orders data")
-	cartsFlag := flag.Bool("carts", false, "Seed carts data")
-	webhooksFlag := flag.Bool("webhooks", false, "Seed webhooks data")
 	paymentTransactionsFlag := flag.Bool("payment-transactions", false, "Seed payment transactions data")
 	shippingFlag := flag.Bool("shipping", false, "Seed shipping data (methods, zones, rates)")
 	clearFlag := flag.Bool("clear", false, "Clear all data before seeding")
@@ -112,27 +110,6 @@ func main() {
 		fmt.Println("Shipping rates seeded successfully")
 	}
 
-	// if *allFlag || *webhooksFlag {
-	// 	if err := seedWebhooks(db); err != nil {
-	// 		log.Fatalf("Failed to seed webhooks: %v", err)
-	// 	}
-	// 	fmt.Println("Webhooks seeded successfully")
-	// }
-
-	// if *allFlag || *cartsFlag {
-	// 	if err := seedCarts(db); err != nil {
-	// 		log.Fatalf("Failed to seed carts: %v", err)
-	// 	}
-	// 	fmt.Println("Carts seeded successfully")
-	// }
-
-	// if *allFlag || *ordersFlag {
-	// 	if err := seedOrders(db); err != nil {
-	// 		log.Fatalf("Failed to seed orders: %v", err)
-	// 	}
-	// 	fmt.Println("Orders seeded successfully")
-	// }
-
 	// if *allFlag || *paymentTransactionsFlag {
 	// 	if err := seedPaymentTransactions(db); err != nil {
 	// 		log.Fatalf("Failed to seed payment transactions: %v", err)
@@ -141,7 +118,7 @@ func main() {
 	// }
 
 	if !*allFlag && !*usersFlag && !*categoriesFlag && !*productsFlag && !*productVariantsFlag &&
-		!*ordersFlag && !*clearFlag && !*discountsFlag && !*cartsFlag && !*webhooksFlag &&
+		!*ordersFlag && !*clearFlag && !*discountsFlag &&
 		!*paymentTransactionsFlag && !*shippingFlag {
 		fmt.Println("No action specified")
 		fmt.Println("\nUsage:")
@@ -160,8 +137,6 @@ func clearData(db *sql.DB) error {
 	tables := []string{
 		"order_items",
 		"orders",
-		"cart_items",
-		"carts",
 		"products",
 		"categories",
 		"users",
@@ -722,246 +697,6 @@ func seedProductVariants(db *sql.DB) error {
 
 		// Notify that variants were created for this product
 		fmt.Printf("Created %d variants for product: %s\n", len(variants), product.name)
-	}
-
-	return nil
-}
-
-// seedCarts seeds cart data
-func seedCarts(db *sql.DB) error {
-	// Get user IDs
-	userRows, err := db.Query("SELECT id FROM users WHERE role = 'user' OR role = 'admin' LIMIT 5")
-	if err != nil {
-		return err
-	}
-	defer userRows.Close()
-
-	var userIDs []int
-	for userRows.Next() {
-		var id int
-		if err := userRows.Scan(&id); err != nil {
-			return err
-		}
-		userIDs = append(userIDs, id)
-	}
-
-	if len(userIDs) == 0 {
-		return fmt.Errorf("no users found to create carts for")
-	}
-
-	// Get product data
-	productRows, err := db.Query("SELECT id, price FROM products LIMIT 10")
-	if err != nil {
-		return err
-	}
-	defer productRows.Close()
-
-	type productInfo struct {
-		id    int
-		price int64
-	}
-
-	var products []productInfo
-	for productRows.Next() {
-		var p productInfo
-		if err := productRows.Scan(&p.id, &p.price); err != nil {
-			return err
-		}
-		products = append(products, p)
-	}
-
-	if len(products) == 0 {
-		return fmt.Errorf("no products found to add to carts")
-	}
-
-	// Get product variant data if available
-	variantRows, err := db.Query("SELECT id, product_id, price FROM product_variants LIMIT 10")
-	var variants []struct {
-		id        int
-		productID int
-		price     int64
-	}
-
-	if err == nil {
-		defer variantRows.Close()
-		for variantRows.Next() {
-			var v struct {
-				id        int
-				productID int
-				price     int64
-			}
-			if err := variantRows.Scan(&v.id, &v.productID, &v.price); err != nil {
-				return err
-			}
-			variants = append(variants, v)
-		}
-	}
-
-	now := time.Now()
-
-	// Create carts with some anonymous carts (no user_id)
-	for i := 0; i < 8; i++ {
-		// Create 3 carts with users, 5 anonymous carts
-		var userID *int
-		if i < 3 && len(userIDs) > i {
-			userID = &userIDs[i]
-		}
-
-		// Generate session_id for carts without users
-		var sessionID *string
-		if userID == nil {
-			token := fmt.Sprintf("guest-session-%s-%d", time.Now().Format("20060102"), i)
-			sessionID = &token
-		}
-
-		// Start a transaction for this cart
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
-		// Insert cart
-		var cartID int
-		err = tx.QueryRow(`
-			INSERT INTO carts (
-				user_id, session_id, created_at, updated_at
-			)
-			VALUES ($1, $2, $3, $4)
-			RETURNING id
-		`,
-			userID,
-			sessionID,
-			now,
-			now,
-		).Scan(&cartID)
-
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		// Add 1-4 random products to cart
-		numItems := (i % 4) + 1
-
-		// Track which products have already been added to this cart to avoid duplicates
-		addedProducts := make(map[int]bool)
-		addedVariants := make(map[int]bool)
-
-		// Use variants if available, otherwise use products
-		if len(variants) > 0 {
-			for j := 0; j < numItems; j++ {
-				// Select variant - ensure we don't pick the same product twice
-				variantIndex := (i + j) % len(variants)
-				variant := variants[variantIndex]
-
-				// Skip if this product was already added to the cart
-				if addedProducts[variant.productID] {
-					// Try to find another product if possible
-					found := false
-					for k := 0; k < len(variants); k++ {
-						testIdx := (variantIndex + k + 1) % len(variants)
-						if !addedProducts[variants[testIdx].productID] {
-							variant = variants[testIdx]
-							found = true
-							break
-						}
-					}
-
-					// If we can't find another product, just skip this one
-					if !found {
-						continue
-					}
-				}
-
-				// Mark this product as added
-				addedProducts[variant.productID] = true
-				addedVariants[variant.id] = true
-
-				// Random quantity between 1 and 3
-				quantity := (j % 3) + 1
-
-				_, err = tx.Exec(`
-					INSERT INTO cart_items (
-						cart_id, product_id, product_variant_id, quantity, created_at, updated_at
-					)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`,
-					cartID,
-					variant.productID,
-					variant.id,
-					quantity,
-					now,
-					now,
-				)
-
-				if err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
-		} else {
-			for j := 0; j < numItems; j++ {
-				// Select product - ensure we don't pick the same product twice
-				productIndex := (i + j) % len(products)
-				product := products[productIndex]
-
-				// Skip if this product was already added to the cart
-				if addedProducts[product.id] {
-					// Try to find another product if possible
-					found := false
-					for k := 0; k < len(products); k++ {
-						testIdx := (productIndex + k + 1) % len(products)
-						if !addedProducts[products[testIdx].id] {
-							product = products[testIdx]
-							found = true
-							break
-						}
-					}
-
-					// If we can't find another product, just skip this one
-					if !found {
-						continue
-					}
-				}
-
-				// Mark this product as added
-				addedProducts[product.id] = true
-
-				// Random quantity between 1 and 3
-				quantity := (j % 3) + 1
-
-				_, err = tx.Exec(`
-					INSERT INTO cart_items (
-						cart_id, product_id, quantity, created_at, updated_at
-					)
-					VALUES ($1, $2, $3, $4, $5)
-				`,
-					cartID,
-					product.id,
-					quantity,
-					now,
-					now,
-				)
-
-				if err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
-		}
-
-		// Commit transaction
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-
-		// Log the cart creation
-		itemCount := len(addedProducts)
-		if userID != nil {
-			fmt.Printf("Created cart #%d for user ID %d with %d items\n", cartID, *userID, itemCount)
-		} else {
-			fmt.Printf("Created guest cart #%d with session ID %s with %d items\n", cartID, *sessionID, itemCount)
-		}
 	}
 
 	return nil
@@ -1861,105 +1596,6 @@ func seedShippingRates(db *sql.DB) error {
 	}
 
 	fmt.Printf("Seeded %d shipping rates with associated rules\n", len(baseRates))
-	return nil
-}
-
-// seedWebhooks seeds webhook data
-func seedWebhooks(db *sql.DB) error {
-	now := time.Now()
-
-	// Insert webhooks
-	webhooks := []struct {
-		provider   string
-		externalID string
-		url        string
-		events     []string
-		secret     string
-		isActive   bool
-	}{
-		{
-			provider:   "stripe",
-			externalID: "evt_stripe_orders_001",
-			url:        "https://example.com/webhooks/stripe/orders",
-			events:     []string{"order.created", "order.updated", "order.paid"},
-			secret:     "whsec_stripe_secret_token_123",
-			isActive:   true,
-		},
-		{
-			provider:   "paypal",
-			externalID: "evt_paypal_payments_001",
-			url:        "https://example.com/webhooks/paypal/payments",
-			events:     []string{"payment.succeeded", "payment.failed", "payment.refunded"},
-			secret:     "whsec_paypal_secret_token_456",
-			isActive:   true,
-		},
-		{
-			provider:   "mobilepay",
-			externalID: "evt_mobilepay_inventory_001",
-			url:        "https://example.com/webhooks/mobilepay/inventory",
-			events:     []string{"product.updated", "product.stock_changed"},
-			secret:     "whsec_mobilepay_secret_789",
-			isActive:   true,
-		},
-		{
-			provider:   "commercify",
-			externalID: "evt_commercify_analytics_001",
-			url:        "https://analytics.example.com/ingest",
-			events:     []string{"user.registered", "user.login", "cart.updated", "product.viewed"},
-			secret:     "whsec_commercify_analytics_secret_abc",
-			isActive:   true,
-		},
-		{
-			provider:   "commercify",
-			externalID: "evt_commercify_shipping_001",
-			url:        "https://logistics.example.com/api/shipping-updates",
-			events:     []string{"order.shipped", "order.delivered"},
-			secret:     "whsec_commercify_shipping_secret_xyz",
-			isActive:   false, // Intentionally inactive for testing
-		},
-	}
-
-	for _, webhook := range webhooks {
-		// Check if webhook with this provider and URL already exists
-		var exists bool
-		err := db.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM webhooks WHERE provider = $1 AND url = $2)`,
-			webhook.provider, webhook.url,
-		).Scan(&exists)
-
-		if err != nil {
-			return err
-		}
-
-		// Only insert if webhook doesn't exist
-		if !exists {
-			eventsJSON, err := json.Marshal(webhook.events)
-			if err != nil {
-				return err
-			}
-
-			_, err = db.Exec(
-				`INSERT INTO webhooks (
-					provider, external_id, url, events, secret, is_active,
-					created_at, updated_at
-				)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-				webhook.provider,
-				webhook.externalID,
-				webhook.url,
-				eventsJSON,
-				webhook.secret,
-				webhook.isActive,
-				now,
-				now,
-			)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	fmt.Printf("Seeded %d webhooks\n", len(webhooks))
 	return nil
 }
 

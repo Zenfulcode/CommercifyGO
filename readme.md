@@ -6,10 +6,12 @@ A robust, scalable e-commerce backend API built with Go, following clean archite
 
 - **User Management**: Registration, authentication, profile management
 - **Product Management**: CRUD operations, categories, variants, search
-- **Shopping Cart**: Add, update, remove items
+- **Checkout System**: Session-based checkout, add/update/remove items, apply discounts, shipping methods
 - **Order Processing**: Create orders, payment processing, order status tracking
 - **Payment Integration**: Support for multiple payment providers (Stripe, MobilePay, etc.)
 - **Email Notifications**: Order confirmations, status updates
+
+> **New**: The Checkout System now uses a session-based approach with cookies. See [Checkout Session Documentation](/docs/checkout_session.md) for details.
 
 ## Technology Stack
 
@@ -155,6 +157,16 @@ Authorization: Bearer <token>
 
 ### API Endpoints
 
+#### Checkout
+
+- `GET /api/checkout` - Retrieves the current checkout session for a user. If no checkout exists, a new one will be created.
+- `POST /api/checkout/items` - Adds a product item to the current checkout session.
+- `PUT /api/checkout/items/{productId}` Updates the quantity or variant of an item in the current checkout.
+- `DELETE /api/checkout/items/{productId}` - Removes an item from the current checkout session.
+- `DELETE /api/checkout` - Removes all items from the current checkout session.
+- `PUT /api/checkout/shipping-addres` - Sets the shipping address for the current checkout.
+- `PUT /api/checkout/billing-address` - Sets the billing address for the current checkout.
+
 #### Users
 
 - `POST /api/users/register` - Register a new user
@@ -184,24 +196,8 @@ Authorization: Bearer <token>
 - `PUT /api/admin/products/{productId}/variants/{variantId}` - Update variant
 - `DELETE /api/admin/products/{productId}/variants/{variantId}` - Delete variant
 
-#### Shopping Cart
-
-- `GET /api/guest/cart` - Get guest cart
-- `POST /api/guest/cart/items` - Add item to guest cart
-- `PUT /api/guest/cart/items/{productId}` - Update guest cart item
-- `DELETE /api/guest/cart/items/{productId}` - Remove item from guest cart
-- `DELETE /api/guest/cart` - Clear guest cart
-- `POST /api/guest/cart/convert` - Convert guest cart to user cart
-- `GET /api/cart` - Get authenticated user's cart
-- `POST /api/cart/items` - Add item to user cart
-- `PUT /api/cart/items/{productId}` - Update user cart item
-- `DELETE /api/cart/items/{productId}` - Remove item from user cart
-- `DELETE /api/cart` - Clear user cart
-
 #### Orders
 
-- `POST /api/guest/orders` - Create guest order
-- `POST /api/guest/orders/{id}/payment` - Process payment for guest order
 - `POST /api/orders` - Create order for authenticated user
 - `GET /api/orders/{id}` - Get order details
 - `GET /api/orders` - List user's orders
@@ -259,11 +255,6 @@ The database consists of the following tables:
 - `categories` - Product categories with hierarchical structure
 - `products` - Product information including name, description, price, and stock
 - `product_variants` - Variations of products with different attributes (size, color, etc.)
-
-### Shopping
-
-- `carts` - Shopping carts for registered users
-- `cart_items` - Items in shopping carts with product and quantity
 
 ### Orders
 

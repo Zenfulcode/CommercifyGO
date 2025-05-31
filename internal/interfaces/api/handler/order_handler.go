@@ -7,10 +7,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
-	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -27,61 +25,6 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 		orderUseCase: orderUseCase,
 		logger:       logger,
 	}
-}
-
-// CreateOrder handles order creation for both authenticated users and guests
-func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	// Parse request body
-	var input dto.CreateOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Check if user is authenticated
-	userID, ok := r.Context().Value("user_id").(uint)
-	if !ok {
-		userID = 0 // Set to 0 for guest orders
-	}
-
-	var order *entity.Order
-	var err error
-
-	if userID > 0 {
-		// Authenticated user checkout
-		order, err = h.orderUseCase.CreateOrderFromCart(convertToCreateOrderInput(input, userID, ""))
-	} else {
-		// Guest checkout
-		// Get session ID from cookie
-		cookie, cookieErr := r.Cookie(common.SessionCookieName)
-		if cookieErr != nil || cookie.Value == "" {
-			http.Error(w, "No cart session found", http.StatusBadRequest)
-			return
-		}
-
-		// Validate required guest fields
-		if input.FirstName == "" || input.LastName == "" {
-			http.Error(w, "First name and last name are required for guest checkout", http.StatusBadRequest)
-			return
-		}
-
-		// Set session ID from cookie
-		order, err = h.orderUseCase.CreateOrderFromCart(convertToCreateOrderInput(input, 0, cookie.Value))
-	}
-
-	if err != nil {
-		h.logger.Error("Failed to create order: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Convert order to DTO
-	orderDTO := convertToOrderDTO(order)
-
-	// Return created order
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(orderDTO)
 }
 
 // GetOrder handles getting an order by ID
@@ -172,132 +115,6 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
-
-// ProcessPayment handles payment processing for an order
-func (h *OrderHandler) ProcessPayment(w http.ResponseWriter, r *http.Request) {
-	// Get order ID from URL
-	vars := mux.Vars(r)
-	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid order ID", http.StatusBadRequest)
-		return
-	}
-
-	// Get the order
-	order, err := h.orderUseCase.GetOrderByID(uint(id))
-	if err != nil {
-		h.logger.Error("Failed to get order: %v", err)
-		http.Error(w, "Order not found", http.StatusNotFound)
-		return
-	}
-
-	// Parse request body
-	var paymentInput dto.ProcessPaymentRequest
-	if err := json.NewDecoder(r.Body).Decode(&paymentInput); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// For registered users, verify authorization
-	if order.UserID > 0 {
-		// Get user ID from context
-		userID, ok := r.Context().Value("user_id").(uint)
-		if !ok || userID == 0 {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		// Check if the user is authorized to process payment for this order
-		if order.UserID != userID {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-	} else {
-		// For guest orders, check the session cookie
-		if !order.IsGuestOrder {
-			http.Error(w, "Invalid order type", http.StatusBadRequest)
-			return
-		}
-
-		// Only allow payment processing for guest orders if they have a valid cookie
-		cookie, cookieErr := r.Cookie(common.SessionCookieName)
-		if cookieErr != nil || cookie.Value == "" {
-			http.Error(w, "Invalid session", http.StatusUnauthorized)
-			return
-		}
-	}
-
-	// Set up payment method based on input
-	var paymentMethod service.PaymentMethod
-	switch paymentInput.PaymentMethod {
-	case "credit_card":
-		paymentMethod = service.PaymentMethodCreditCard
-		if paymentInput.CardDetails == nil {
-			http.Error(w, "Card details are required for credit card payment", http.StatusBadRequest)
-			return
-		}
-	case "wallet":
-		paymentMethod = service.PaymentMethodWallet
-	default:
-		http.Error(w, "Invalid payment method", http.StatusBadRequest)
-		return
-	}
-
-	// Set up payment provider based on input
-	var paymentProvider service.PaymentProviderType
-	switch paymentInput.PaymentProvider {
-	case "stripe":
-		paymentProvider = service.PaymentProviderStripe
-	case "paypal":
-		paymentProvider = service.PaymentProviderPayPal
-	case "mock":
-		paymentProvider = service.PaymentProviderMock
-	case "mobilepay":
-		paymentProvider = service.PaymentProviderMobilePay
-	default:
-		http.Error(w, "Invalid payment provider", http.StatusBadRequest)
-		return
-	}
-
-	// Get customer email based on order type
-	customerEmail := ""
-	if order.IsGuestOrder {
-		customerEmail = order.CustomerDetails.Email
-	} else {
-		// For registered users, get email from user repository
-		user, err := h.orderUseCase.GetUserByID(order.UserID)
-		if err != nil {
-			h.logger.Error("Failed to get user: %v", err)
-			http.Error(w, "Failed to process payment", http.StatusInternalServerError)
-			return
-		}
-		customerEmail = user.Email
-	}
-
-	// Process payment
-	input := usecase.ProcessPaymentInput{
-		OrderID:         uint(id),
-		PaymentMethod:   paymentMethod,
-		PaymentProvider: paymentProvider,
-		CardDetails:     paymentInput.CardDetails,
-		CustomerEmail:   customerEmail,
-		PhoneNumber:     paymentInput.PhoneNumber,
-	}
-
-	updatedOrder, err := h.orderUseCase.ProcessPayment(input)
-	if err != nil {
-		h.logger.Error("Failed to process payment: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Convert order to DTO
-	orderDTO := convertToOrderDTO(updatedOrder)
-
-	// Return updated order
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(orderDTO)
 }
 
 // ListAllOrders handles listing all orders (admin only)
@@ -442,11 +259,11 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 	}
 
 	paymentDetails := dto.PaymentDetails{
-		ID:       order.PaymentID,
-		Provider: dto.PaymentProvider(order.PaymentProvider),
-		Method:   dto.PaymentMethod(order.PaymentMethod),
-		Captured: order.IsCaptured(),
-		Refunded: order.IsRefunded(),
+		PaymentID: order.PaymentID,
+		Provider:  dto.PaymentProvider(order.PaymentProvider),
+		Method:    dto.PaymentMethod(order.PaymentMethod),
+		Captured:  order.IsCaptured(),
+		Refunded:  order.IsRefunded(),
 	}
 
 	var discountDetails dto.DiscountDetails
@@ -481,38 +298,8 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 		ShippingDetails: shippingDetails,
 		DiscountDetails: discountDetails,
 		Customer:        customerDetails,
-		ActionURL:       order.ActionURL,
+		CheckoutID:      order.CheckoutSessionID,
 		CreatedAt:       order.CreatedAt,
 		UpdatedAt:       order.UpdatedAt,
-	}
-}
-
-func convertToCreateOrderInput(input dto.CreateOrderRequest, userID uint, sessionID string) usecase.CreateOrderInput {
-	// Convert addresses
-	shippingAddr := entity.Address{
-		Street:     input.ShippingAddress.AddressLine1,
-		City:       input.ShippingAddress.City,
-		State:      input.ShippingAddress.State,
-		PostalCode: input.ShippingAddress.PostalCode,
-		Country:    input.ShippingAddress.Country,
-	}
-
-	billingAddr := entity.Address{
-		Street:     input.BillingAddress.AddressLine1,
-		City:       input.BillingAddress.City,
-		State:      input.BillingAddress.State,
-		PostalCode: input.BillingAddress.PostalCode,
-		Country:    input.BillingAddress.Country,
-	}
-
-	return usecase.CreateOrderInput{
-		UserID:           userID,
-		SessionID:        sessionID,
-		ShippingAddr:     shippingAddr,
-		BillingAddr:      billingAddr,
-		Email:            input.Email,
-		PhoneNumber:      input.PhoneNumber,
-		FullName:         input.FirstName + " " + input.LastName,
-		ShippingMethodID: input.ShippingMethodID,
 	}
 }
