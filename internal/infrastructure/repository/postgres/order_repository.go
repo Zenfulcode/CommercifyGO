@@ -49,8 +49,8 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 	var query string
 	var err2 error
 
-	// For guest orders, explicitly set user_id to NULL
-	if order.IsGuestOrder {
+	// For guest orders or orders with UserID=0, explicitly set user_id to NULL
+	if order.IsGuestOrder || order.UserID == 0 {
 		// Add guest order fields
 		query = `
 			INSERT INTO orders (
@@ -236,7 +236,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	// Handle guest order fields
 	if isGuestOrder.Valid && isGuestOrder.Bool {
 		order.IsGuestOrder = true
-		order.CustomerDetails = entity.CustomerDetails{
+		order.CustomerDetails = &entity.CustomerDetails{
 			Email:    customerEmail.String,
 			Phone:    customerPhone.String,
 			FullName: customerFullName.String,
@@ -475,7 +475,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 		// Handle guest order fields
 		if isGuestOrder.Valid && isGuestOrder.Bool {
 			order.IsGuestOrder = true
-			order.CustomerDetails = entity.CustomerDetails{
+			order.CustomerDetails = &entity.CustomerDetails{
 				Email:    customerEmail.String,
 				Phone:    customerPhone.String,
 				FullName: customerFullName.String,
@@ -605,7 +605,7 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 		// Handle guest order fields
 		if isGuestOrder.Valid && isGuestOrder.Bool {
 			order.IsGuestOrder = true
-			order.CustomerDetails = entity.CustomerDetails{
+			order.CustomerDetails = &entity.CustomerDetails{
 				Email:    customerEmail.String,
 				Phone:    customerPhone.String,
 				FullName: customerFullName.String,
@@ -768,7 +768,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 	// Handle guest order fields
 	if isGuestOrder.Valid && isGuestOrder.Bool {
 		order.IsGuestOrder = true
-		order.CustomerDetails = entity.CustomerDetails{
+		order.CustomerDetails = &entity.CustomerDetails{
 			Email:    customerEmail.String,
 			Phone:    customerPhone.String,
 			FullName: customerFullName.String,

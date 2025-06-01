@@ -217,7 +217,7 @@ func LoadConfig() (*Config, error) {
 			ReturnURL:            getEnv("RETURN_URL", ""),
 			WebhookURL:           getEnv("MOBILEPAY_WEBHOOK_URL", ""),
 			PaymentDescription:   getEnv("MOBILEPAY_PAYMENT_DESCRIPTION", "Commercify Store Purchase"),
-			Market:               getEnv("MOBILEPAY_MARKET", "NOK"),
+			Market:               getEnv("MOBILEPAY_MARKET", "DKK"), // Default to DKK
 			Enabled:              mobilePayEnabled,
 			IsTestMode:           mobilePayTestMode,
 		},
