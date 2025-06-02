@@ -79,14 +79,9 @@
 							"    pm.expect(response.items.length).to.be.greaterThan(0);",
 							"    ",
 							"    // Check if the item we added is in the cart",
-							"    const addedItem = response.items.find(item => item.product_id === parseInt(pm.collectionVariables.get('product_id')));",
+							"    const addedItem = response.items.find(item => item.sku === pm.collectionVariables.get('first_sku'));",
 							"    pm.expect(addedItem).to.not.be.undefined;",
 							"    pm.expect(addedItem.quantity).to.equal(1);",
-							"    ",
-							"    // Store the first item's product_id for later updates",
-							"    if (response.items.length > 0) {",
-							"        pm.collectionVariables.set('first_item_product_id', response.items[0].product_id);",
-							"    }",
 							"});",
 							"",
 							"pm.test(\"Checkout totals are correct\", function () {",
@@ -113,7 +108,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"product_id\": {{product_id}},\n    \"variant_id\": {{variant_id}},\n    \"quantity\": 1\n}"
+					"raw": "{\n    \"sku\": \"{{first_sku}}\",\n    \"quantity\": 1\n}"
 				},
 				"url": {
 					"raw": "{{baseUrl}}/api/checkout/items",
@@ -142,10 +137,10 @@
 							"});",
 							"",
 							"const response = pm.response.json();",
-							"const productId = pm.collectionVariables.get('first_item_product_id');",
+							"const firstSku = pm.collectionVariables.get('first_sku');",
 							"",
 							"pm.test(\"Item quantity was updated\", function () {",
-							"    const updatedItem = response.items.find(item => item.product_id === parseInt(productId));",
+							"    const updatedItem = response.items.find(item => item.sku === firstSku);",
 							"    pm.expect(updatedItem).to.not.be.undefined;",
 							"    pm.expect(updatedItem.quantity).to.equal(2);",
 							"});",
@@ -177,7 +172,7 @@
 					"raw": "{\n    \"quantity\": 2\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/api/checkout/items/{{first_item_product_id}}",
+					"raw": "{{baseUrl}}/api/checkout/items/{{first_sku}}",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -185,7 +180,7 @@
 						"api",
 						"checkout",
 						"items",
-						"{{first_item_product_id}}"
+						"{{first_sku}}"
 					]
 				},
 				"description": "Updates the quantity of an item in the checkout."
@@ -210,12 +205,9 @@
 							"    pm.expect(response.items.length).to.be.greaterThan(1);",
 							"    ",
 							"    // Check if the second item we added is in the cart",
-							"    const secondItem = response.items.find(item => item.product_id === parseInt(pm.collectionVariables.get('second_product_id')));",
+							"    const secondItem = response.items.find(item => item.sku === pm.collectionVariables.get('second_sku'));",
 							"    pm.expect(secondItem).to.not.be.undefined;",
 							"    pm.expect(secondItem.quantity).to.equal(1);",
-							"    ",
-							"    // Store the second item id for later use",
-							"    pm.collectionVariables.set('second_item_product_id', secondItem.product_id);",
 							"});"
 						],
 						"type": "text/javascript"
@@ -232,7 +224,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"product_id\": {{second_product_id}},\n    \"variant_id\": {{second_variant_id}},\n    \"quantity\": 1\n}"
+					"raw": "{\n    \"sku\": \"{{second_sku}}\",\n    \"quantity\": 1\n}"
 				},
 				"url": {
 					"raw": "{{baseUrl}}/api/checkout/items",
@@ -640,10 +632,10 @@
 							"});",
 							"",
 							"const response = pm.response.json();",
-							"const removedProductId = pm.collectionVariables.get('second_item_product_id');",
+							"const secondSku = pm.collectionVariables.get('second_sku');",
 							"",
 							"pm.test(\"Item was removed from checkout\", function () {",
-							"    const removedItem = response.items.find(item => item.product_id === parseInt(removedProductId));",
+							"    const removedItem = response.items.find(item => item.sku === secondSku);",
 							"    pm.expect(removedItem).to.be.undefined;",
 							"    ",
 							"    // Check we still have one item left",
@@ -658,7 +650,7 @@
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "{{baseUrl}}/api/checkout/items/{{second_item_product_id}}",
+					"raw": "{{baseUrl}}/api/checkout/items/{{second_sku}}",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -666,7 +658,7 @@
 						"api",
 						"checkout",
 						"items",
-						"{{second_item_product_id}}"
+						"{{second_sku}}"
 					]
 				},
 				"description": "Removes a specific item from the checkout."
@@ -1094,33 +1086,13 @@
 			"type": "string"
 		},
 		{
-			"key": "product_id",
-			"value": "1",
+			"key": "first_sku",
+			"value": "Men-B-M",
 			"type": "string"
 		},
 		{
-			"key": "variant_id",
-			"value": "1",
-			"type": "string"
-		},
-		{
-			"key": "second_product_id",
-			"value": "2",
-			"type": "string"
-		},
-		{
-			"key": "second_variant_id",
-			"value": "10",
-			"type": "string"
-		},
-		{
-			"key": "first_item_product_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "second_item_product_id",
-			"value": "",
+			"key": "second_sku",
+			"value": "Women-R-L",
 			"type": "string"
 		},
 		{

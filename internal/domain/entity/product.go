@@ -7,18 +7,19 @@ import (
 )
 
 // Product represents a product in the system
+// Note: All products must have at least one variant. ProductNumber is deprecated in favor of variant SKUs.
 type Product struct {
 	ID            uint              `json:"id"`
-	ProductNumber string            `json:"product_number"`
+	ProductNumber string            `json:"product_number,omitempty"` // Deprecated: Use variant SKUs instead
 	Name          string            `json:"name"`
 	Description   string            `json:"description"`
-	Price         int64             `json:"price"` // Stored as cents (in default currency)
+	Price         int64             `json:"price"` // Stored as cents (default variant price)
 	CurrencyCode  string            `json:"currency_code,omitempty"`
-	Stock         int               `json:"stock"`
+	Stock         int               `json:"stock"`  // Aggregate stock from variants
 	Weight        float64           `json:"weight"` // Weight in kg
 	CategoryID    uint              `json:"category_id"`
 	Images        []string          `json:"images"`
-	HasVariants   bool              `json:"has_variants"`
+	HasVariants   bool              `json:"has_variants"` // Always true, kept for backward compatibility
 	Variants      []*ProductVariant `json:"variants,omitempty"`
 	Prices        []ProductPrice    `json:"prices,omitempty"` // Prices in different currencies
 	CreatedAt     time.Time         `json:"created_at"`
@@ -27,6 +28,7 @@ type Product struct {
 }
 
 // NewProduct creates a new product with the given details (price in cents)
+// Note: This creates a product structure, but at least one variant must be added before saving
 func NewProduct(name, description string, price int64, currencyCode string, stock int, weight float64, categoryID uint, images []string) (*Product, error) {
 	if name == "" {
 		return nil, errors.New("product name cannot be empty")
@@ -43,7 +45,7 @@ func NewProduct(name, description string, price int64, currencyCode string, stoc
 
 	now := time.Now()
 
-	// Generate a temporary product number (will be replaced with actual ID after creation)
+	// Generate a temporary product number (deprecated, variants will have SKUs)
 	productNumber := "PROD-TEMP"
 
 	return &Product{
@@ -56,7 +58,7 @@ func NewProduct(name, description string, price int64, currencyCode string, stoc
 		Weight:        weight,
 		CategoryID:    categoryID,
 		Images:        images,
-		HasVariants:   false,
+		HasVariants:   true, // Always true now - all products have variants
 		Active:        true,
 		CreatedAt:     now,
 		UpdatedAt:     now,

@@ -160,6 +160,61 @@ func (r *ProductRepository) GetByID(productID uint) (*entity.Product, error) {
 	return product, nil
 }
 
+// GetByProductNumber gets a product by product number
+func (r *ProductRepository) GetByProductNumber(productNumber string) (*entity.Product, error) {
+	query := `
+			SELECT id, product_number, name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at
+			FROM products
+			WHERE product_number = $1
+			`
+
+	var imagesJSON []byte
+	product := &entity.Product{}
+	var productNumberResult sql.NullString
+
+	err := r.db.QueryRow(query, productNumber).Scan(
+		&product.ID,
+		&productNumberResult,
+		&product.Name,
+		&product.Description,
+		&product.Price,
+		&product.CurrencyCode,
+		&product.Stock,
+		&product.Weight,
+		&product.CategoryID,
+		&imagesJSON,
+		&product.HasVariants,
+		&product.Active,
+		&product.CreatedAt,
+		&product.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("product not found")
+		}
+		return nil, err
+	}
+
+	// Set product number if valid
+	if productNumberResult.Valid {
+		product.ProductNumber = productNumberResult.String
+	}
+
+	// Unmarshal images JSON
+	if err := json.Unmarshal(imagesJSON, &product.Images); err != nil {
+		return nil, err
+	}
+
+	// Load currency-specific prices
+	prices, err := r.getProductPrices(product.ID)
+	if err != nil {
+		return nil, err
+	}
+	product.Prices = prices
+
+	return product, nil
+}
+
 // getProductPrices retrieves all prices for a product in different currencies
 func (r *ProductRepository) getProductPrices(productID uint) ([]entity.ProductPrice, error) {
 	query := `

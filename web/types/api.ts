@@ -76,8 +76,7 @@ export interface AppliedDiscountDTO {
  * AddToCheckoutRequest represents the data needed to add an item to a checkout
  */
 export interface AddToCheckoutRequest {
-  product_id: number /* uint */;
-  variant_id?: number /* uint */;
+  sku: string;
   quantity: number /* int */;
 }
 /**
@@ -85,7 +84,6 @@ export interface AddToCheckoutRequest {
  */
 export interface UpdateCheckoutItemRequest {
   quantity: number /* int */;
-  variant_id?: number /* uint */;
 }
 /**
  * SetShippingAddressRequest represents the data needed to set a shipping address

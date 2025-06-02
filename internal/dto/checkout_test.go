@@ -277,25 +277,23 @@ func TestAddToCheckoutRequest(t *testing.T) {
 		{
 			name: "full add to checkout request",
 			request: AddToCheckoutRequest{
-				ProductID: 10,
-				VariantID: 20,
-				Quantity:  2,
+				SKU:      "TEST-M",
+				Quantity: 2,
 			},
 			expected: AddToCheckoutRequest{
-				ProductID: 10,
-				VariantID: 20,
-				Quantity:  2,
+				SKU:      "TEST-M",
+				Quantity: 2,
 			},
 		},
 		{
 			name: "without variant ID",
 			request: AddToCheckoutRequest{
-				ProductID: 10,
-				Quantity:  1,
+				SKU:      "TEST-M",
+				Quantity: 1,
 			},
 			expected: AddToCheckoutRequest{
-				ProductID: 10,
-				Quantity:  1,
+				SKU:      "TEST-M",
+				Quantity: 1,
 			},
 		},
 		{
@@ -323,12 +321,12 @@ func TestUpdateCheckoutItemRequest(t *testing.T) {
 		{
 			name: "full update checkout item request",
 			request: UpdateCheckoutItemRequest{
-				Quantity:  3,
-				VariantID: 25,
+				Quantity: 3,
+				SKU:      "TEST-M",
 			},
 			expected: UpdateCheckoutItemRequest{
-				Quantity:  3,
-				VariantID: 25,
+				Quantity: 3,
+				SKU:      "TEST-M",
 			},
 		},
 		{

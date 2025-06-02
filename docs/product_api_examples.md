@@ -2,6 +2,12 @@
 
 This document provides example request bodies and responses for the product system API endpoints.
 
+## Important Notes
+
+- **All products must have at least one variant**: Every product in the system is required to have at least one product variant. If no variants are specified when creating a product, a default variant will be automatically created using the product's basic information.
+- **SKUs are variant-specific**: All SKU-based operations (like adding items to checkout) must use variant SKUs, not product numbers.
+- **Product numbers are deprecated**: While products still have product numbers for backward compatibility, all SKU lookups are now performed against variant SKUs.
+
 ## Public Product Endpoints
 
 ### List Products
@@ -34,7 +40,19 @@ Example response:
       "category_id": 1,
       "seller_id": 2,
       "images": ["smartphone.jpg"],
-      "has_variants": false
+      "has_variants": true,
+      "variants": [
+        {
+          "id": 1,
+          "product_id": 1,
+          "sku": "PROD-000001",
+          "price": 999.99,
+          "stock_quantity": 50,
+          "attributes": [],
+          "images": [],
+          "is_default": true
+        }
+      ]
     },
     {
       "id": 2,
@@ -273,9 +291,11 @@ Request body:
   "weight": 1.5,
   "category_id": 1,
   "images": ["product.jpg"],
-  "has_variants": false
+  "variants": []
 }
 ```
+
+**Note:** All products must have at least one variant. If no variants are provided in the request, a default variant will be automatically created using the product's basic information (price, stock) and the product number as the SKU.
 
 Example response:
 
@@ -295,7 +315,21 @@ Example response:
     "category_id": 1,
     "seller_id": 2,
     "images": ["product.jpg"],
-    "has_variants": false
+    "has_variants": true,
+    "variants": [
+      {
+        "id": 1,
+        "product_id": 4,
+        "sku": "PROD-000004",
+        "price": 199.99,
+        "stock_quantity": 100,
+        "attributes": [],
+        "images": [],
+        "is_default": true,
+        "created_at": "2023-04-25T14:00:00Z",
+        "updated_at": "2023-04-25T14:00:00Z"
+      }
+    ]
   }
 }
 ```
@@ -345,7 +379,7 @@ Example response:
     "category_id": 1,
     "seller_id": 2,
     "images": ["updated-product.jpg"],
-    "has_variants": false
+    "has_variants": true
   }
 }
 ```
@@ -411,7 +445,7 @@ Example response:
       "category_id": 1,
       "seller_id": 2,
       "images": ["updated-product.jpg"],
-      "has_variants": false
+      "has_variants": true
     }
   ],
   "pagination": {
