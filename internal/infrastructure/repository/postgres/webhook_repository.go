@@ -38,7 +38,7 @@ func (r *WebhookRepository) Create(webhook *entity.Webhook) error {
 	// Insert webhook
 	query := `
 		INSERT INTO webhooks (
-			provider, external_id, url, events, secret, is_active, created_at, updated_at
+			provider, external_id, url, events, secret, active, created_at, updated_at
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
@@ -51,7 +51,7 @@ func (r *WebhookRepository) Create(webhook *entity.Webhook) error {
 		webhook.URL,
 		eventsJSON,
 		webhook.Secret,
-		webhook.IsActive,
+		webhook.Active,
 		webhook.CreatedAt,
 		webhook.UpdatedAt,
 	).Scan(&webhook.ID)
@@ -73,7 +73,7 @@ func (r *WebhookRepository) Update(webhook *entity.Webhook) error {
 	// Update webhook
 	query := `
 		UPDATE webhooks
-		SET provider = $1, external_id = $2, url = $3, events = $4, secret = $5, is_active = $6, updated_at = $7
+		SET provider = $1, external_id = $2, url = $3, events = $4, secret = $5, active = $6, updated_at = $7
 		WHERE id = $8
 	`
 
@@ -84,7 +84,7 @@ func (r *WebhookRepository) Update(webhook *entity.Webhook) error {
 		webhook.URL,
 		eventsJSON,
 		webhook.Secret,
-		webhook.IsActive,
+		webhook.Active,
 		webhook.UpdatedAt,
 		webhook.ID,
 	)
@@ -128,7 +128,7 @@ func (r *WebhookRepository) Delete(id uint) error {
 // GetByID returns a webhook by ID
 func (r *WebhookRepository) GetByID(id uint) (*entity.Webhook, error) {
 	query := `
-		SELECT id, provider, external_id, url, events, secret, is_active, created_at, updated_at
+		SELECT id, provider, external_id, url, events, secret, active, created_at, updated_at
 		FROM webhooks
 		WHERE id = $1
 	`
@@ -143,7 +143,7 @@ func (r *WebhookRepository) GetByID(id uint) (*entity.Webhook, error) {
 		&webhook.URL,
 		&eventsJSON,
 		&webhook.Secret,
-		&webhook.IsActive,
+		&webhook.Active,
 		&webhook.CreatedAt,
 		&webhook.UpdatedAt,
 	)
@@ -166,7 +166,7 @@ func (r *WebhookRepository) GetByID(id uint) (*entity.Webhook, error) {
 // GetByProvider returns all webhooks for a specific provider
 func (r *WebhookRepository) GetByProvider(provider string) ([]*entity.Webhook, error) {
 	query := `
-		SELECT id, provider, external_id, url, events, secret, is_active, created_at, updated_at
+		SELECT id, provider, external_id, url, events, secret, active, created_at, updated_at
 		FROM webhooks
 		WHERE provider = $1
 	`
@@ -189,7 +189,7 @@ func (r *WebhookRepository) GetByProvider(provider string) ([]*entity.Webhook, e
 			&webhook.URL,
 			&eventsJSON,
 			&webhook.Secret,
-			&webhook.IsActive,
+			&webhook.Active,
 			&webhook.CreatedAt,
 			&webhook.UpdatedAt,
 		)
@@ -212,9 +212,9 @@ func (r *WebhookRepository) GetByProvider(provider string) ([]*entity.Webhook, e
 // GetActive returns all active webhooks
 func (r *WebhookRepository) GetActive() ([]*entity.Webhook, error) {
 	query := `
-		SELECT id, provider, external_id, url, events, secret, is_active, created_at, updated_at
+		SELECT id, provider, external_id, url, events, secret, active, created_at, updated_at
 		FROM webhooks
-		WHERE is_active = true
+		WHERE active = true
 	`
 
 	rows, err := r.db.Query(query)
@@ -235,7 +235,7 @@ func (r *WebhookRepository) GetActive() ([]*entity.Webhook, error) {
 			&webhook.URL,
 			&eventsJSON,
 			&webhook.Secret,
-			&webhook.IsActive,
+			&webhook.Active,
 			&webhook.CreatedAt,
 			&webhook.UpdatedAt,
 		)
@@ -258,7 +258,7 @@ func (r *WebhookRepository) GetActive() ([]*entity.Webhook, error) {
 // GetByExternalID returns a webhook by external ID
 func (r *WebhookRepository) GetByExternalID(provider string, externalID string) (*entity.Webhook, error) {
 	query := `
-		SELECT id, provider, external_id, url, events, secret, is_active, created_at, updated_at
+		SELECT id, provider, external_id, url, events, secret, active, created_at, updated_at
 		FROM webhooks
 		WHERE provider = $1 AND external_id = $2
 	`
@@ -273,7 +273,7 @@ func (r *WebhookRepository) GetByExternalID(provider string, externalID string) 
 		&webhook.URL,
 		&eventsJSON,
 		&webhook.Secret,
-		&webhook.IsActive,
+		&webhook.Active,
 		&webhook.CreatedAt,
 		&webhook.UpdatedAt,
 	)

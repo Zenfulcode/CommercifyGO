@@ -265,7 +265,7 @@ func (s *Server) setupMobilePayWebhooks(api *mux.Router, webhookHandler *handler
 
 	// Configure webhook handlers
 	for _, webhook := range result {
-		if webhook.IsActive && webhook.Provider == "mobilepay" {
+		if webhook.Active && webhook.Provider == "mobilepay" {
 			handler := webhooks.NewHandler(webhook.Secret)
 			router := webhooks.NewRouter()
 

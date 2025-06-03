@@ -86,7 +86,7 @@ func (s *WebhookService) RegisterMobilePayWebhook(url string, events []string) (
 		URL:        url,
 		Events:     events,
 		Secret:     res.Secret,
-		IsActive:   true,
+		Active:     true,
 	}
 
 	// Save webhook in database

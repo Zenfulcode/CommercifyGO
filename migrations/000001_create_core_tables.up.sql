@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS shipping_methods (
 -- Create orders table with final schema
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
-    friendly_id VARCHAR(20) NOT NULL UNIQUE,
+    order_number VARCHAR(20) NOT NULL UNIQUE,
     user_id INTEGER REFERENCES users(id),
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     shipping_address JSONB NOT NULL,
@@ -158,7 +158,9 @@ CREATE TABLE IF NOT EXISTS discounts (
 CREATE TABLE IF NOT EXISTS webhooks (
     id SERIAL PRIMARY KEY,
     url VARCHAR(500) NOT NULL,
-    events TEXT[] NOT NULL,
+    external_id VARCHAR(255) NOT NULL UNIQUE,
+    provider VARCHAR(50) NOT NULL, -- e.g., 'stripe', 'paypal'
+    events JSONB NOT NULL,
     secret VARCHAR(255) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true,
     action_url VARCHAR(500), -- URL for actions like payment processing
@@ -217,7 +219,7 @@ CREATE INDEX IF NOT EXISTS idx_product_variants_sku ON product_variants(sku);
 
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_friendly_id ON orders(friendly_id);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
@@ -257,8 +259,8 @@ WHERE is_default = true;
 -- Insert default currency
 INSERT INTO currencies (currency_code, name, symbol, exchange_rate, is_default, created_at, updated_at)
 VALUES
-('USD', 'US Dollar', '$', 1.0, true, NOW(), NOW())
-('EUR', 'Euro', '€', 1.2, false, NOW(), NOW())
-('GBP', 'British Pound', '£', 1.4, false, NOW(), NOW())
+('USD', 'US Dollar', '$', 1.0, true, NOW(), NOW()),
+('EUR', 'Euro', '€', 1.2, false, NOW(), NOW()),
+('GBP', 'British Pound', '£', 1.4, false, NOW(), NOW()),
 ('DKK', 'Danish Krone', 'kr', 0.15, false, NOW(), NOW())
 ON CONFLICT (currency_code) DO NOTHING;
