@@ -7,6 +7,7 @@ type ProductRepository interface {
 	Create(product *entity.Product) error
 	GetByID(productID uint) (*entity.Product, error)
 	GetByIDWithVariants(productID uint) (*entity.Product, error)
+	GetByProductNumber(productNumber string) (*entity.Product, error)
 	Update(product *entity.Product) error
 	Delete(productID uint) error
 	List(offset, limit int) ([]*entity.Product, error)

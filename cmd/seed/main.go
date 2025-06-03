@@ -593,17 +593,17 @@ func seedProductVariants(db *sql.DB) error {
 						productID  int
 						images     string
 					}{
-						sku:   fmt.Sprintf("%s-%s-%s", strings.ReplaceAll(product.name, "'s", ""), color[:1], size),
+						sku:   fmt.Sprintf("%s-%s-%s", strings.ReplaceAll(strings.TrimSpace(product.name), "'s", ""), color[:1], size),
 						price: basePrice,
 						stock: 20 - (i * 2) - (j * 1),
 						attributes: []map[string]string{
-							{"name": "Color", "value": color},
-							{"name": "Size", "value": size},
-							{"name": "Material", "value": materialOptions[i%len(materialOptions)]},
+							{"name": "Color", "value": strings.TrimSpace(color)},
+							{"name": "Size", "value": strings.TrimSpace(size)},
+							{"name": "Material", "value": strings.TrimSpace(materialOptions[i%len(materialOptions)])},
 						},
 						isDefault: isDefault,
 						productID: product.id,
-						images:    fmt.Sprintf(`["/images/%s_%s.jpg"]`, strings.ToLower(strings.ReplaceAll(product.name, " ", "")), strings.ToLower(color)),
+						images:    fmt.Sprintf(`["/images/%s_%s.jpg"]`, strings.ToLower(strings.ReplaceAll(strings.TrimSpace(product.name), " ", "")), strings.ToLower(strings.TrimSpace(color))),
 					})
 				}
 			}

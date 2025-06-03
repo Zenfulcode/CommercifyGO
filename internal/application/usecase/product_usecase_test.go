@@ -55,7 +55,9 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		assert.Equal(t, input.Stock, product.Stock)
 		assert.Equal(t, input.CategoryID, product.CategoryID)
 		assert.Equal(t, input.Images, product.Images)
-		assert.Len(t, product.Variants, 0)
+		assert.True(t, product.HasVariants, "Product should have variants set to true")
+		assert.Len(t, product.Variants, 1, "Product should have one default variant")
+		assert.Equal(t, product.ProductNumber, product.Variants[0].SKU, "Default variant SKU should match product number")
 	})
 
 	t.Run("Create product with variants successfully", func(t *testing.T) {
@@ -233,7 +235,7 @@ func TestProductUseCase_GetProductByID(t *testing.T) {
 			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
-			HasVariants: false,
+			HasVariants: true,
 		}
 		productRepo.Create(product)
 
@@ -280,7 +282,7 @@ func TestProductUseCase_GetProductByID(t *testing.T) {
 			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
-			HasVariants: false,
+			HasVariants: true,
 			Prices: []entity.ProductPrice{
 				{
 					CurrencyCode: "USD",
@@ -331,7 +333,7 @@ func TestProductUseCase_GetProductByID(t *testing.T) {
 			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
-			HasVariants: false,
+			HasVariants: true,
 		}
 		productRepo.Create(product)
 
@@ -875,7 +877,7 @@ func TestProductUseCase_DeleteProduct(t *testing.T) {
 			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
-			HasVariants: false,
+			HasVariants: true,
 		}
 		productRepo.Create(product)
 

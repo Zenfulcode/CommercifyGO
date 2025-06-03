@@ -2,6 +2,10 @@
 
 This document outlines the Checkout API endpoints for the Commercify e-commerce system.
 
+## Important Notes
+
+- **SKUs must be variant SKUs**: When adding or updating items in checkout, the SKU parameter must refer to a product variant SKU, not a product number. All products now have at least one variant, and SKU lookups are performed exclusively against the product_variants table.
+
 ## Guest Checkout Endpoints
 
 The following endpoints support guest checkout functionality, allowing users to create and manage checkout sessions without authentication.
@@ -93,8 +97,7 @@ Adds a product item to the current checkout session.
 
 ```json
 {
-  "product_id": 42,
-  "variant_id": 7,
+  "sku": "Men-B-M",
   "quantity": 1
 }
 ```
@@ -161,21 +164,20 @@ Adds a product item to the current checkout session.
 ### Update Checkout Item
 
 ```plaintext
-PUT /api/checkout/items/{productId}
+PUT /api/checkout/items/{sku}
 ```
 
-Updates the quantity or variant of an item in the current checkout.
+Updates the quantity of an item in the current checkout.
 
 **Path Parameters:**
 
-- `productId`: ID of the product to update
+- `sku`: SKU of the product variant to update
 
 **Request Body:**
 
 ```json
 {
-  "quantity": 2,
-  "variant_id": 8
+  "quantity": 2
 }
 ```
 
@@ -224,14 +226,14 @@ Updates the quantity or variant of an item in the current checkout.
 ### Remove Item from Checkout
 
 ```plaintext
-DELETE /api/checkout/items/{productId}
+DELETE /api/checkout/items/{sku}
 ```
 
-Removes an item from the current checkout session.
+Removes an item from the current checkout session using the product variant SKU.
 
 **Path Parameters:**
 
-- `productId`: ID of the product to remove
+- `sku`: SKU of the product variant to remove (e.g., "TS-BL-M")
 
 **Response Body:**
 
@@ -272,7 +274,8 @@ Removes an item from the current checkout session.
 **Status Codes:**
 
 - `200 OK`: Item removed successfully
-- `404 Not Found`: Product not found in checkout
+- `400 Bad Request`: SKU not provided in URL path
+- `404 Not Found`: Product variant not found with provided SKU
 - `500 Internal Server Error`: Server error
 
 ### Clear Checkout
@@ -479,7 +482,7 @@ Sets the customer contact information for the current checkout.
     "address_line1": "123 Main Street",
     "address_line2": "Apt 4B",
     "city": "Springfield",
-    "state": "IL", 
+    "state": "IL",
     "postal_code": "62704",
     "country": "US"
   },
@@ -629,7 +632,7 @@ Applies a discount code to the current checkout.
   "total_weight": 0.6,
   "currency": "USD",
   "discount_code": "SUMMER25",
-  "discount_amount": 12.50,
+  "discount_amount": 12.5,
   "final_amount": 43.47,
   "applied_discount": {
     "id": 5,
@@ -637,7 +640,7 @@ Applies a discount code to the current checkout.
     "type": "basket",
     "method": "percentage",
     "value": 25,
-    "amount": 12.50
+    "amount": 12.5
   },
   "updated_at": "2025-05-24T11:10:00Z",
   "last_activity_at": "2025-05-24T11:10:00Z",
@@ -712,12 +715,12 @@ Removes any applied discount code from the current checkout.
 
 ### Complete Checkout
 
-```plaintext
+````plaintext
 ### Complete Checkout
 
 ```plaintext
 POST /api/checkout/complete
-```
+````
 
 **Request Body:**
 

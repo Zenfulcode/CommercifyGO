@@ -71,15 +71,13 @@ type AppliedDiscountDTO struct {
 
 // AddToCheckoutRequest represents the data needed to add an item to a checkout
 type AddToCheckoutRequest struct {
-	ProductID uint `json:"product_id"`
-	VariantID uint `json:"variant_id,omitempty"`
-	Quantity  int  `json:"quantity"`
+	SKU      string `json:"sku"`
+	Quantity int    `json:"quantity"`
 }
 
 // UpdateCheckoutItemRequest represents the data needed to update a checkout item
 type UpdateCheckoutItemRequest struct {
-	Quantity  int  `json:"quantity"`
-	VariantID uint `json:"variant_id,omitempty"`
+	Quantity int `json:"quantity"`
 }
 
 // SetShippingAddressRequest represents the data needed to set a shipping address

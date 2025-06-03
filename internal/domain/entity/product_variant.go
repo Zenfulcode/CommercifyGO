@@ -41,9 +41,7 @@ func NewProductVariant(productID uint, sku string, price int64, currencyCode str
 	if stock < 0 {
 		return nil, errors.New("stock cannot be negative")
 	}
-	if len(attributes) == 0 {
-		return nil, errors.New("variant must have at least one attribute")
-	}
+	// Note: attributes can be empty for default variants
 
 	now := time.Now()
 	return &ProductVariant{
@@ -58,6 +56,12 @@ func NewProductVariant(productID uint, sku string, price int64, currencyCode str
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}, nil
+}
+
+// NewDefaultProductVariant creates a default product variant using the product's basic information
+// This is used when a product needs at least one variant but no specific variants are provided
+func NewDefaultProductVariant(productID uint, sku string, price int64, currencyCode string, stock int) (*ProductVariant, error) {
+	return NewProductVariant(productID, sku, price, currencyCode, stock, []VariantAttribute{}, []string{}, true)
 }
 
 // UpdateStock updates the variant's stock

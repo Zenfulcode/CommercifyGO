@@ -155,3 +155,13 @@ func (r *MockProductRepository) Search(query string, categoryID uint, minPrice, 
 
 	return result, nil
 }
+
+// GetByProductNumber retrieves a product by product number (SKU)
+func (r *MockProductRepository) GetByProductNumber(productNumber string) (*entity.Product, error) {
+	for _, product := range r.products {
+		if product.ProductNumber == productNumber {
+			return product, nil
+		}
+	}
+	return nil, errors.New("product not found")
+}
