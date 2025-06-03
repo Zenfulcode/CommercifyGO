@@ -1,0 +1,15 @@
+-- Drop all tables in reverse order of dependencies
+
+DROP TABLE IF EXISTS checkout_items CASCADE;
+DROP TABLE IF EXISTS checkouts CASCADE;
+DROP TABLE IF EXISTS webhooks CASCADE;
+DROP TABLE IF EXISTS discounts CASCADE;
+DROP TABLE IF EXISTS payment_transactions CASCADE;
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS shipping_methods CASCADE;
+DROP TABLE IF EXISTS currency_settings CASCADE;
+DROP TABLE IF EXISTS product_variants CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
