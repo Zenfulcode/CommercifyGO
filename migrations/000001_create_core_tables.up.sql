@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS product_variants (
 );
 
 -- Create currency settings table
-CREATE TABLE IF NOT EXISTS currency_settings (
+CREATE TABLE IF NOT EXISTS currencies (
     id SERIAL PRIMARY KEY,
     currency_code VARCHAR(3) NOT NULL UNIQUE,
-    currency_name VARCHAR(100) NOT NULL,
-    currency_symbol VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    symbol VARCHAR(10) NOT NULL,
     exchange_rate DECIMAL(10, 6) NOT NULL DEFAULT 1.0,
     is_default BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL,
@@ -250,11 +250,15 @@ ON checkouts(session_id)
 WHERE status = 'active' AND session_id IS NOT NULL;
 
 -- Ensure only one default currency
-CREATE UNIQUE INDEX IF NOT EXISTS idx_currency_settings_default 
-ON currency_settings(is_default) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_currency_default 
+ON currencies(is_default) 
 WHERE is_default = true;
 
 -- Insert default currency
-INSERT INTO currency_settings (currency_code, currency_name, currency_symbol, exchange_rate, is_default, created_at, updated_at)
-VALUES ('USD', 'US Dollar', '$', 1.0, true, NOW(), NOW())
+INSERT INTO currencies (currency_code, name, symbol, exchange_rate, is_default, created_at, updated_at)
+VALUES
+('USD', 'US Dollar', '$', 1.0, true, NOW(), NOW())
+('EUR', 'Euro', '€', 1.2, false, NOW(), NOW())
+('GBP', 'British Pound', '£', 1.4, false, NOW(), NOW())
+('DKK', 'Danish Krone', 'kr', 0.15, false, NOW(), NOW())
 ON CONFLICT (currency_code) DO NOTHING;
