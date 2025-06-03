@@ -112,7 +112,7 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	fmt.Printf("Checkout session ID: %s\n", checkoutSessionID)
 
 	// Try to find checkout by checkout session ID first
-	checkout, err := h.checkoutUseCase.GetOrCreateCheckout(checkoutSessionID)
+	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		response := dto.ResponseDTO[any]{
@@ -193,7 +193,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
-	checkout, err := h.checkoutUseCase.GetOrCreateCheckout(checkoutSessionID)
+	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		response := dto.ResponseDTO[any]{
