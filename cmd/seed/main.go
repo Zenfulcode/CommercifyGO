@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/infrastructure/database"
@@ -98,16 +98,6 @@ func main() {
 			log.Fatalf("Failed to seed shipping methods: %v", err)
 		}
 		fmt.Println("Shipping methods seeded successfully")
-
-		if err := seedShippingZones(db); err != nil {
-			log.Fatalf("Failed to seed shipping zones: %v", err)
-		}
-		fmt.Println("Shipping zones seeded successfully")
-
-		if err := seedShippingRates(db); err != nil {
-			log.Fatalf("Failed to seed shipping rates: %v", err)
-		}
-		fmt.Println("Shipping rates seeded successfully")
 	}
 
 	// if *allFlag || *paymentTransactionsFlag {
@@ -133,13 +123,25 @@ func clearData(db *sql.DB) error {
 		return err
 	}
 
+	// Temporarily disable the variant deletion trigger
+	if _, err := db.Exec("DROP TRIGGER IF EXISTS prevent_last_variant_deletion ON product_variants"); err != nil {
+		return err
+	}
+
 	// Clear tables in reverse order of dependencies
 	tables := []string{
+		"checkout_items",
+		"checkouts",
+		"payment_transactions",
 		"order_items",
 		"orders",
+		"product_variants",
 		"products",
 		"categories",
 		"users",
+		"discounts",
+		"webhooks",
+		"shipping_methods",
 	}
 
 	for _, table := range tables {
@@ -154,6 +156,17 @@ func clearData(db *sql.DB) error {
 
 	// Re-enable foreign key checks
 	if _, err := db.Exec("SET CONSTRAINTS ALL IMMEDIATE"); err != nil {
+		return err
+	}
+
+	// Re-create the variant deletion trigger
+	triggerSQL := `
+	CREATE TRIGGER prevent_last_variant_deletion
+		BEFORE DELETE ON product_variants
+		FOR EACH ROW
+		EXECUTE FUNCTION check_product_has_variants();
+	`
+	if _, err := db.Exec(triggerSQL); err != nil {
 		return err
 	}
 
@@ -459,19 +472,17 @@ func seedProducts(db *sql.DB) error {
 		},
 	}
 
-	for i, product := range products {
+	for _, product := range products {
 		categoryID, ok := categoryIDs[product.categoryName]
 		if !ok {
 			continue
 		}
-		// Generate product number
-		productNumber := fmt.Sprintf("PROD-%06d", i+1)
 
-		// Check if product with this product_number already exists
+		// Check if product with this name already exists
 		var exists bool
 		err := db.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM products WHERE product_number = $1)`,
-			productNumber,
+			`SELECT EXISTS(SELECT 1 FROM products WHERE name = $1)`,
+			product.name,
 		).Scan(&exists)
 
 		if err != nil {
@@ -481,9 +492,9 @@ func seedProducts(db *sql.DB) error {
 		// Only insert if product doesn't exist
 		if !exists {
 			_, err := db.Exec(
-				`INSERT INTO products (name, description, price, currency_code, stock, category_id, images, created_at, updated_at, product_number, active)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-				product.name, product.description, money.ToCents(product.price), product.currencyCode, product.stock, categoryID, product.images, now, now, productNumber, product.active,
+				`INSERT INTO products (name, description, price, stock, category_id, images, created_at, updated_at, active)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				product.name, product.description, money.ToCents(product.price), product.stock, categoryID, product.images, now, now, product.active,
 			)
 			if err != nil {
 				return err
@@ -662,30 +673,32 @@ func seedProductVariants(db *sql.DB) error {
 					return err
 				}
 
-				// Set has_variants=true for the parent product
-				_, err = db.Exec(
-					`UPDATE products SET has_variants = true WHERE id = $1`,
-					variant.productID,
-				)
-				if err != nil {
-					return err
+				// Insert product variant
+				variantName := product.name
+				if len(variant.attributes) > 0 {
+					var values []string
+					for _, attr := range variant.attributes {
+						if value, ok := attr["value"]; ok {
+							values = append(values, value)
+						}
+					}
+					if len(values) > 0 {
+						variantName = fmt.Sprintf("%s - %s", product.name, strings.Join(values, ", "))
+					}
 				}
 
-				// Insert product variant
 				_, err = db.Exec(
 					`INSERT INTO product_variants (
-						sku, price, stock, attributes, is_default, product_id, currency_code,
-						images, created_at, updated_at
+						product_id, name, sku, price, stock, weight, attributes, created_at, updated_at
 					)
-					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+					variant.productID,
+					variantName,
 					variant.sku,
 					money.ToCents(variant.price),
 					variant.stock,
+					0.5, // Default weight in kg
 					attributesJSON,
-					variant.isDefault,
-					variant.productID,
-					"USD",
-					variant.images,
 					now,
 					now,
 				)
@@ -697,244 +710,6 @@ func seedProductVariants(db *sql.DB) error {
 
 		// Notify that variants were created for this product
 		fmt.Printf("Created %d variants for product: %s\n", len(variants), product.name)
-	}
-
-	return nil
-}
-
-// seedOrders seeds order data
-func seedOrders(db *sql.DB) error {
-	// Get user IDs
-	rows, err := db.Query("SELECT id FROM users WHERE role = 'user' OR role = 'admin'")
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var userIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		userIDs = append(userIDs, id)
-	}
-
-	if len(userIDs) == 0 {
-		return fmt.Errorf("no users found to create orders for")
-	}
-
-	// Get product data
-	productRows, err := db.Query("SELECT id, price FROM products")
-	if err != nil {
-		return err
-	}
-	defer productRows.Close()
-
-	type productInfo struct {
-		id    int
-		price float64
-	}
-
-	var products []productInfo
-	for productRows.Next() {
-		var p productInfo
-		if err := productRows.Scan(&p.id, &p.price); err != nil {
-			return err
-		}
-		products = append(products, p)
-	}
-
-	if len(products) == 0 {
-		return fmt.Errorf("no products found to create orders with")
-	}
-
-	// Sample addresses
-	addresses := []map[string]string{
-		{
-			"street":      "123 Main St",
-			"city":        "New York",
-			"state":       "NY",
-			"postal_code": "10001",
-			"country":     "USA",
-		},
-		{
-			"street":      "456 Oak Ave",
-			"city":        "Los Angeles",
-			"state":       "CA",
-			"postal_code": "90001",
-			"country":     "USA",
-		},
-		{
-			"street":      "789 Pine Rd",
-			"city":        "Chicago",
-			"state":       "IL",
-			"postal_code": "60601",
-			"country":     "USA",
-		},
-		{
-			"street":      "101 Maple Dr",
-			"city":        "Seattle",
-			"state":       "WA",
-			"postal_code": "98101",
-			"country":     "USA",
-		},
-	}
-
-	// Order statuses
-	statuses := []string{"pending", "paid", "shipped", "delivered", "cancelled"}
-
-	// Payment providers
-	paymentProviders := []string{"stripe", "paypal", "mock"}
-
-	// Create orders
-	for i := 0; i < 10; i++ {
-		// Select random user
-		userID := userIDs[i%len(userIDs)]
-
-		// Select random address
-		addrIndex := i % len(addresses)
-		shippingAddr := addresses[addrIndex]
-		billingAddr := addresses[addrIndex] // Use same address for billing
-
-		// Convert addresses to JSON
-		shippingAddrJSON, err := json.Marshal(shippingAddr)
-		if err != nil {
-			return err
-		}
-
-		billingAddrJSON, err := json.Marshal(billingAddr)
-		if err != nil {
-			return err
-		}
-
-		// Select random status
-		status := statuses[i%len(statuses)]
-
-		// Create timestamps
-		now := time.Now()
-		createdAt := now.Add(time.Duration(-i*24) * time.Hour) // Each order created a day apart
-		updatedAt := createdAt
-
-		// Set completed_at for delivered orders
-		var completedAt *time.Time
-		if status == "delivered" {
-			completedTime := updatedAt.Add(3 * 24 * time.Hour) // 3 days after creation
-			completedAt = &completedTime
-		}
-
-		// Set payment details for paid, shipped, or delivered orders
-		var paymentID string
-		var paymentProvider string
-		var trackingCode string
-
-		if status == "paid" || status == "shipped" || status == "delivered" {
-			paymentID = fmt.Sprintf("payment_%d_%s", i, time.Now().Format("20060102"))
-			paymentProvider = paymentProviders[i%len(paymentProviders)]
-		}
-
-		if status == "shipped" || status == "delivered" {
-			trackingCode = fmt.Sprintf("TRACK%d%s", i, time.Now().Format("20060102"))
-		}
-
-		// Generate order number
-		orderNumber := fmt.Sprintf("ORD-%s-%06d", createdAt.Format("20060102"), i+1)
-
-		// Start a transaction
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
-		// Insert order
-		var orderID int
-		err = tx.QueryRow(`
-			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
-				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, order_number
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-			RETURNING id
-		`,
-			userID,
-			0, // Total amount will be updated after adding items
-			status,
-			shippingAddrJSON,
-			billingAddrJSON,
-			paymentID,
-			paymentProvider,
-			trackingCode,
-			createdAt,
-			updatedAt,
-			completedAt,
-			orderNumber,
-		).Scan(&orderID)
-
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		// Add 1-3 random products as order items
-		numItems := (i % 3) + 1
-		totalAmount := 0.0
-
-		// Ensure we don't try to add more items than we have products
-		if numItems > len(products) {
-			numItems = len(products)
-		}
-
-		for j := 0; j < numItems; j++ {
-			// Select product
-			product := products[(i+j)%len(products)]
-
-			// Random quantity between 1 and 3
-			quantity := (j % 3) + 1
-
-			// Calculate subtotal
-			subtotal := float64(quantity) * product.price
-			totalAmount += subtotal
-
-			// Insert order item
-			_, err = tx.Exec(`
-				INSERT INTO order_items (
-					order_id, product_id, quantity, price, subtotal, created_at
-				)
-				VALUES ($1, $2, $3, $4, $5, $6)
-			`,
-				orderID,
-				product.id,
-				quantity,
-				int64(product.price),
-				int64(subtotal),
-				createdAt,
-			)
-
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-		}
-
-		// Update order with total amount
-		_, err = tx.Exec(`
-			UPDATE orders
-			SET total_amount = $1
-			WHERE id = $2
-		`,
-			int64(totalAmount),
-			orderID,
-		)
-
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		// Commit transaction
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -1144,14 +919,25 @@ func seedDiscounts(db *sql.DB) error {
 
 	// Insert discounts
 	for _, discount := range discounts {
-		productIDsJSON, err := json.Marshal(discount.productIDs)
-		if err != nil {
-			return err
+		// Convert value based on method
+		var valueInCents int64
+		if discount.method == "percentage" {
+			// Store percentage as value * 100 (e.g., 10% = 1000)
+			valueInCents = int64(discount.value * 100)
+		} else {
+			// Store fixed amount as cents
+			valueInCents = money.ToCents(discount.value)
 		}
 
-		categoryIDsJSON, err := json.Marshal(discount.categoryIDs)
-		if err != nil {
-			return err
+		// Convert uint slices to int slices for PostgreSQL
+		productIDsInt := make([]int, len(discount.productIDs))
+		for i, id := range discount.productIDs {
+			productIDsInt[i] = int(id)
+		}
+
+		categoryIDsInt := make([]int, len(discount.categoryIDs))
+		for i, id := range discount.categoryIDs {
+			categoryIDsInt[i] = int(id)
 		}
 
 		_, err = db.Exec(
@@ -1165,11 +951,11 @@ func seedDiscounts(db *sql.DB) error {
 			discount.code,
 			discount.discountType,
 			discount.method,
-			discount.value,
+			valueInCents,
 			money.ToCents(discount.minOrderValue),
 			money.ToCents(discount.maxDiscountValue),
-			productIDsJSON,
-			categoryIDsJSON,
+			pq.Array(productIDsInt),
+			pq.Array(categoryIDsInt),
 			discount.startDate,
 			discount.endDate,
 			discount.usageLimit,
@@ -1193,40 +979,58 @@ func seedShippingMethods(db *sql.DB) error {
 
 	// Insert shipping methods
 	methods := []struct {
-		name                  string
-		description           string
-		active                bool
-		estimatedDeliveryDays int
+		name            string
+		description     string
+		baseRate        float64
+		ratePerKg       float64
+		minDeliveryDays int
+		maxDeliveryDays int
+		active          bool
 	}{
 		{
-			name:                  "Standard Shipping",
-			description:           "Standard delivery - 3-5 business days",
-			active:                true,
-			estimatedDeliveryDays: 4, // average of 3-5 days
+			name:            "Standard Shipping",
+			description:     "Standard delivery - 3-5 business days",
+			baseRate:        5.99,
+			ratePerKg:       2.00,
+			minDeliveryDays: 3,
+			maxDeliveryDays: 5,
+			active:          true,
 		},
 		{
-			name:                  "Express Shipping",
-			description:           "Express delivery - 1-2 business days",
-			active:                true,
-			estimatedDeliveryDays: 1, // minimum delivery time
+			name:            "Express Shipping",
+			description:     "Express delivery - 1-2 business days",
+			baseRate:        12.99,
+			ratePerKg:       5.00,
+			minDeliveryDays: 1,
+			maxDeliveryDays: 2,
+			active:          true,
 		},
 		{
-			name:                  "Next Day Delivery",
-			description:           "Next business day delivery (order by 2pm)",
-			active:                true,
-			estimatedDeliveryDays: 1,
+			name:            "Next Day Delivery",
+			description:     "Next business day delivery (order by 2pm)",
+			baseRate:        19.99,
+			ratePerKg:       8.00,
+			minDeliveryDays: 1,
+			maxDeliveryDays: 1,
+			active:          true,
 		},
 		{
-			name:                  "Economy Shipping",
-			description:           "Budget-friendly shipping - 5-8 business days",
-			active:                true,
-			estimatedDeliveryDays: 7, // average of 5-8 days
+			name:            "Economy Shipping",
+			description:     "Budget-friendly shipping - 5-8 business days",
+			baseRate:        3.99,
+			ratePerKg:       1.50,
+			minDeliveryDays: 5,
+			maxDeliveryDays: 8,
+			active:          true,
 		},
 		{
-			name:                  "International Shipping",
-			description:           "International delivery - 7-14 business days",
-			active:                true,
-			estimatedDeliveryDays: 10, // average of 7-14 days
+			name:            "International Shipping",
+			description:     "International delivery - 7-14 business days",
+			baseRate:        25.99,
+			ratePerKg:       10.00,
+			minDeliveryDays: 7,
+			maxDeliveryDays: 14,
+			active:          true,
 		},
 	}
 
@@ -1246,13 +1050,16 @@ func seedShippingMethods(db *sql.DB) error {
 		if !exists {
 			_, err := db.Exec(
 				`INSERT INTO shipping_methods (
-					name, description, active, estimated_delivery_days, created_at, updated_at
+					name, description, base_rate, rate_per_kg, min_delivery_days, max_delivery_days, active, created_at, updated_at
 				)
-				VALUES ($1, $2, $3, $4, $5, $6)`,
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 				method.name,
 				method.description,
+				money.ToCents(method.baseRate),
+				money.ToCents(method.ratePerKg),
+				method.minDeliveryDays,
+				method.maxDeliveryDays,
 				method.active,
-				method.estimatedDeliveryDays,
 				now,
 				now,
 			)
@@ -1263,445 +1070,5 @@ func seedShippingMethods(db *sql.DB) error {
 	}
 
 	fmt.Printf("Seeded %d shipping methods\n", len(methods))
-	return nil
-}
-
-// seedShippingZones seeds shipping zone data
-func seedShippingZones(db *sql.DB) error {
-	now := time.Now()
-
-	// Insert shipping zones
-	zones := []struct {
-		name        string
-		description string
-		countries   []string
-		active      bool
-	}{
-		{
-			name:        "Domestic",
-			description: "Shipping within the United States",
-			countries:   []string{"USA"},
-			active:      true,
-		},
-		{
-			name:        "North America",
-			description: "Shipping to North American countries",
-			countries:   []string{"USA", "CAN", "MEX"},
-			active:      true,
-		},
-		{
-			name:        "Europe",
-			description: "Shipping to European countries",
-			countries:   []string{"GBR", "DEU", "FRA", "ESP", "ITA", "NLD", "SWE", "NOR", "DNK", "FIN"},
-			active:      true,
-		},
-		{
-			name:        "Asia Pacific",
-			description: "Shipping to Asia-Pacific countries",
-			countries:   []string{"JPN", "CHN", "KOR", "AUS", "NZL", "SGP", "THA", "IDN"},
-			active:      true,
-		},
-		{
-			name:        "Rest of World",
-			description: "Shipping to all other countries",
-			countries:   []string{"*"},
-			active:      true,
-		},
-	}
-
-	for _, zone := range zones {
-		// Check if the shipping zone already exists
-		var exists bool
-		err := db.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM shipping_zones WHERE name = $1)`,
-			zone.name,
-		).Scan(&exists)
-
-		if err != nil {
-			return err
-		}
-
-		// Only insert if the shipping zone doesn't exist
-		if !exists {
-			countriesJSON, err := json.Marshal(zone.countries)
-			if err != nil {
-				return err
-			}
-
-			_, err = db.Exec(
-				`INSERT INTO shipping_zones (
-					name, description, countries, active, created_at, updated_at
-				)
-				VALUES ($1, $2, $3, $4, $5, $6)`,
-				zone.name,
-				zone.description,
-				countriesJSON,
-				zone.active,
-				now,
-				now,
-			)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	fmt.Printf("Seeded %d shipping zones\n", len(zones))
-	return nil
-}
-
-// seedShippingRates seeds shipping rate data
-func seedShippingRates(db *sql.DB) error {
-	// Get shipping method IDs
-	methodRows, err := db.Query("SELECT id, name FROM shipping_methods")
-	if err != nil {
-		return err
-	}
-	defer methodRows.Close()
-
-	methodIDs := make(map[string]int)
-	for methodRows.Next() {
-		var id int
-		var name string
-		if err := methodRows.Scan(&id, &name); err != nil {
-			return err
-		}
-		methodIDs[name] = id
-	}
-
-	// Get shipping zone IDs
-	zoneRows, err := db.Query("SELECT id, name FROM shipping_zones")
-	if err != nil {
-		return err
-	}
-	defer zoneRows.Close()
-
-	zoneIDs := make(map[string]int)
-	for zoneRows.Next() {
-		var id int
-		var name string
-		if err := zoneRows.Scan(&id, &name); err != nil {
-			return err
-		}
-		zoneIDs[name] = id
-	}
-
-	now := time.Now()
-
-	// Insert base shipping rates
-	baseRates := []struct {
-		displayName           string // For logging only, not stored in DB
-		methodName            string
-		zoneName              string
-		baseRate              float64
-		minOrderValue         float64
-		freeShippingThreshold *float64
-		active                bool
-		rateType              string
-	}{
-		{
-			displayName:           "Domestic Standard",
-			methodName:            "Standard Shipping",
-			zoneName:              "Domestic",
-			baseRate:              5.99,
-			minOrderValue:         0,
-			freeShippingThreshold: nil,
-			active:                true,
-			rateType:              "flat",
-		},
-		{
-			displayName:           "Domestic Express",
-			methodName:            "Express Shipping",
-			zoneName:              "Domestic",
-			baseRate:              12.99,
-			minOrderValue:         0,
-			freeShippingThreshold: &[]float64{75.0}[0], // Free shipping over $75
-			active:                true,
-			rateType:              "flat",
-		},
-		{
-			displayName:           "North America Standard",
-			methodName:            "Standard Shipping",
-			zoneName:              "North America",
-			baseRate:              15.99,
-			minOrderValue:         0,
-			freeShippingThreshold: &[]float64{100.0}[0], // Free shipping over $100
-			active:                true,
-			rateType:              "flat",
-		},
-		{
-			displayName:           "Europe Standard",
-			methodName:            "Standard Shipping",
-			zoneName:              "Europe",
-			baseRate:              24.99,
-			minOrderValue:         0,
-			freeShippingThreshold: nil,
-			active:                true,
-			rateType:              "weight_based",
-		},
-		{
-			displayName:           "Europe Express",
-			methodName:            "Express Shipping",
-			zoneName:              "Europe",
-			baseRate:              34.99,
-			minOrderValue:         0,
-			freeShippingThreshold: nil,
-			active:                true,
-			rateType:              "weight_based",
-		},
-		{
-			displayName:           "Asia Pacific Standard",
-			methodName:            "Standard Shipping",
-			zoneName:              "Asia Pacific",
-			baseRate:              29.99,
-			minOrderValue:         0,
-			freeShippingThreshold: nil,
-			active:                true,
-			rateType:              "value_based",
-		},
-		{
-			displayName:           "Worldwide Economy",
-			methodName:            "Economy Shipping",
-			zoneName:              "Rest of World",
-			baseRate:              39.99,
-			minOrderValue:         0,
-			freeShippingThreshold: nil,
-			active:                true,
-			rateType:              "value_based",
-		},
-	}
-
-	// Start a transaction for inserting rates
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	for _, rate := range baseRates {
-		methodID, ok := methodIDs[rate.methodName]
-		if !ok {
-			tx.Rollback()
-			return fmt.Errorf("shipping method not found: %s", rate.methodName)
-		}
-
-		zoneID, ok := zoneIDs[rate.zoneName]
-		if !ok {
-			tx.Rollback()
-			return fmt.Errorf("shipping zone not found: %s", rate.zoneName)
-		}
-
-		// Insert basic shipping rate
-		var rateID int
-		var freeShippingThresholdCents *int64
-		if rate.freeShippingThreshold != nil {
-			thresholdCents := money.ToCents(*rate.freeShippingThreshold)
-			freeShippingThresholdCents = &thresholdCents
-		}
-
-		err := tx.QueryRow(
-			`INSERT INTO shipping_rates (
-				shipping_method_id, shipping_zone_id, base_rate, min_order_value, 
-				free_shipping_threshold, active, created_at, updated_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			RETURNING id`,
-			methodID,
-			zoneID,
-			money.ToCents(rate.baseRate),
-			money.ToCents(rate.minOrderValue),
-			freeShippingThresholdCents,
-			rate.active,
-			now,
-			now,
-		).Scan(&rateID)
-
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		// Add weight-based rules for weight-based rates
-		if rate.rateType == "weight_based" {
-			weightRules := []struct {
-				minWeight float64
-				maxWeight float64
-				rate      float64
-			}{
-				{0.0, 1.0, rate.baseRate},
-				{1.01, 2.0, rate.baseRate * 1.5},
-				{2.01, 5.0, rate.baseRate * 2.0},
-				{5.01, 10.0, rate.baseRate * 3.0},
-				{10.01, 20.0, rate.baseRate * 4.0},
-			}
-
-			for _, rule := range weightRules {
-				_, err := tx.Exec(
-					`INSERT INTO weight_based_rates (
-						shipping_rate_id, min_weight, max_weight, rate
-					)
-					VALUES ($1, $2, $3, $4)`,
-					rateID,
-					rule.minWeight,
-					rule.maxWeight,
-					money.ToCents(rule.rate),
-				)
-
-				if err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
-		}
-
-		// Add value-based rules for value-based rates
-		if rate.rateType == "value_based" {
-			valueRules := []struct {
-				minValue float64
-				maxValue float64
-				rate     float64
-			}{
-				{0.0, 50.0, rate.baseRate},
-				{50.01, 100.0, rate.baseRate * 1.25},
-				{100.01, 250.0, rate.baseRate * 1.5},
-				{250.01, 500.0, rate.baseRate * 1.75},
-				{500.01, 1000.0, rate.baseRate * 2.0},
-				{1000.01, 9999999.0, rate.baseRate * 2.5},
-			}
-
-			for _, rule := range valueRules {
-				_, err := tx.Exec(
-					`INSERT INTO value_based_rates (
-						shipping_rate_id, min_order_value, max_order_value, rate
-					)
-					VALUES ($1, $2, $3, $4)`,
-					rateID,
-					money.ToCents(rule.minValue),
-					money.ToCents(rule.maxValue),
-					money.ToCents(rule.rate),
-				)
-
-				if err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
-		}
-
-		fmt.Printf("Created shipping rate: %s (%s to %s)\n", rate.displayName, rate.methodName, rate.zoneName)
-	}
-
-	// Commit the transaction
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	fmt.Printf("Seeded %d shipping rates with associated rules\n", len(baseRates))
-	return nil
-}
-
-// seedPaymentTransactions seeds payment transaction data
-func seedPaymentTransactions(db *sql.DB) error {
-	// Get order IDs with payment providers set
-	orderRows, err := db.Query(`
-		SELECT id, payment_id, payment_provider, total_amount, order_number 
-		FROM orders 
-		WHERE payment_provider IS NOT NULL 
-		AND status IN ('paid', 'shipped', 'delivered')
-	`)
-	if err != nil {
-		return err
-	}
-	defer orderRows.Close()
-
-	type orderInfo struct {
-		id              int
-		paymentID       string
-		paymentProvider string
-		totalAmount     int64
-		orderNumber     string
-	}
-
-	var orders []orderInfo
-	for orderRows.Next() {
-		var o orderInfo
-		if err := orderRows.Scan(&o.id, &o.paymentID, &o.paymentProvider, &o.totalAmount, &o.orderNumber); err != nil {
-			return err
-		}
-		orders = append(orders, o)
-	}
-
-	if len(orders) == 0 {
-		return fmt.Errorf("no paid orders found to create payment transactions for")
-	}
-
-	now := time.Now()
-
-	// Transaction statuses by provider
-	statuses := map[string][]string{
-		"stripe":    {"successful", "pending", "failed"},
-		"paypal":    {"successful", "pending", "failed"},
-		"mobilepay": {"successful", "pending", "failed"},
-		"mock":      {"successful", "pending", "failed"},
-	}
-
-	// Transaction types
-	transactionTypes := []string{"authorize", "capture", "refund"}
-
-	// Create payment transactions
-	for i, order := range orders {
-		// Set transaction status (mostly successful, with a few failures for testing)
-		statusList := statuses[order.paymentProvider]
-		if statusList == nil {
-			statusList = statuses["mock"] // Fallback to mock statuses
-		}
-
-		var status string
-		if i < len(orders)-2 {
-			status = statusList[0] // Success status (first in each list)
-		} else {
-			status = statusList[i%len(statusList)] // Mix of statuses for the last few
-		}
-
-		// Determine transaction type based on index
-		transactionType := transactionTypes[i%len(transactionTypes)]
-
-		// Generate metadata
-		metadata := map[string]interface{}{
-			"order_number": order.orderNumber,
-			"customer_ip":  fmt.Sprintf("192.168.1.%d", 100+i%100),
-			"user_agent":   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-		}
-
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return err
-		}
-
-		// Insert payment transaction using the correct column names from the schema
-		_, err = db.Exec(`
-			INSERT INTO payment_transactions (
-				order_id, transaction_id, type, status, amount, currency, provider,
-				metadata, created_at, updated_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`,
-			order.id,
-			order.paymentID,
-			transactionType,
-			status,
-			order.totalAmount,
-			"USD", // Default currency
-			order.paymentProvider,
-			metadataJSON,
-			now,
-			now,
-		)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	fmt.Printf("Seeded %d payment transactions\n", len(orders))
 	return nil
 }
