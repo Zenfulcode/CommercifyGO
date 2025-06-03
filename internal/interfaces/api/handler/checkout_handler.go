@@ -107,8 +107,12 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	// Always get checkout session ID, needed for all checkouts
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
+	// print request and session ID for debugging
+	h.logger.Debug("AddToCheckout request: %+v", request)
+	fmt.Printf("Checkout session ID: %s\n", checkoutSessionID)
+
 	// Try to find checkout by checkout session ID first
-	checkout, err := h.checkoutUseCase.GetOrCreateCheckout(checkoutSessionID)
+	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		response := dto.ResponseDTO[any]{
@@ -123,9 +127,8 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 
 	// Convert DTO to usecase input
 	checkoutInput := usecase.CheckoutInput{
-		ProductID: request.ProductID,
-		VariantID: request.VariantID,
-		Quantity:  request.Quantity,
+		SKU:      request.SKU,
+		Quantity: request.Quantity,
 	}
 
 	// Add item to checkout
@@ -159,14 +162,14 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 
 // UpdateCheckoutItem handles updating an item in the checkout
 func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Request) {
-	// Get product ID from URL
+	// Get SKU from URL path
 	vars := mux.Vars(r)
-	productID, err := strconv.ParseUint(vars["productId"], 10, 32)
-	if err != nil {
-		h.logger.Error("Invalid product ID: %v", err)
+	sku := vars["sku"]
+	if sku == "" {
+		h.logger.Error("SKU is required in URL path")
 		response := dto.ResponseDTO[any]{
 			Success: false,
-			Error:   "Invalid product ID",
+			Error:   "SKU is required in URL path",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -190,7 +193,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
-	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
+	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		response := dto.ResponseDTO[any]{
@@ -203,15 +206,14 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Convert DTO to usecase input
+	// Convert path parameter and request body to usecase input
 	updateInput := usecase.UpdateCheckoutItemInput{
-		ProductID: uint(productID),
-		VariantID: request.VariantID,
-		Quantity:  request.Quantity,
+		SKU:      sku,
+		Quantity: request.Quantity,
 	}
 
-	checkout.UpdateItem(updateInput.ProductID, updateInput.VariantID, updateInput.Quantity)
-	checkout, err = h.checkoutUseCase.UpdateCheckout(checkout)
+	// Update item in checkout using the new usecase method
+	checkout, err = h.checkoutUseCase.UpdateCheckoutItemBySKU(checkout.ID, updateInput)
 
 	if err != nil {
 		h.logger.Error("Failed to update checkout item: %v", err)
@@ -241,15 +243,14 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 
 // RemoveFromCheckout handles removing an item from the checkout
 func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Request) {
-	// Get product ID from URL
+	// Get SKU from URL path
 	vars := mux.Vars(r)
-	productID, err := strconv.ParseUint(vars["productId"], 10, 32)
-	if err != nil {
-		h.logger.Error("Invalid product ID: %v", err)
-
+	sku := vars["sku"]
+	if sku == "" {
+		h.logger.Error("SKU is required in URL path")
 		response := dto.ResponseDTO[any]{
 			Success: false,
-			Error:   "Invalid product ID",
+			Error:   "SKU is required in URL path",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -272,8 +273,14 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Remove the item from checkout
-	err = checkout.RemoveItem(uint(productID), 0)
+	// Convert SKU to usecase input
+	removeInput := usecase.RemoveItemInput{
+		SKU: sku,
+	}
+
+	// Remove item from checkout using the new usecase method
+	checkout, err = h.checkoutUseCase.RemoveItemBySKU(checkout.ID, removeInput)
+
 	if err != nil {
 		h.logger.Error("Failed to remove item from checkout: %v", err)
 		response := dto.ResponseDTO[any]{
@@ -282,21 +289,6 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Update the checkout
-	checkout, err = h.checkoutUseCase.UpdateCheckout(checkout)
-
-	if err != nil {
-		h.logger.Error("Failed to remove item from checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}

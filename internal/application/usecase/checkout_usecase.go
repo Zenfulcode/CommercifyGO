@@ -13,21 +13,25 @@ import (
 
 // CheckoutInput defines the input for creating/adding to a checkout
 type CheckoutInput struct {
-	ProductID   uint
-	VariantID   uint
+	SKU         string
 	Quantity    int
 	Price       int64
 	Weight      float64
 	ProductName string
 	VariantName string
-	SKU         string
+	ProductID   uint // Internal use only - resolved from SKU
+	VariantID   uint // Internal use only - resolved from SKU
 }
 
 // UpdateCheckoutItemInput defines the input for updating a checkout item
 type UpdateCheckoutItemInput struct {
-	ProductID uint
-	VariantID uint
-	Quantity  int
+	SKU      string
+	Quantity int
+}
+
+// RemoveItemInput defines the input for removing an item from a checkout
+type RemoveItemInput struct {
+	SKU string
 }
 
 // CheckoutUseCase implements checkout business logic
@@ -694,7 +698,7 @@ func (uc *CheckoutUseCase) UpdateOrder(order *entity.Order) error {
 	return uc.orderRepo.Update(order)
 }
 
-// AddItemToCheckout adds an item to a checkout by ID
+// AddItemToCheckout adds an item to a checkout by ID using SKU
 func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInput) (*entity.Checkout, error) {
 	// Get the checkout
 	checkout, err := uc.checkoutRepo.GetByID(checkoutID)
@@ -707,10 +711,21 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("cannot modify a non-active checkout")
 	}
 
-	// Get product details
-	product, err := uc.productRepo.GetByID(input.ProductID)
+	// Validate SKU is provided
+	if input.SKU == "" {
+		return nil, errors.New("SKU is required")
+	}
+
+	// Find the product variant by SKU (all products now have variants)
+	variant, err := uc.productVariantRepo.GetBySKU(input.SKU)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
+	}
+
+	// Get the parent product
+	product, err := uc.productRepo.GetByID(variant.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product for variant: %w", err)
 	}
 
 	// Check if product is active
@@ -718,42 +733,137 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("product is not available")
 	}
 
-	// Populate missing fields in the input
-	input.ProductName = product.Name
-	input.Price = product.Price
-	input.Weight = product.Weight
-
-	// If variant ID is provided, get variant details
-	if input.VariantID > 0 {
-		variant, err := uc.productVariantRepo.GetByID(input.VariantID)
-		if err != nil {
-			return nil, err
+	// Extract variant name from attributes
+	variantName := ""
+	for _, attr := range variant.Attributes {
+		if variantName == "" {
+			variantName = attr.Value
+		} else {
+			variantName += " / " + attr.Value
 		}
-
-		// Make sure variant belongs to this product
-		if variant.ProductID != input.ProductID {
-			return nil, errors.New("variant does not belong to the specified product")
-		}
-
-		// Extract variant name from attributes
-		variantName := ""
-		for _, attr := range variant.Attributes {
-			if variantName == "" {
-				variantName = attr.Value
-			} else {
-				variantName += " / " + attr.Value
-			}
-		}
-
-		// Override with variant-specific details
-		// TODO: might delete VariantName later
-		input.VariantName = variantName
-		input.SKU = variant.SKU
-		input.Price = variant.Price
 	}
+
+	// Populate input with variant details
+	input.ProductID = variant.ProductID
+	input.VariantID = variant.ID
+	input.ProductName = product.Name
+	input.VariantName = variantName
+	input.Price = variant.Price
+	input.Weight = product.Weight
 
 	// Add the item to the checkout
 	err = checkout.AddItem(input.ProductID, input.VariantID, input.Quantity, input.Price, input.Weight, input.ProductName, input.VariantName, input.SKU)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save the updated checkout
+	err = uc.checkoutRepo.Update(checkout)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkout, nil
+}
+
+// UpdateCheckoutItemBySKU updates an item in a checkout by SKU
+func (uc *CheckoutUseCase) UpdateCheckoutItemBySKU(checkoutID uint, input UpdateCheckoutItemInput) (*entity.Checkout, error) {
+	// Get the checkout
+	checkout, err := uc.checkoutRepo.GetByID(checkoutID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if checkout is active
+	if checkout.Status != entity.CheckoutStatusActive {
+		return nil, errors.New("cannot modify a non-active checkout")
+	}
+
+	// Validate SKU is provided
+	if input.SKU == "" {
+		return nil, errors.New("SKU is required")
+	}
+
+	// Validate quantity
+	if input.Quantity <= 0 {
+		return nil, errors.New("quantity must be greater than zero")
+	}
+
+	// Find the product variant by SKU (all products now have variants)
+	variant, err := uc.productVariantRepo.GetBySKU(input.SKU)
+	if err != nil {
+		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
+	}
+
+	// Get the parent product
+	product, err := uc.productRepo.GetByID(variant.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product for variant: %w", err)
+	}
+
+	// Check if product is active
+	if !product.Active {
+		return nil, errors.New("product is not available")
+	}
+
+	productID := variant.ProductID
+	variantID := variant.ID
+
+	// Update the item in the checkout
+	err = checkout.UpdateItem(productID, variantID, input.Quantity)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save the updated checkout
+	err = uc.checkoutRepo.Update(checkout)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkout, nil
+}
+
+// RemoveItemBySKU removes an item from a checkout by SKU
+func (uc *CheckoutUseCase) RemoveItemBySKU(checkoutID uint, input RemoveItemInput) (*entity.Checkout, error) {
+	// Get the checkout
+	checkout, err := uc.checkoutRepo.GetByID(checkoutID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if checkout is active
+	if checkout.Status != entity.CheckoutStatusActive {
+		return nil, errors.New("cannot modify a non-active checkout")
+	}
+
+	// Validate SKU is provided
+	if input.SKU == "" {
+		return nil, errors.New("SKU is required")
+	}
+
+	// Find the product variant by SKU (all products now have variants)
+	variant, err := uc.productVariantRepo.GetBySKU(input.SKU)
+	if err != nil {
+		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
+	}
+
+	// Get the parent product
+	product, err := uc.productRepo.GetByID(variant.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product for variant: %w", err)
+	}
+
+	// Check if product is active
+	if !product.Active {
+		return nil, errors.New("product is not available")
+	}
+
+	productID := variant.ProductID
+	variantID := variant.ID
+
+	// Remove the item from the checkout
+	err = checkout.RemoveItem(productID, variantID)
 	if err != nil {
 		return nil, err
 	}

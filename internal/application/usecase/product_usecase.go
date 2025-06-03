@@ -177,6 +177,28 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 		// Add variants to product
 		product.Variants = variants
 		product.HasVariants = true
+	} else {
+		// ALL PRODUCTS MUST HAVE AT LEAST ONE VARIANT
+		// Create a default variant using the product's basic information
+		defaultVariant, err := entity.NewDefaultProductVariant(
+			product.ID,
+			product.ProductNumber, // Use product number as SKU
+			product.Price,         // Use product price
+			product.CurrencyCode,
+			product.Stock, // Use product stock
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Save the default variant
+		if err := uc.productVariantRepo.Create(defaultVariant); err != nil {
+			return nil, err
+		}
+
+		// Add variant to product
+		product.Variants = []*entity.ProductVariant{defaultVariant}
+		product.HasVariants = true
 	}
 
 	return product, nil

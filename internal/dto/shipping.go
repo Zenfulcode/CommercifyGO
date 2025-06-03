@@ -245,7 +245,7 @@ func ConvertToShippingRateDTO(rate *entity.ShippingRate) ShippingRateDTO {
 	}
 
 	// Convert weight-based rates
-	if rate.WeightBasedRates != nil && len(rate.WeightBasedRates) > 0 {
+	if len(rate.WeightBasedRates) > 0 {
 		dto.WeightBasedRates = make([]WeightBasedRateDTO, len(rate.WeightBasedRates))
 		for i, wbr := range rate.WeightBasedRates {
 			dto.WeightBasedRates[i] = ConvertToWeightBasedRateDTO(&wbr)
@@ -253,7 +253,7 @@ func ConvertToShippingRateDTO(rate *entity.ShippingRate) ShippingRateDTO {
 	}
 
 	// Convert value-based rates
-	if rate.ValueBasedRates != nil && len(rate.ValueBasedRates) > 0 {
+	if len(rate.ValueBasedRates) > 0 {
 		dto.ValueBasedRates = make([]ValueBasedRateDTO, len(rate.ValueBasedRates))
 		for i, vbr := range rate.ValueBasedRates {
 			dto.ValueBasedRates[i] = ConvertToValueBasedRateDTO(&vbr)
