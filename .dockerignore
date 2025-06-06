@@ -1,0 +1,14 @@
+.github
+.vscode
+bin/
+docs/
+web/
+
+.env.example
+.env.test
+cookies.txt
+docker-compose.yml
+readme.md
+SECURITY.md
+todo.txt
+tygo.yaml

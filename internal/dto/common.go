@@ -33,3 +33,27 @@ type AddressDTO struct {
 	PostalCode   string `json:"postal_code"`
 	Country      string `json:"country"`
 }
+
+func ErrorResponse(message string) ResponseDTO[any] {
+	return ResponseDTO[any]{
+		Success: false,
+		Error:   message,
+	}
+}
+
+func SuccessResponseWithMessage[T any](data T, message string) ResponseDTO[T] {
+	return ResponseDTO[T]{
+		Success: true,
+		Data:    data,
+		Message: message,
+	}
+}
+
+func SuccessResponse[T any](data T) ResponseDTO[T] {
+	response := ResponseDTO[T]{
+		Success: true,
+		Data:    data,
+	}
+
+	return response
+}
