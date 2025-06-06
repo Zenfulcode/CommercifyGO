@@ -392,6 +392,9 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 
 	// Parse pagination parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 {
+		page = 1 // Default page
+	}
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if pageSize <= 0 {
 		pageSize = 10 // Default page size
