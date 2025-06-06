@@ -176,7 +176,8 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 
 		// Add variants to product
 		product.Variants = variants
-		product.HasVariants = true
+		// Only set has_variants=true if there are multiple variants
+		product.HasVariants = len(variants) > 1
 	} else {
 		// ALL PRODUCTS MUST HAVE AT LEAST ONE VARIANT
 		// Create a default variant using the product's basic information
@@ -198,7 +199,8 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 
 		// Add variant to product
 		product.Variants = []*entity.ProductVariant{defaultVariant}
-		product.HasVariants = true
+		// Single default variant means has_variants=false
+		product.HasVariants = false
 	}
 
 	return product, nil
@@ -471,18 +473,17 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		}
 	}
 
-	// If this is the first variant or it's set as default, update product
-	isFirstVariant := !product.HasVariants
-	if isFirstVariant || input.IsDefault {
-		// If this is the first variant, set product to have variants
-		if isFirstVariant {
+	// Check if this will be the second variant (making it a multi-variant product)
+	currentVariantCount := len(product.Variants)
+
+	if currentVariantCount >= 1 || input.IsDefault {
+		// If this will be the second or more variant, set product to have variants
+		if currentVariantCount >= 1 {
 			product.HasVariants = true
 		}
 
-		// If this is the default variant, update product price and weight
-		// TODO: Handle this in the repository
-		if input.IsDefault && isFirstVariant {
-			// If there are other variants, unset their default status
+		// If this is the default variant, unset any other default variants
+		if input.IsDefault {
 			variants := product.Variants
 
 			for _, v := range variants {

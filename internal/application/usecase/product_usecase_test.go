@@ -55,7 +55,7 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		assert.Equal(t, input.Stock, product.Stock)
 		assert.Equal(t, input.CategoryID, product.CategoryID)
 		assert.Equal(t, input.Images, product.Images)
-		assert.True(t, product.HasVariants, "Product should have variants set to true")
+		assert.False(t, product.HasVariants, "Product should have variants set to false for single default variant")
 		assert.Len(t, product.Variants, 1, "Product should have one default variant")
 		assert.Equal(t, product.ProductNumber, product.Variants[0].SKU, "Default variant SKU should match product number")
 	})
@@ -426,7 +426,7 @@ func TestProductUseCase_AddVariant(t *testing.T) {
 		productVariantRepo := mock.NewMockProductVariantRepository()
 		currencyRepo := mock.NewMockCurrencyRepository()
 
-		// Create a test product without variants
+		// Create a test product with a default variant (as per business rules)
 		product := &entity.Product{
 			ID:          1,
 			Name:        "Test Product",
@@ -435,8 +435,21 @@ func TestProductUseCase_AddVariant(t *testing.T) {
 			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
+			HasVariants: false, // Starts with false since it has only one variant
 		}
 		productRepo.Create(product)
+
+		// Create a default variant that already exists
+		defaultVariant := &entity.ProductVariant{
+			ID:        1,
+			ProductID: 1,
+			SKU:       "DEFAULT-SKU",
+			Price:     9999,
+			Stock:     100,
+			IsDefault: true,
+		}
+		productVariantRepo.Create(defaultVariant)
+		product.Variants = []*entity.ProductVariant{defaultVariant}
 
 		// Create use case with mocks
 		productUseCase := usecase.NewProductUseCase(

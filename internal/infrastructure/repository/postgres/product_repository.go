@@ -29,9 +29,8 @@ func NewProductRepository(db *sql.DB, variantRepository repository.ProductVarian
 // Create creates a new product
 func (r *ProductRepository) Create(product *entity.Product) error {
 	query := `
-
-	INSERT INTO products (name, description, price, currency_code, stock, weight, category_id, images, has_variants,active, created_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8,$9, $10, $11)
+	INSERT INTO products (name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	RETURNING id
 	`
 

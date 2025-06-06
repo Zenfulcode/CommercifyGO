@@ -97,9 +97,6 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 		return errors.New("variant does not belong to this product")
 	}
 
-	// Set product to have variants
-	p.HasVariants = true
-
 	// If this is the first variant and it's the default, set product price to match
 	if len(p.Variants) == 0 && variant.IsDefault {
 		p.Price = variant.Price
@@ -107,6 +104,10 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 
 	// Add variant to product
 	p.Variants = append(p.Variants, variant)
+
+	// Only set has_variants=true if there are now multiple variants
+	p.HasVariants = len(p.Variants) > 1
+
 	p.UpdatedAt = time.Now()
 
 	return nil
@@ -114,7 +115,7 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 
 // GetDefaultVariant returns the default variant of the product
 func (p *Product) GetDefaultVariant() *ProductVariant {
-	if !p.HasVariants || len(p.Variants) == 0 {
+	if len(p.Variants) == 0 {
 		return nil
 	}
 
@@ -130,7 +131,7 @@ func (p *Product) GetDefaultVariant() *ProductVariant {
 
 // GetVariantByID returns a variant by its ID
 func (p *Product) GetVariantByID(variantID uint) *ProductVariant {
-	if !p.HasVariants || len(p.Variants) == 0 {
+	if len(p.Variants) == 0 {
 		return nil
 	}
 
@@ -145,7 +146,7 @@ func (p *Product) GetVariantByID(variantID uint) *ProductVariant {
 
 // GetVariantBySKU returns a variant by its SKU
 func (p *Product) GetVariantBySKU(sku string) *ProductVariant {
-	if !p.HasVariants || len(p.Variants) == 0 || sku == "" {
+	if len(p.Variants) == 0 || sku == "" {
 		return nil
 	}
 

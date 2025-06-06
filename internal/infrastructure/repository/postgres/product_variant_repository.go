@@ -304,8 +304,8 @@ func (r *ProductVariantRepository) Delete(variantID uint) error {
 		return errors.New("variant not found or already deleted")
 	}
 
-	// If this was the only variant, update product to not have variants
-	if variantCount == 1 {
+	// If this deletion will leave only one variant, update product to not have multiple variants
+	if variantCount == 2 {
 		_, err = tx.Exec(
 			"UPDATE products SET has_variants = false WHERE id = $1",
 			productID,

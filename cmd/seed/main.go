@@ -643,6 +643,7 @@ func seedProductVariants(db *sql.DB) error {
 		}
 
 		// Insert variants for this product
+		variantsCreated := 0
 		for _, variant := range variants {
 			// Check if variant with this SKU already exists
 			var exists bool
@@ -658,15 +659,6 @@ func seedProductVariants(db *sql.DB) error {
 			// Only insert if variant doesn't exist
 			if !exists {
 				attributesJSON, err := json.Marshal(variant.attributes)
-				if err != nil {
-					return err
-				}
-
-				// Set has_variants=true for the parent product
-				_, err = db.Exec(
-					`UPDATE products SET has_variants = true WHERE id = $1`,
-					variant.productID,
-				)
 				if err != nil {
 					return err
 				}
@@ -692,11 +684,23 @@ func seedProductVariants(db *sql.DB) error {
 				if err != nil {
 					return err
 				}
+				variantsCreated++
+			}
+		}
+
+		// Only set has_variants=true if there are multiple variants for this product
+		if len(variants) > 1 {
+			_, err = db.Exec(
+				`UPDATE products SET has_variants = true WHERE id = $1`,
+				product.id,
+			)
+			if err != nil {
+				return err
 			}
 		}
 
 		// Notify that variants were created for this product
-		fmt.Printf("Created %d variants for product: %s\n", len(variants), product.name)
+		fmt.Printf("Created %d variants for product: %s\n", variantsCreated, product.name)
 	}
 
 	return nil
