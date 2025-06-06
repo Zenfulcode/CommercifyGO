@@ -42,6 +42,16 @@ func (u *WebhookUseCase) RegisterMobilePayWebhook(input RegisterWebhookInput) (*
 	return u.webhookService.RegisterMobilePayWebhook(input.URL, input.Events)
 }
 
+func (u *WebhookUseCase) DeleteMobilePayWebhook(externalID string) error {
+	// Validate ID
+	if externalID == "" {
+		return entity.ErrInvalidInput{Field: "id", Message: "ID is required"}
+	}
+
+	// Delete webhook from MobilePay
+	return u.webhookService.ForceDeleteMobilePayWebhook(externalID)
+}
+
 // DeleteWebhook deletes a webhook
 func (u *WebhookUseCase) DeleteWebhook(id uint) error {
 	webhook, err := u.webhookRepo.GetByID(id)
@@ -51,7 +61,7 @@ func (u *WebhookUseCase) DeleteWebhook(id uint) error {
 
 	// Delete from provider if supported
 	if webhook.Provider == "mobilepay" {
-		return u.webhookService.DeleteMobilePayWebhook(id)
+		return u.webhookService.DeleteMobilePayWebhook(webhook.ExternalID)
 	}
 
 	// Otherwise just delete from our database

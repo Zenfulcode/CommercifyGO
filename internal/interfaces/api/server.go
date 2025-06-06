@@ -204,6 +204,7 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/webhooks/{webhookId:[0-9]+}", webhookHandler.DeleteWebhook).Methods(http.MethodDelete)
 	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.RegisterMobilePayWebhook).Methods(http.MethodPost)
 	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.GetMobilePayWebhooks).Methods(http.MethodGet)
+	admin.HandleFunc("/webhooks/mobilepay/{externalId}", webhookHandler.DeleteMobilePayWebhook).Methods(http.MethodDelete)
 
 	admin.HandleFunc("/products", productHandler.ListProducts).Methods(http.MethodGet)
 	admin.HandleFunc("/products", productHandler.CreateProduct).Methods(http.MethodPost)
