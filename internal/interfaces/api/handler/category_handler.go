@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
@@ -54,6 +55,11 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 
 		if err.Error() == "parent category does not exist" || err.Error() == "parent category not found" {
 			statusCode = http.StatusBadRequest
+			errorMessage = err.Error()
+		}
+
+		if strings.Contains(err.Error(), "a category with the name") {
+			statusCode = http.StatusConflict
 			errorMessage = err.Error()
 		}
 

@@ -3,6 +3,7 @@ package usecase
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -47,6 +48,16 @@ func (uc *CategoryUseCase) CreateCategory(input CreateCategory) (*entity.Categor
 
 	// Save to repository
 	if err := uc.categoryRepo.Create(category); err != nil {
+		// Check for unique constraint violations
+		if strings.Contains(err.Error(), "unique_root_category_name") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists at the root level", input.Name)
+		}
+		if strings.Contains(err.Error(), "unique_child_category_name_parent") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists under this parent category", input.Name)
+		}
+		if strings.Contains(err.Error(), "unique_category_name_parent") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists at this level", input.Name)
+		}
 		return nil, fmt.Errorf("failed to save category: %w", err)
 	}
 
@@ -108,6 +119,16 @@ func (uc *CategoryUseCase) UpdateCategory(input UpdateCategory) (*entity.Categor
 
 	// Save updated category
 	if err := uc.categoryRepo.Update(category); err != nil {
+		// Check for unique constraint violations
+		if strings.Contains(err.Error(), "unique_root_category_name") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists at the root level", category.Name)
+		}
+		if strings.Contains(err.Error(), "unique_child_category_name_parent") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists under this parent category", category.Name)
+		}
+		if strings.Contains(err.Error(), "unique_category_name_parent") {
+			return nil, fmt.Errorf("a category with the name '%s' already exists at this level", category.Name)
+		}
 		return nil, fmt.Errorf("failed to update category: %w", err)
 	}
 
@@ -119,7 +140,7 @@ func (uc *CategoryUseCase) DeleteCategory(categoryID uint) error {
 	// Check if category exists
 	_, err := uc.categoryRepo.GetByID(categoryID)
 	if err != nil {
-		return fmt.Errorf("failed to get category: %w", err)
+		return fmt.Errorf("category not found")
 	}
 
 	// Check if category has children
