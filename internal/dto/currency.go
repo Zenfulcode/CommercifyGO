@@ -24,18 +24,6 @@ type CurrencyDTO struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// CurrencyDetailDTO represents detailed currency information
-type CurrencyDetailDTO struct {
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	Symbol       string    `json:"symbol"`
-	ExchangeRate float64   `json:"exchange_rate"`
-	IsEnabled    bool      `json:"is_enabled"`
-	IsDefault    bool      `json:"is_default"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
 // CurrencySummaryDTO represents a simplified currency view
 type CurrencySummaryDTO struct {
 	Code         string  `json:"code"`
@@ -84,43 +72,6 @@ type SetDefaultCurrencyRequest struct {
 // RESPONSE DTOs
 // =================================================================================================
 
-// CreateCurrencyResponse represents the response after creating a currency
-type CreateCurrencyResponse struct {
-	Currency CurrencyDetailDTO `json:"currency"`
-}
-
-// UpdateCurrencyResponse represents the response after updating a currency
-type UpdateCurrencyResponse struct {
-	Currency CurrencyDetailDTO `json:"currency"`
-}
-
-// GetCurrencyResponse represents the response for getting a currency
-type GetCurrencyResponse struct {
-	Currency CurrencyDetailDTO `json:"currency"`
-}
-
-// ListCurrenciesResponse represents the response for listing currencies
-type ListCurrenciesResponse struct {
-	Currencies []CurrencyDTO `json:"currencies"`
-	Total      int           `json:"total"`
-}
-
-// ListEnabledCurrenciesResponse represents the response for listing enabled currencies
-type ListEnabledCurrenciesResponse struct {
-	Currencies []CurrencySummaryDTO `json:"currencies"`
-	Total      int                  `json:"total"`
-}
-
-// GetDefaultCurrencyResponse represents the response for getting the default currency
-type GetDefaultCurrencyResponse struct {
-	Currency CurrencyDetailDTO `json:"currency"`
-}
-
-// SetDefaultCurrencyResponse represents the response after setting default currency
-type SetDefaultCurrencyResponse struct {
-	Currency CurrencyDetailDTO `json:"currency"`
-}
-
 // ConvertAmountResponse represents the response for currency conversion
 type ConvertAmountResponse struct {
 	From ConvertedAmountDTO `json:"from"`
@@ -144,8 +95,8 @@ type DeleteCurrencyResponse struct {
 // CONVERSION FUNCTIONS - Entity to DTO
 // =================================================================================================
 
-// FromCurrencyEntity converts a Currency entity to CurrencyDTO
-func FromCurrencyEntity(currency *entity.Currency) CurrencyDTO {
+// toCurrencyDTO converts a Currency entity to CurrencyDTO
+func toCurrencyDTO(currency *entity.Currency) CurrencyDTO {
 	return CurrencyDTO{
 		Code:         currency.Code,
 		Name:         currency.Name,
@@ -158,22 +109,8 @@ func FromCurrencyEntity(currency *entity.Currency) CurrencyDTO {
 	}
 }
 
-// FromCurrencyEntityDetail converts a Currency entity to CurrencyDetailDTO
-func FromCurrencyEntityDetail(currency *entity.Currency) CurrencyDetailDTO {
-	return CurrencyDetailDTO{
-		Code:         currency.Code,
-		Name:         currency.Name,
-		Symbol:       currency.Symbol,
-		ExchangeRate: currency.ExchangeRate,
-		IsEnabled:    currency.IsEnabled,
-		IsDefault:    currency.IsDefault,
-		CreatedAt:    currency.CreatedAt,
-		UpdatedAt:    currency.UpdatedAt,
-	}
-}
-
 // FromCurrencyEntitySummary converts a Currency entity to CurrencySummaryDTO
-func FromCurrencyEntitySummary(currency *entity.Currency) CurrencySummaryDTO {
+func toCurrencySummary(currency *entity.Currency) CurrencySummaryDTO {
 	return CurrencySummaryDTO{
 		Code:         currency.Code,
 		Name:         currency.Name,
@@ -183,20 +120,20 @@ func FromCurrencyEntitySummary(currency *entity.Currency) CurrencySummaryDTO {
 	}
 }
 
-// FromCurrencyEntities converts a slice of Currency entities to CurrencyDTOs
-func FromCurrencyEntities(currencies []*entity.Currency) []CurrencyDTO {
+// fromCurrencyEntities converts a slice of Currency entities to CurrencyDTOs
+func fromCurrencyEntities(currencies []*entity.Currency) []CurrencyDTO {
 	dtos := make([]CurrencyDTO, len(currencies))
 	for i, currency := range currencies {
-		dtos[i] = FromCurrencyEntity(currency)
+		dtos[i] = toCurrencyDTO(currency)
 	}
 	return dtos
 }
 
-// FromCurrencyEntitiesSummary converts a slice of Currency entities to CurrencySummaryDTOs
-func FromCurrencyEntitiesSummary(currencies []*entity.Currency) []CurrencySummaryDTO {
+// fromCurrencyEntitiesSummary converts a slice of Currency entities to CurrencySummaryDTOs
+func fromCurrencyEntitiesSummary(currencies []*entity.Currency) []CurrencySummaryDTO {
 	dtos := make([]CurrencySummaryDTO, len(currencies))
 	for i, currency := range currencies {
-		dtos[i] = FromCurrencyEntitySummary(currency)
+		dtos[i] = toCurrencySummary(currency)
 	}
 	return dtos
 }
@@ -241,7 +178,7 @@ func (r UpdateCurrencyRequest) ToUseCaseInput() usecase.CurrencyInput {
 // =================================================================================================
 
 // CreateConvertedAmountDTO creates a ConvertedAmountDTO from currency and amount in cents
-func CreateConvertedAmountDTO(currency string, amountCents int64) ConvertedAmountDTO {
+func createConvertedAmountDTO(currency string, amountCents int64) ConvertedAmountDTO {
 	return ConvertedAmountDTO{
 		Currency: currency,
 		Amount:   money.FromCents(amountCents),
@@ -249,42 +186,55 @@ func CreateConvertedAmountDTO(currency string, amountCents int64) ConvertedAmoun
 	}
 }
 
+// =================================================================================================
+// UTILITY FUNCTIONS
+// =================================================================================================
+
 // CreateConvertAmountResponse creates a ConvertAmountResponse from conversion data
 func CreateConvertAmountResponse(fromCurrency string, fromAmount float64, toCurrency string, toAmountCents int64) ConvertAmountResponse {
 	fromCents := money.ToCents(fromAmount)
 
 	return ConvertAmountResponse{
-		From: CreateConvertedAmountDTO(fromCurrency, fromCents),
-		To:   CreateConvertedAmountDTO(toCurrency, toAmountCents),
+		From: createConvertedAmountDTO(fromCurrency, fromCents),
+		To:   createConvertedAmountDTO(toCurrency, toAmountCents),
 	}
 }
-
-// =================================================================================================
-// UTILITY FUNCTIONS
-// =================================================================================================
 
 // CreateListCurrenciesResponse creates a response for listing currencies
-func CreateListCurrenciesResponse(currencies []*entity.Currency) ListCurrenciesResponse {
-	dtos := FromCurrencyEntities(currencies)
-	return ListCurrenciesResponse{
-		Currencies: dtos,
-		Total:      len(dtos),
+func CreateCurrenciesListResponse(currencies []*entity.Currency, page, pageSize, total int) ListResponseDTO[CurrencyDTO] {
+	dtos := fromCurrencyEntities(currencies)
+	return ListResponseDTO[CurrencyDTO]{
+		Success: true,
+		Data:    dtos,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
 	}
 }
 
-// CreateListEnabledCurrenciesResponse creates a response for listing enabled currencies
-func CreateListEnabledCurrenciesResponse(currencies []*entity.Currency) ListEnabledCurrenciesResponse {
-	dtos := FromCurrencyEntitiesSummary(currencies)
-	return ListEnabledCurrenciesResponse{
-		Currencies: dtos,
-		Total:      len(dtos),
+func CreateCurrencySummaryResponse(currencies []*entity.Currency, page, size, total int) ListResponseDTO[CurrencySummaryDTO] {
+	dtos := fromCurrencyEntitiesSummary(currencies)
+	return ListResponseDTO[CurrencySummaryDTO]{
+		Success: true,
+		Data:    dtos,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: size,
+			Total:    total,
+		},
 	}
+}
+
+func CreateCurrencyResponse(currency *entity.Currency) ResponseDTO[CurrencyDTO] {
+	return SuccessResponse(toCurrencyDTO(currency))
 }
 
 // CreateDeleteCurrencyResponse creates a standard delete response
-func CreateDeleteCurrencyResponse() DeleteCurrencyResponse {
-	return DeleteCurrencyResponse{
+func CreateDeleteCurrencyResponse() ResponseDTO[DeleteCurrencyResponse] {
+	return SuccessResponse(DeleteCurrencyResponse{
 		Status:  "success",
 		Message: "Currency deleted successfully",
-	}
+	})
 }
