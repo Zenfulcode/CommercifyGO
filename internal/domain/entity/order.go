@@ -48,7 +48,7 @@ type Order struct {
 
 	// Shipping information
 	ShippingMethodID uint            `json:"shipping_method_id,omitempty"`
-	ShippingMethod   *ShippingMethod `json:"shipping_method,omitempty"`
+	ShippingOption   *ShippingOption `json:"shipping_option,omitempty"`
 	ShippingCost     int64           `json:"shipping_cost"` // stored in cents
 	TotalWeight      float64         `json:"total_weight"`
 
@@ -317,18 +317,14 @@ func (o *Order) SetActionURL(actionURL string) error {
 }
 
 // SetShippingMethod sets the shipping method for the order and updates shipping cost
-func (o *Order) SetShippingMethod(method *ShippingMethod, cost int64) error {
-	if method == nil {
+func (o *Order) SetShippingMethod(option *ShippingOption) error {
+	if option == nil {
 		return errors.New("shipping method cannot be nil")
 	}
 
-	if cost < 0 {
-		return errors.New("shipping cost cannot be negative")
-	}
-
-	o.ShippingMethodID = method.ID
-	o.ShippingMethod = method
-	o.ShippingCost = cost
+	o.ShippingMethodID = option.ShippingMethodID
+	o.ShippingOption = option
+	o.ShippingCost = option.Cost
 
 	// Update final amount with new shipping cost
 	o.FinalAmount = o.TotalAmount + o.ShippingCost - o.DiscountAmount

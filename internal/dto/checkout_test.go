@@ -396,7 +396,7 @@ func TestConvertToCheckoutDTO_MinimalCheckout(t *testing.T) {
 		t.Errorf("Expected 0 items, got %d", len(dto.Items))
 	}
 
-	if dto.ShippingMethod != nil {
+	if dto.ShippingOption != nil {
 		t.Error("Expected shipping method to be nil")
 	}
 

@@ -48,7 +48,7 @@ export interface CheckoutDTO {
   shipping_address: AddressDTO;
   billing_address: AddressDTO;
   shipping_method_id?: number /* uint */;
-  shipping_method?: ShippingMethodDetailDTO;
+  shipping_option?: ShippingOptionDTO;
   payment_provider?: string;
   total_amount: number /* float64 */;
   shipping_cost: number /* float64 */;

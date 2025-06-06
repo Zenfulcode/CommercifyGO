@@ -279,10 +279,10 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 	}
 
 	var shippingDetails dto.ShippingMethodDetailDTO
-	if order.ShippingMethod != nil {
+	if order.ShippingOption != nil {
 		shippingDetails = dto.ShippingMethodDetailDTO{
 			ID:   order.ShippingMethodID,
-			Name: order.ShippingMethod.Name,
+			Name: order.ShippingOption.Name,
 			Cost: money.FromCents(order.ShippingCost),
 		}
 	}

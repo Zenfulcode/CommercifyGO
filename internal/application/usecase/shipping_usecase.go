@@ -344,34 +344,13 @@ func (uc *ShippingUseCase) CalculateShippingOptions(address entity.Address, orde
 	}
 
 	for _, rate := range rates {
-		cost := rate.BaseRate
-
-		// Check if there are weight-based rates
-		if len(rate.WeightBasedRates) > 0 {
-			for _, weightRate := range rate.WeightBasedRates {
-				if orderWeight >= weightRate.MinWeight && (weightRate.MaxWeight == 0 || orderWeight <= weightRate.MaxWeight) {
-					cost += weightRate.Rate
-					break
-				}
-			}
-		}
-
-		// Check if there are value-based rates
-		if len(rate.ValueBasedRates) > 0 {
-			for _, valueRate := range rate.ValueBasedRates {
-				if orderValue >= valueRate.MinOrderValue && (valueRate.MaxOrderValue == 0 || orderValue <= valueRate.MaxOrderValue) {
-					cost += valueRate.Rate
-					break
-				}
-			}
+		cost, err := rate.CalculateShippingCost(orderValue, orderWeight)
+		if err != nil {
+			continue // Skip this rate if there's an error calculating cost
 		}
 
 		// Check if free shipping applies
-		freeShipping := false
-		if rate.FreeShippingThreshold != nil && orderValue >= *rate.FreeShippingThreshold {
-			cost = 0
-			freeShipping = true
-		}
+		freeShipping := cost == 0
 
 		option := &entity.ShippingOption{
 			ShippingRateID:        rate.ID,
@@ -397,32 +376,9 @@ func (uc *ShippingUseCase) GetShippingCost(rateID uint, orderValue int64, orderW
 		return 0, err
 	}
 
-	// Start with base rate
-	cost := rate.BaseRate
-
-	// Check if there are weight-based rates
-	if len(rate.WeightBasedRates) > 0 {
-		for _, weightRate := range rate.WeightBasedRates {
-			if orderWeight >= weightRate.MinWeight && (weightRate.MaxWeight == 0 || orderWeight <= weightRate.MaxWeight) {
-				cost += weightRate.Rate
-				break
-			}
-		}
-	}
-
-	// Check if there are value-based rates
-	if len(rate.ValueBasedRates) > 0 {
-		for _, valueRate := range rate.ValueBasedRates {
-			if orderValue >= valueRate.MinOrderValue && (valueRate.MaxOrderValue == 0 || orderValue <= valueRate.MaxOrderValue) {
-				cost += valueRate.Rate
-				break
-			}
-		}
-	}
-
-	// Check if free shipping applies
-	if rate.FreeShippingThreshold != nil && orderValue >= *rate.FreeShippingThreshold {
-		cost = 0
+	cost, err := rate.CalculateShippingCost(orderValue, orderWeight)
+	if err != nil {
+		return 0, err
 	}
 
 	return cost, nil

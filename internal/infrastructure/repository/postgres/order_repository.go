@@ -417,7 +417,7 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.Order, error) {
 	query := `
 		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
-			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
+			payment_id, payment_provider, created_at, updated_at, completed_at,
 			customer_email, customer_phone, customer_full_name, is_guest_order
 		FROM orders
 		WHERE user_id = $1
@@ -546,9 +546,8 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 // ListByStatus retrieves orders by status
 func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
-			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
-			customer_email, customer_phone, customer_full_name, is_guest_order
+		SELECT id, order_number, user_id, total_amount, status, created_at, updated_at, completed_at,
+			customer_email, customer_full_name, is_guest_order
 		FROM orders
 		WHERE status = $1
 		ORDER BY created_at DESC
@@ -768,11 +767,13 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 	// Handle guest order fields
 	if isGuestOrder.Valid && isGuestOrder.Bool {
 		order.IsGuestOrder = true
-		order.CustomerDetails = &entity.CustomerDetails{
-			Email:    customerEmail.String,
-			Phone:    customerPhone.String,
-			FullName: customerFullName.String,
-		}
+
+	}
+
+	order.CustomerDetails = &entity.CustomerDetails{
+		Email:    customerEmail.String,
+		Phone:    customerPhone.String,
+		FullName: customerFullName.String,
 	}
 
 	order.AppliedDiscount = &entity.AppliedDiscount{
@@ -877,9 +878,8 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 	query := `
 		SELECT id, order_number, user_id, total_amount, status,
-			payment_id, payment_provider, created_at, updated_at, completed_at,
-			discount_amount, discount_id, discount_code, final_amount,
-			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost
+			payment_provider, created_at, updated_at, completed_at,
+			final_amount, customer_email, customer_full_name, is_guest_order
 		FROM orders
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -896,10 +896,8 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 		order := &entity.Order{}
 		var completedAt sql.NullTime
 		var userID sql.NullInt64
-		var guestEmail, guestPhone, guestFullName sql.NullString
+		var guestEmail, guestFullName sql.NullString
 		var isGuestOrder sql.NullBool
-		var discountID sql.NullInt64
-		var discountCode sql.NullString
 
 		err := rows.Scan(
 			&order.ID,
@@ -912,34 +910,14 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 			&order.CreatedAt,
 			&order.UpdatedAt,
 			&completedAt,
-			&order.DiscountAmount,
-			&discountID,
-			&discountCode,
 			&order.FinalAmount,
 			&guestEmail,
-			&guestPhone,
 			&guestFullName,
 			&isGuestOrder,
-			&order.ShippingMethodID,
-			&order.ShippingCost,
 		)
 
 		if err != nil {
 			return nil, err
-		}
-
-		if discountID.Valid {
-			order.AppliedDiscount = &entity.AppliedDiscount{
-				DiscountID:     uint(discountID.Int64),
-				DiscountCode:   discountCode.String,
-				DiscountAmount: order.DiscountAmount,
-			}
-		}
-
-		if order.ShippingMethodID != 0 {
-			order.ShippingMethod = &entity.ShippingMethod{
-				ID: order.ShippingMethodID,
-			}
 		}
 
 		orders = append(orders, order)
