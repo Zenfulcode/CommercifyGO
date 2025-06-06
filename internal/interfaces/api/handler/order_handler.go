@@ -278,13 +278,9 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 		}
 	}
 
-	var shippingDetails dto.ShippingMethodDetailDTO
+	var shippingDetails dto.ShippingOptionDTO
 	if order.ShippingOption != nil {
-		shippingDetails = dto.ShippingMethodDetailDTO{
-			ID:   order.ShippingMethodID,
-			Name: order.ShippingOption.Name,
-			Cost: money.FromCents(order.ShippingCost),
-		}
+		shippingDetails = dto.ConvertToShippingOptionDTO(order.ShippingOption)
 	}
 
 	return dto.OrderDTO{
@@ -294,7 +290,7 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 		Status:          dto.OrderStatus(order.Status),
 		TotalAmount:     money.FromCents(order.TotalAmount),
 		FinalAmount:     money.FromCents(order.FinalAmount),
-		Currency:        "USD",
+		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
 		Items:           items,
 		ShippingAddress: *shippingAddr,
 		BillingAddress:  *billingAddr,

@@ -8,23 +8,23 @@ import (
 
 // OrderDTO represents an order in the system
 type OrderDTO struct {
-	ID              uint                    `json:"id"`
-	UserID          uint                    `json:"user_id"`
-	OrderNumber     string                  `json:"order_number"`
-	Items           []OrderItemDTO          `json:"items"`
-	Status          OrderStatus             `json:"status"`
-	TotalAmount     float64                 `json:"total_amount"`
-	FinalAmount     float64                 `json:"final_amount"`
-	Currency        string                  `json:"currency"`
-	ShippingAddress AddressDTO              `json:"shipping_address"`
-	BillingAddress  AddressDTO              `json:"billing_address"`
-	PaymentDetails  PaymentDetails          `json:"payment_details"`
-	ShippingDetails ShippingMethodDetailDTO `json:"shipping_details"`
-	DiscountDetails AppliedDiscountDTO      `json:"discount_details"`
-	Customer        CustomerDetailsDTO      `json:"customer"`
-	CheckoutID      string                  `json:"checkout_id,omitempty"`
-	CreatedAt       time.Time               `json:"created_at"`
-	UpdatedAt       time.Time               `json:"updated_at"`
+	ID              uint               `json:"id"`
+	UserID          uint               `json:"user_id"`
+	OrderNumber     string             `json:"order_number"`
+	Items           []OrderItemDTO     `json:"items"`
+	Status          OrderStatus        `json:"status"`
+	TotalAmount     float64            `json:"total_amount"`
+	FinalAmount     float64            `json:"final_amount"`
+	Currency        string             `json:"currency"`
+	ShippingAddress AddressDTO         `json:"shipping_address"`
+	BillingAddress  AddressDTO         `json:"billing_address"`
+	PaymentDetails  PaymentDetails     `json:"payment_details"`
+	ShippingDetails ShippingOptionDTO  `json:"shipping_details"`
+	DiscountDetails AppliedDiscountDTO `json:"discount_details"`
+	Customer        CustomerDetailsDTO `json:"customer"`
+	CheckoutID      string             `json:"checkout_id,omitempty"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
 type PaymentDetails struct {

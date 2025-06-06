@@ -428,7 +428,7 @@ export interface OrderDTO {
   shipping_address: AddressDTO;
   billing_address: AddressDTO;
   payment_details: PaymentDetails;
-  shipping_details: ShippingMethodDetailDTO;
+  shipping_details: ShippingOptionDTO;
   discount_details: AppliedDiscountDTO;
   customer: CustomerDetailsDTO;
   checkout_id?: string;
@@ -638,7 +638,6 @@ export interface ShippingMethodDetailDTO {
   name: string;
   description: string;
   estimated_delivery_days: number /* int */;
-  cost: number /* float64 */;
   active: boolean;
   created_at: string;
   updated_at: string;

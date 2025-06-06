@@ -130,7 +130,7 @@ go run cmd/seed/main.go -all
 # Build the application
 
 ```
-go build -o commercify cmd/api/main.go
+go build -o bin/api cmd/api/main.go
 ```
 
 # Run the application

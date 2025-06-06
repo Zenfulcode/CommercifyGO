@@ -51,12 +51,14 @@ func TestOrderDTO(t *testing.T) {
 		Refunded:  false,
 	}
 
-	shippingDetails := ShippingMethodDetailDTO{
-		ID:                    1,
+	shippingDetails := ShippingOptionDTO{
+		ShippingRateID:        2,
+		ShippingMethodID:      1,
 		Name:                  "Standard Shipping",
 		Description:           "Delivery in 5-7 business days",
+		Cost:                  9.99,
 		EstimatedDeliveryDays: 5,
-		Active:                true,
+		FreeShipping:          false,
 	}
 
 	customer := CustomerDetailsDTO{
@@ -202,14 +204,18 @@ func TestPaymentDetails(t *testing.T) {
 }
 
 func TestShippingDetails(t *testing.T) {
-	details := ShippingMethodDetailDTO{
-		ID:   2,
-		Name: "Express Shipping",
-		Cost: 19.99,
+	details := ShippingOptionDTO{
+		ShippingRateID:        2,
+		ShippingMethodID:      1,
+		Name:                  "Express Shipping",
+		Description:           "Delivery in 1-2 business days",
+		Cost:                  19.99,
+		EstimatedDeliveryDays: 2,
+		FreeShipping:          false,
 	}
 
-	if details.ID != 2 {
-		t.Errorf("Expected MethodID 2, got %d", details.ID)
+	if details.ShippingMethodID != 2 {
+		t.Errorf("Expected MethodID 2, got %d", details.ShippingMethodID)
 	}
 	if details.Name != "Express Shipping" {
 		t.Errorf("Expected Method 'Express Shipping', got %s", details.Name)
