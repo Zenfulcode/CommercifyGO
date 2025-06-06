@@ -10,6 +10,7 @@ import (
 type UseCaseProvider interface {
 	UserUseCase() *usecase.UserUseCase
 	ProductUseCase() *usecase.ProductUseCase
+	CategoryUseCase() *usecase.CategoryUseCase
 	CheckoutUseCase() *usecase.CheckoutUseCase
 	OrderUseCase() *usecase.OrderUseCase
 	DiscountUseCase() *usecase.DiscountUseCase
@@ -25,6 +26,7 @@ type useCaseProvider struct {
 
 	userUseCase     *usecase.UserUseCase
 	productUseCase  *usecase.ProductUseCase
+	categoryUseCase *usecase.CategoryUseCase
 	checkoutUseCase *usecase.CheckoutUseCase
 	orderUseCase    *usecase.OrderUseCase
 	discountUseCase *usecase.DiscountUseCase
@@ -67,6 +69,19 @@ func (p *useCaseProvider) ProductUseCase() *usecase.ProductUseCase {
 		)
 	}
 	return p.productUseCase
+}
+
+// CategoryUseCase returns the category use case
+func (p *useCaseProvider) CategoryUseCase() *usecase.CategoryUseCase {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.categoryUseCase == nil {
+		p.categoryUseCase = usecase.NewCategoryUseCase(
+			p.container.Repositories().CategoryRepository(),
+		)
+	}
+	return p.categoryUseCase
 }
 
 // CheckoutUseCase returns the checkout use case
