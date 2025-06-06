@@ -39,33 +39,33 @@ type CurrencySummaryDTO struct {
 
 // CreateCurrencyRequest represents a request to create a new currency
 type CreateCurrencyRequest struct {
-	Code         string  `json:"code" validate:"required,min=3,max=3,alpha"`
-	Name         string  `json:"name" validate:"required,min=1,max=100"`
-	Symbol       string  `json:"symbol" validate:"required,min=1,max=10"`
-	ExchangeRate float64 `json:"exchange_rate" validate:"required,gt=0"`
+	Code         string  `json:"code"`
+	Name         string  `json:"name"`
+	Symbol       string  `json:"symbol"`
+	ExchangeRate float64 `json:"exchange_rate"`
 	IsEnabled    bool    `json:"is_enabled"`
 	IsDefault    bool    `json:"is_default"`
 }
 
 // UpdateCurrencyRequest represents a request to update an existing currency
 type UpdateCurrencyRequest struct {
-	Name         string  `json:"name" validate:"omitempty,min=1,max=100"`
-	Symbol       string  `json:"symbol" validate:"omitempty,min=1,max=10"`
-	ExchangeRate float64 `json:"exchange_rate" validate:"omitempty,gt=0"`
+	Name         string  `json:"name"`
+	Symbol       string  `json:"symbol"`
+	ExchangeRate float64 `json:"exchange_rate"`
 	IsEnabled    *bool   `json:"is_enabled,omitempty"`
 	IsDefault    *bool   `json:"is_default,omitempty"`
 }
 
 // ConvertAmountRequest represents a request to convert an amount between currencies
 type ConvertAmountRequest struct {
-	Amount       float64 `json:"amount" validate:"required,gt=0"`
-	FromCurrency string  `json:"from_currency" validate:"required,min=3,max=3,alpha"`
-	ToCurrency   string  `json:"to_currency" validate:"required,min=3,max=3,alpha"`
+	Amount       float64 `json:"amount"`
+	FromCurrency string  `json:"from_currency"`
+	ToCurrency   string  `json:"to_currency"`
 }
 
 // SetDefaultCurrencyRequest represents a request to set a currency as default
 type SetDefaultCurrencyRequest struct {
-	Code string `json:"code" validate:"required,min=3,max=3,alpha"`
+	Code string `json:"code"`
 }
 
 // =================================================================================================

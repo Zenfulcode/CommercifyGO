@@ -252,7 +252,7 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 		}
 	}
 
-	customerDetails := dto.CustomerDetails{
+	customerDetails := dto.CustomerDetailsDTO{
 		Email:    order.CustomerDetails.Email,
 		Phone:    order.CustomerDetails.Phone,
 		FullName: order.CustomerDetails.FullName,
@@ -266,20 +266,24 @@ func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
 		Refunded:  order.IsRefunded(),
 	}
 
-	var discountDetails dto.DiscountDetails
+	var discountDetails dto.AppliedDiscountDTO
 	if order.AppliedDiscount != nil {
-		discountDetails = dto.DiscountDetails{
+		discountDetails = dto.AppliedDiscountDTO{
+			ID:     order.AppliedDiscount.DiscountID,
 			Code:   order.AppliedDiscount.DiscountCode,
 			Amount: money.FromCents(order.AppliedDiscount.DiscountAmount),
+			Type:   "",
+			Method: "",
+			Value:  0,
 		}
 	}
 
-	var shippingDetails dto.ShippingDetails
+	var shippingDetails dto.ShippingMethodDetailDTO
 	if order.ShippingMethod != nil {
-		shippingDetails = dto.ShippingDetails{
-			MethodID: order.ShippingMethodID,
-			Method:   order.ShippingMethod.Name,
-			Cost:     money.FromCents(order.ShippingCost),
+		shippingDetails = dto.ShippingMethodDetailDTO{
+			ID:   order.ShippingMethodID,
+			Name: order.ShippingMethod.Name,
+			Cost: money.FromCents(order.ShippingCost),
 		}
 	}
 

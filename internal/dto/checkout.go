@@ -52,23 +52,6 @@ type CheckoutItemDTO struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// CustomerDetailsDTO represents customer information for a checkout
-type CustomerDetailsDTO struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	FullName string `json:"full_name"`
-}
-
-// AppliedDiscountDTO represents an applied discount in a checkout
-type AppliedDiscountDTO struct {
-	ID     uint    `json:"id"`
-	Code   string  `json:"code"`
-	Type   string  `json:"type"`
-	Method string  `json:"method"`
-	Value  float64 `json:"value"`
-	Amount float64 `json:"amount"`
-}
-
 // AddToCheckoutRequest represents the data needed to add an item to a checkout
 type AddToCheckoutRequest struct {
 	SKU      string `json:"sku"`

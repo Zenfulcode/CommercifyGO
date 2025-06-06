@@ -34,6 +34,13 @@ type AddressDTO struct {
 	Country      string `json:"country"`
 }
 
+// CustomerDetailsDTO represents customer information for a checkout
+type CustomerDetailsDTO struct {
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	FullName string `json:"full_name"`
+}
+
 func ErrorResponse(message string) ResponseDTO[any] {
 	return ResponseDTO[any]{
 		Success: false,

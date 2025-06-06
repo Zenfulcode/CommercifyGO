@@ -8,23 +8,23 @@ import (
 
 // OrderDTO represents an order in the system
 type OrderDTO struct {
-	ID              uint            `json:"id"`
-	UserID          uint            `json:"user_id"`
-	OrderNumber     string          `json:"order_number"`
-	Items           []OrderItemDTO  `json:"items"`
-	Status          OrderStatus     `json:"status"`
-	TotalAmount     float64         `json:"total_amount"`
-	FinalAmount     float64         `json:"final_amount"`
-	Currency        string          `json:"currency"`
-	ShippingAddress AddressDTO      `json:"shipping_address"`
-	BillingAddress  AddressDTO      `json:"billing_address"`
-	PaymentDetails  PaymentDetails  `json:"payment_details"`
-	ShippingDetails ShippingDetails `json:"shipping_details"`
-	DiscountDetails DiscountDetails `json:"discount_details"`
-	Customer        CustomerDetails `json:"customer"`
-	CheckoutID      string          `json:"checkout_id,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              uint                    `json:"id"`
+	UserID          uint                    `json:"user_id"`
+	OrderNumber     string                  `json:"order_number"`
+	Items           []OrderItemDTO          `json:"items"`
+	Status          OrderStatus             `json:"status"`
+	TotalAmount     float64                 `json:"total_amount"`
+	FinalAmount     float64                 `json:"final_amount"`
+	Currency        string                  `json:"currency"`
+	ShippingAddress AddressDTO              `json:"shipping_address"`
+	BillingAddress  AddressDTO              `json:"billing_address"`
+	PaymentDetails  PaymentDetails          `json:"payment_details"`
+	ShippingDetails ShippingMethodDetailDTO `json:"shipping_details"`
+	DiscountDetails AppliedDiscountDTO      `json:"discount_details"`
+	Customer        CustomerDetailsDTO      `json:"customer"`
+	CheckoutID      string                  `json:"checkout_id,omitempty"`
+	CreatedAt       time.Time               `json:"created_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 type PaymentDetails struct {
@@ -34,23 +34,6 @@ type PaymentDetails struct {
 	Status    string          `json:"status"`
 	Captured  bool            `json:"captured"`
 	Refunded  bool            `json:"refunded"`
-}
-
-type ShippingDetails struct {
-	MethodID uint    `json:"method_id"`
-	Method   string  `json:"method"`
-	Cost     float64 `json:"cost"`
-}
-
-type CustomerDetails struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	FullName string `json:"full_name"`
-}
-
-type DiscountDetails struct {
-	Code   string  `json:"code"`
-	Amount float64 `json:"amount"`
 }
 
 // OrderItemDTO represents an item in an order

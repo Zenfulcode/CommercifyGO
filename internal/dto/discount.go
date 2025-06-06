@@ -27,40 +27,50 @@ type DiscountDTO struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// AppliedDiscountDTO represents an applied discount in a checkout
+type AppliedDiscountDTO struct {
+	ID     uint    `json:"id"`
+	Code   string  `json:"code"`
+	Type   string  `json:"type"`
+	Method string  `json:"method"`
+	Value  float64 `json:"value"`
+	Amount float64 `json:"amount"`
+}
+
 // CreateDiscountRequest represents the data needed to create a new discount
 type CreateDiscountRequest struct {
-	Code             string    `json:"code" validate:"required,min=3,max=50"`
-	Type             string    `json:"type" validate:"required,oneof=basket product"`
-	Method           string    `json:"method" validate:"required,oneof=fixed percentage"`
-	Value            float64   `json:"value" validate:"required,gt=0"`
-	MinOrderValue    float64   `json:"min_order_value" validate:"gte=0"`
-	MaxDiscountValue float64   `json:"max_discount_value" validate:"gte=0"`
+	Code             string    `json:"code"`
+	Type             string    `json:"type"`
+	Method           string    `json:"method"`
+	Value            float64   `json:"value"`
+	MinOrderValue    float64   `json:"min_order_value"`
+	MaxDiscountValue float64   `json:"max_discount_value"`
 	ProductIDs       []uint    `json:"product_ids,omitempty"`
 	CategoryIDs      []uint    `json:"category_ids,omitempty"`
-	StartDate        time.Time `json:"start_date" validate:"required"`
-	EndDate          time.Time `json:"end_date" validate:"required"`
-	UsageLimit       int       `json:"usage_limit" validate:"gte=0"`
+	StartDate        time.Time `json:"start_date"`
+	EndDate          time.Time `json:"end_date"`
+	UsageLimit       int       `json:"usage_limit"`
 }
 
 // UpdateDiscountRequest represents the data needed to update a discount
 type UpdateDiscountRequest struct {
-	Code             string    `json:"code,omitempty" validate:"omitempty,min=3,max=50"`
-	Type             string    `json:"type,omitempty" validate:"omitempty,oneof=basket product"`
-	Method           string    `json:"method,omitempty" validate:"omitempty,oneof=fixed percentage"`
-	Value            float64   `json:"value,omitempty" validate:"omitempty,gt=0"`
-	MinOrderValue    float64   `json:"min_order_value,omitempty" validate:"omitempty,gte=0"`
-	MaxDiscountValue float64   `json:"max_discount_value,omitempty" validate:"omitempty,gte=0"`
+	Code             string    `json:"code,omitempty"`
+	Type             string    `json:"type,omitempty"`
+	Method           string    `json:"method,omitempty"`
+	Value            float64   `json:"value,omitempty"`
+	MinOrderValue    float64   `json:"min_order_value,omitempty"`
+	MaxDiscountValue float64   `json:"max_discount_value,omitempty"`
 	ProductIDs       []uint    `json:"product_ids,omitempty"`
 	CategoryIDs      []uint    `json:"category_ids,omitempty"`
-	StartDate        time.Time `json:"start_date,omitempty"`
-	EndDate          time.Time `json:"end_date,omitempty"`
-	UsageLimit       int       `json:"usage_limit,omitempty" validate:"omitempty,gte=0"`
+	StartDate        time.Time `json:"start_date"`
+	EndDate          time.Time `json:"end_date"`
+	UsageLimit       int       `json:"usage_limit,omitempty"`
 	Active           bool      `json:"active"`
 }
 
 // ValidateDiscountRequest represents the data needed to validate a discount code
 type ValidateDiscountRequest struct {
-	DiscountCode string `json:"discount_code" validate:"required"`
+	DiscountCode string `json:"discount_code"`
 }
 
 // ValidateDiscountResponse represents the response for discount validation
