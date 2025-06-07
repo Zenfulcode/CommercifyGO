@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 )
@@ -86,8 +87,70 @@ type ValidateDiscountResponse struct {
 	MaxDiscountValue float64 `json:"max_discount_value,omitempty"`
 }
 
+func (r CreateDiscountRequest) ToUseCaseInput() usecase.CreateDiscountInput {
+	return usecase.CreateDiscountInput{
+		Code:             r.Code,
+		Type:             r.Type,
+		Method:           r.Method,
+		Value:            r.Value,
+		MinOrderValue:    r.MinOrderValue,
+		MaxDiscountValue: r.MaxDiscountValue,
+		ProductIDs:       r.ProductIDs,
+		CategoryIDs:      r.CategoryIDs,
+		StartDate:        r.StartDate,
+		EndDate:          r.EndDate,
+		UsageLimit:       r.UsageLimit,
+	}
+}
+
+func (r UpdateDiscountRequest) ToUseCaseInput() usecase.UpdateDiscountInput {
+	return usecase.UpdateDiscountInput{
+		Code:             r.Code,
+		Type:             r.Type,
+		Method:           r.Method,
+		Value:            r.Value,
+		MinOrderValue:    r.MinOrderValue,
+		MaxDiscountValue: r.MaxDiscountValue,
+		ProductIDs:       r.ProductIDs,
+		CategoryIDs:      r.CategoryIDs,
+		StartDate:        r.StartDate,
+		EndDate:          r.EndDate,
+		UsageLimit:       r.UsageLimit,
+		Active:           r.Active,
+	}
+}
+
+func DiscountCreateResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponseWithMessage(toDiscountDTO(discount), "Discount created successfully")
+}
+
+func DiscountRetrieveResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponse(toDiscountDTO(discount))
+}
+
+func DiscountUpdateResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponseWithMessage(toDiscountDTO(discount), "Discount updated successfully")
+}
+
+func DiscountDeleteResponse() ResponseDTO[any] {
+	return SuccessResponseMessage("Discount deleted successfully")
+}
+
+func DiscountListResponse(discounts []*entity.Discount, totalCount, page, pageSize int) ListResponseDTO[DiscountDTO] {
+	return ListResponseDTO[DiscountDTO]{
+		Success: true,
+		Data:    ConvertDiscountListToDTO(discounts),
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    totalCount,
+		},
+		Message: "Discounts retrieved successfully",
+	}
+}
+
 // ConvertToDiscountDTO converts a domain discount entity to a DTO
-func ConvertToDiscountDTO(discount *entity.Discount) DiscountDTO {
+func toDiscountDTO(discount *entity.Discount) DiscountDTO {
 	if discount == nil {
 		return DiscountDTO{}
 	}
@@ -132,7 +195,7 @@ func ConvertToAppliedDiscountDTO(appliedDiscount *entity.AppliedDiscount) Applie
 func ConvertDiscountListToDTO(discounts []*entity.Discount) []DiscountDTO {
 	dtos := make([]DiscountDTO, len(discounts))
 	for i, discount := range discounts {
-		dtos[i] = ConvertToDiscountDTO(discount)
+		dtos[i] = toDiscountDTO(discount)
 	}
 	return dtos
 }

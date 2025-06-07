@@ -48,17 +48,20 @@ func ErrorResponse(message string) ResponseDTO[any] {
 	}
 }
 
-func SuccessResponseWithMessage[T *any](data *T, message string) ResponseDTO[T] {
-	response := ResponseDTO[T]{
+func SuccessResponseWithMessage[T any](data T, message string) ResponseDTO[T] {
+	return ResponseDTO[T]{
 		Success: true,
 		Message: message,
+		Data:    data,
 	}
+}
 
-	if data != nil {
-		response.Data = *data
+func SuccessResponseMessage(message string) ResponseDTO[any] {
+	return ResponseDTO[any]{
+		Success: true,
+		Message: message,
+		Data:    nil,
 	}
-
-	return response
 }
 
 func SuccessResponse[T any](data T) ResponseDTO[T] {
