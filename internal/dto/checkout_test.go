@@ -495,7 +495,7 @@ func TestConvertToCheckoutDTO_MultipleItems(t *testing.T) {
 func TestCheckoutCompleteResponse(t *testing.T) {
 	now := time.Now()
 
-	order := OrderDTO{
+	order := OrderSummaryDTO{
 		ID:          1,
 		Status:      "confirmed",
 		TotalAmount: 99.99,

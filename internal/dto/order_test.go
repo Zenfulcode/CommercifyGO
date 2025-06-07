@@ -458,7 +458,7 @@ func TestPaymentProviderConstants(t *testing.T) {
 }
 
 func TestOrderListResponse(t *testing.T) {
-	orders := []OrderDTO{
+	orders := []OrderSummaryDTO{
 		{
 			ID:          1,
 			OrderNumber: "ORD-001",
@@ -481,12 +481,13 @@ func TestOrderListResponse(t *testing.T) {
 		Total:    2,
 	}
 
-	response := OrderListResponse{
-		ListResponseDTO: ListResponseDTO[OrderDTO]{
-			Success:    true,
-			Message:    "Orders retrieved successfully",
-			Data:       orders,
-			Pagination: pagination,
+	response := ListResponseDTO[OrderSummaryDTO]{
+		Success: true,
+		Data:    orders,
+		Pagination: PaginationDTO{
+			Page:     pagination.Page,
+			PageSize: pagination.PageSize,
+			Total:    pagination.Total,
 		},
 	}
 
