@@ -31,6 +31,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
+		h.logger.Error("Unauthorized access attempt")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -39,6 +40,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
 	if err != nil {
+		h.logger.Error("Invalid order ID: %v", err)
 		http.Error(w, "Invalid order ID", http.StatusBadRequest)
 		return
 	}
@@ -47,7 +49,10 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
 	if err != nil {
 		h.logger.Error("Failed to get order: %v", err)
-		http.Error(w, "Order not found", http.StatusNotFound)
+		response := dto.ErrorResponse(err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -55,13 +60,16 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	if order.UserID != userID {
 		role, ok := r.Context().Value("role").(string)
 		if !ok || role != "admin" {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
+			h.logger.Error("Unauthorized access to order %d by user %d", order.ID, userID)
+			response := dto.ErrorResponse("You are not authorized to view this order")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(response)
 			return
 		}
 	}
 
-	// Convert order to DTO
-	orderDTO := dto.ConvertToOrderDTO(order)
+	orderDTO := dto.OrderDetailResponse(order)
 
 	// Return order
 	w.Header().Set("Content-Type", "application/json")
@@ -73,42 +81,37 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
+		h.logger.Error("Unauthorized access attempt")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse pagination parameters
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 {
-		limit = 10 // Default limit
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+
+	if page <= 0 {
+		page = 1 // Default to page 1
+	}
+
+	if pageSize <= 0 {
+		page = 10 // Default limit
 	}
 
 	// Get orders
-	orders, err := h.orderUseCase.GetUserOrders(userID, offset, limit)
+	orders, err := h.orderUseCase.GetUserOrders(userID, page, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
-		http.Error(w, "Failed to list orders", http.StatusInternalServerError)
+		// TODO: Add proper error handling
+		response := dto.ErrorResponse("Failed to list orders")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	orderDTOs := make([]dto.OrderDTO, len(orders))
-	for i, order := range orders {
-		orderDTOs[i] = dto.ConvertToOrderDTO(order)
-	}
-
 	// Create response
-	response := dto.OrderListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.OrderDTO]{
-			Success: true,
-			Data:    orderDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     offset/limit + 1,
-				PageSize: limit,
-				Total:    len(orderDTOs),
-			},
-		},
-	}
+	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -118,12 +121,15 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // ListAllOrders handles listing all orders (admin only)
 func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 	// Parse pagination parameters
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 {
-		limit = 10 // Default limit
+	if page <= 0 {
+		page = 1 // Default to page 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10 // Default page size
 	}
 
 	// Get orders by status if provided
@@ -131,34 +137,24 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if status != "" {
-		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), offset, limit)
+		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), page, pageSize)
 	} else {
-		orders, err = h.orderUseCase.ListAllOrders(offset, limit)
+		orders, err = h.orderUseCase.ListAllOrders(page, pageSize)
 	}
 
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
-		http.Error(w, "Failed to list orders", http.StatusInternalServerError)
+		// TODO: Add proper error handling
+		response := dto.ErrorResponse("Failed to list orders")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	orderDTOs := make([]dto.OrderDTO, len(orders))
-	for i, order := range orders {
-		orderDTOs[i] = dto.ConvertToOrderDTO(order)
-	}
-
 	// Create response
-	response := dto.OrderListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.OrderDTO]{
-			Success: true,
-			Data:    orderDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     offset/limit + 1,
-				PageSize: limit,
-				Total:    len(orderDTOs),
-			},
-		},
-	}
+	// TODO: FIX total count logic
+	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -171,6 +167,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
 	if err != nil {
+		h.logger.Error("Invalid order ID: %v", err)
 		http.Error(w, "Invalid order ID", http.StatusBadRequest)
 		return
 	}
@@ -180,6 +177,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		Status string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&statusInput); err != nil {
+		h.logger.Error("Failed to decode request body: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -193,12 +191,15 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	updatedOrder, err := h.orderUseCase.UpdateOrderStatus(input)
 	if err != nil {
 		h.logger.Error("Failed to update order status: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ErrorResponse(err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	// Convert order to DTO
-	orderDTO := dto.ConvertToOrderDTO(updatedOrder)
+	orderDTO := dto.OrderUpdateStatusResponse(updatedOrder)
 
 	// Return updated order
 	w.Header().Set("Content-Type", "application/json")

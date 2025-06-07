@@ -89,7 +89,7 @@ func (uc *OrderUseCase) GetOrderByID(id uint) (*entity.Order, error) {
 
 	order, err := uc.orderRepo.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order by ID: %w", err)
+		return nil, err
 	}
 
 	return order, nil

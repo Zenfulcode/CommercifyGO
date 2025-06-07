@@ -119,9 +119,9 @@ type CheckoutSearchRequest struct {
 }
 
 type CheckoutCompleteResponse struct {
-	Order          OrderDTO `json:"order"`
-	ActionRequired bool     `json:"action_required,omitempty"`
-	ActionURL      string   `json:"redirect_url,omitempty"`
+	Order          OrderSummaryDTO `json:"order"`
+	ActionRequired bool            `json:"action_required,omitempty"`
+	ActionURL      string          `json:"redirect_url,omitempty"`
 }
 
 // CompleteCheckoutRequest represents the data needed to convert a checkout to an order
@@ -169,7 +169,7 @@ func CreateCheckoutResponse(checkout *entity.Checkout) ResponseDTO[CheckoutDTO] 
 
 func CreateCompleteCheckoutResponse(order *entity.Order) ResponseDTO[CheckoutCompleteResponse] {
 	response := CheckoutCompleteResponse{
-		Order:          ConvertToOrderDTO(order),
+		Order:          ToOrderSummaryDTO(order),
 		ActionRequired: order.Status == entity.OrderStatusPendingAction,
 		ActionURL:      order.ActionURL,
 	}

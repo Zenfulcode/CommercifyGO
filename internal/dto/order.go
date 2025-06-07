@@ -29,6 +29,19 @@ type OrderDTO struct {
 	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
+type OrderSummaryDTO struct {
+	ID               uint        `json:"id"`
+	OrderNumber      string      `json:"order_number"`
+	UserID           uint        `json:"user_id"`
+	Status           OrderStatus `json:"status"`
+	TotalAmount      float64     `json:"total_amount"`
+	FinalAmount      float64     `json:"final_amount"`
+	OrderLinesAmount int         `json:"order_lines_amount"`
+	Currency         string      `json:"currency"`
+	CreatedAt        time.Time   `json:"created_at"`
+	UpdatedAt        time.Time   `json:"updated_at"`
+}
+
 type PaymentDetails struct {
 	PaymentID string          `json:"payment_id"`
 	Provider  PaymentProvider `json:"provider"`
@@ -80,11 +93,6 @@ type UpdateOrderRequest struct {
 	EstimatedDelivery *time.Time `json:"estimated_delivery,omitempty"`
 }
 
-// OrderListResponse represents a paginated list of orders
-type OrderListResponse struct {
-	ListResponseDTO[OrderDTO]
-}
-
 // OrderSearchRequest represents the parameters for searching orders
 type OrderSearchRequest struct {
 	UserID        uint        `json:"user_id,omitempty"`
@@ -133,7 +141,47 @@ const (
 	PaymentProviderMobilePay PaymentProvider = "mobilepay"
 )
 
-func ConvertToOrderDTO(order *entity.Order) OrderDTO {
+func OrderUpdateStatusResponse(order *entity.Order) ResponseDTO[OrderSummaryDTO] {
+	return SuccessResponseWithMessage(ToOrderSummaryDTO(order), "Order status updated successfully")
+}
+
+func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ResponseDTO[ListResponseDTO[OrderSummaryDTO]] {
+	var orderSummaries []OrderSummaryDTO
+	for _, order := range orders {
+		orderSummaries = append(orderSummaries, ToOrderSummaryDTO(order))
+	}
+
+	return SuccessResponseWithMessage(ListResponseDTO[OrderSummaryDTO]{
+		Data: orderSummaries,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+	}, "Orders retrieved successfully")
+}
+
+func OrderDetailResponse(order *entity.Order) ResponseDTO[OrderDTO] {
+	return SuccessResponse(toOrderDTO(order))
+}
+
+// toOrderSummaryDTO converts an Order entity to OrderSummaryDTO
+func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
+	return OrderSummaryDTO{
+		ID:               order.ID,
+		OrderNumber:      order.OrderNumber,
+		UserID:           order.UserID,
+		Status:           OrderStatus(order.Status),
+		TotalAmount:      money.FromCents(order.TotalAmount),
+		FinalAmount:      money.FromCents(order.FinalAmount),
+		OrderLinesAmount: len(order.Items),
+		Currency:         "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
+	}
+}
+
+func toOrderDTO(order *entity.Order) OrderDTO {
 	// Convert order items to DTOs
 	var items []OrderItemDTO
 	if len(order.Items) > 0 {
