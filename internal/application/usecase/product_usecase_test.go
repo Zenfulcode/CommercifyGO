@@ -398,8 +398,6 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 		input := usecase.UpdateProductInput{
 			Name:        "Updated Product",
 			Description: "Updated description",
-			Price:       12999,
-			Stock:       50,
 			CategoryID:  2,
 			Images:      []string{"updated.jpg"},
 		}
@@ -411,8 +409,6 @@ func TestProductUseCase_UpdateProduct(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, input.Name, updatedProduct.Name)
 		assert.Equal(t, input.Description, updatedProduct.Description)
-		assert.Equal(t, money.ToCents(input.Price), updatedProduct.Price)
-		assert.Equal(t, input.Stock, updatedProduct.Stock)
 		assert.Equal(t, input.CategoryID, updatedProduct.CategoryID)
 		assert.Equal(t, input.Images, updatedProduct.Images)
 	})

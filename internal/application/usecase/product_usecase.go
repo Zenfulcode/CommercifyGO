@@ -243,14 +243,12 @@ func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.
 
 // UpdateProductInput contains the data needed to update a product (prices in dollars)
 type UpdateProductInput struct {
-	Name           string
-	Description    string
-	Price          float64
-	Stock          int
-	CategoryID     uint
-	Images         []string
-	CurrencyPrices []CurrencyPriceInput
-	Active         bool
+	Name        string
+	Description string
+	CategoryID  uint
+	Images      []string
+	Active      bool
+	Weight      float64
 }
 
 // UpdateProduct updates a product
@@ -277,40 +275,15 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 	if input.Description != "" {
 		product.Description = input.Description
 	}
-	if input.Price > 0 && !product.HasVariants {
-		product.Price = money.ToCents(input.Price) // Convert to cents
-	}
-	if input.Stock >= 0 && !product.HasVariants {
-		product.Stock = input.Stock
-	}
+
 	if len(input.Images) > 0 {
 		product.Images = input.Images
 	}
+	if input.Weight > 0 {
+		product.Weight = input.Weight
+	}
 	if input.Active != product.Active {
 		product.Active = input.Active
-	}
-
-	// Process currency-specific prices, if any
-	if len(input.CurrencyPrices) > 0 {
-		// Clear existing prices
-		product.Prices = make([]entity.ProductPrice, 0, len(input.CurrencyPrices))
-
-		for _, currPrice := range input.CurrencyPrices {
-			// Validate currency exists
-			_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-			if err != nil {
-				return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-			}
-
-			// Convert price to cents
-			priceCents := money.ToCents(currPrice.Price)
-
-			product.Prices = append(product.Prices, entity.ProductPrice{
-				ProductID:    product.ID,
-				CurrencyCode: currPrice.CurrencyCode,
-				Price:        priceCents,
-			})
-		}
 	}
 
 	// Update product in repository

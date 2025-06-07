@@ -160,7 +160,7 @@ export interface CheckoutSearchRequest {
   PaginationDTO: PaginationDTO;
 }
 export interface CheckoutCompleteResponse {
-  order: OrderDTO;
+  order: OrderSummaryDTO;
   action_required?: boolean;
   redirect_url?: string;
 }
@@ -435,6 +435,18 @@ export interface OrderDTO {
   created_at: string;
   updated_at: string;
 }
+export interface OrderSummaryDTO {
+  id: number /* uint */;
+  order_number: string;
+  user_id: number /* uint */;
+  status: OrderStatus;
+  total_amount: number /* float64 */;
+  final_amount: number /* float64 */;
+  order_lines_amount: number /* int */;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
 export interface PaymentDetails {
   payment_id: string;
   provider: PaymentProvider;
@@ -488,12 +500,6 @@ export interface UpdateOrderRequest {
   payment_status?: string;
   tracking_number?: string;
   estimated_delivery?: string;
-}
-/**
- * OrderListResponse represents a paginated list of orders
- */
-export interface OrderListResponse {
-  ListResponseDTO: ListResponseDTO<OrderDTO>;
 }
 /**
  * OrderSearchRequest represents the parameters for searching orders
