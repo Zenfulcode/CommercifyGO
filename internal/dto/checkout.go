@@ -146,8 +146,38 @@ type CardDetailsDTO struct {
 	Token          string `json:"token,omitempty"` // Optional token for saved cards
 }
 
+func CreateCheckoutsListResponse(checkouts []*entity.Checkout, totalCount, page, pageSize int) ListResponseDTO[CheckoutDTO] {
+	var checkoutDTOs []CheckoutDTO
+	for _, checkout := range checkouts {
+		checkoutDTOs = append(checkoutDTOs, toCheckoutDTO(checkout))
+	}
+
+	return ListResponseDTO[CheckoutDTO]{
+		Success: true,
+		Data:    checkoutDTOs,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    totalCount,
+		},
+	}
+}
+
+func CreateCheckoutResponse(checkout *entity.Checkout) ResponseDTO[CheckoutDTO] {
+	return SuccessResponse(toCheckoutDTO(checkout))
+}
+
+func CreateCompleteCheckoutResponse(order *entity.Order) ResponseDTO[CheckoutCompleteResponse] {
+	response := CheckoutCompleteResponse{
+		Order:          ConvertToOrderDTO(order),
+		ActionRequired: order.Status == entity.OrderStatusPendingAction,
+		ActionURL:      order.ActionURL,
+	}
+	return SuccessResponse(response)
+}
+
 // ConvertToCheckoutDTO converts a checkout entity to a DTO
-func ConvertToCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
+func toCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
 	dto := CheckoutDTO{
 		ID:               checkout.ID,
 		UserID:           checkout.UserID,

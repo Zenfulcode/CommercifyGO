@@ -3,6 +3,8 @@ package dto
 import (
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
@@ -130,3 +132,97 @@ const (
 	PaymentProviderStripe    PaymentProvider = "stripe"
 	PaymentProviderMobilePay PaymentProvider = "mobilepay"
 )
+
+func ConvertToOrderDTO(order *entity.Order) OrderDTO {
+	// Convert order items to DTOs
+	var items []OrderItemDTO
+	if len(order.Items) > 0 {
+		items = make([]OrderItemDTO, len(order.Items))
+		for i, item := range order.Items {
+			items[i] = OrderItemDTO{
+				ID:         item.ID,
+				OrderID:    order.ID,
+				ProductID:  item.ProductID,
+				Quantity:   item.Quantity,
+				UnitPrice:  money.FromCents(item.Price),
+				TotalPrice: money.FromCents(item.Subtotal),
+				CreatedAt:  order.CreatedAt,
+				UpdatedAt:  order.UpdatedAt,
+			}
+		}
+	}
+
+	// Convert addresses to DTOs
+	var shippingAddr *AddressDTO
+	if order.ShippingAddr.Street != "" {
+		shippingAddr = &AddressDTO{
+			AddressLine1: order.ShippingAddr.Street,
+			City:         order.ShippingAddr.City,
+			State:        order.ShippingAddr.State,
+			PostalCode:   order.ShippingAddr.PostalCode,
+			Country:      order.ShippingAddr.Country,
+		}
+	}
+
+	var billingAddr *AddressDTO
+	if order.BillingAddr.Street != "" {
+		billingAddr = &AddressDTO{
+			AddressLine1: order.BillingAddr.Street,
+			City:         order.BillingAddr.City,
+			State:        order.BillingAddr.State,
+			PostalCode:   order.BillingAddr.PostalCode,
+			Country:      order.BillingAddr.Country,
+		}
+	}
+
+	customerDetails := CustomerDetailsDTO{
+		Email:    order.CustomerDetails.Email,
+		Phone:    order.CustomerDetails.Phone,
+		FullName: order.CustomerDetails.FullName,
+	}
+
+	paymentDetails := PaymentDetails{
+		PaymentID: order.PaymentID,
+		Provider:  PaymentProvider(order.PaymentProvider),
+		Method:    PaymentMethod(order.PaymentMethod),
+		Captured:  order.IsCaptured(),
+		Refunded:  order.IsRefunded(),
+	}
+
+	var discountDetails AppliedDiscountDTO
+	if order.AppliedDiscount != nil {
+		discountDetails = AppliedDiscountDTO{
+			ID:     order.AppliedDiscount.DiscountID,
+			Code:   order.AppliedDiscount.DiscountCode,
+			Amount: money.FromCents(order.AppliedDiscount.DiscountAmount),
+			Type:   "",
+			Method: "",
+			Value:  0,
+		}
+	}
+
+	var shippingDetails ShippingOptionDTO
+	if order.ShippingOption != nil {
+		shippingDetails = ConvertToShippingOptionDTO(order.ShippingOption)
+	}
+
+	return OrderDTO{
+		ID:              order.ID,
+		OrderNumber:     order.OrderNumber,
+		UserID:          order.UserID,
+		Status:          OrderStatus(order.Status),
+		TotalAmount:     money.FromCents(order.TotalAmount),
+		FinalAmount:     money.FromCents(order.FinalAmount),
+		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Items:           items,
+		ShippingAddress: *shippingAddr,
+		BillingAddress:  *billingAddr,
+		PaymentDetails:  paymentDetails,
+		ShippingDetails: shippingDetails,
+		DiscountDetails: discountDetails,
+		Customer:        customerDetails,
+		CheckoutID:      order.CheckoutSessionID,
+		CreatedAt:       order.CreatedAt,
+		UpdatedAt:       order.UpdatedAt,
+	}
+}

@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -62,7 +61,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert order to DTO
-	orderDTO := convertToOrderDTO(order)
+	orderDTO := dto.ConvertToOrderDTO(order)
 
 	// Return order
 	w.Header().Set("Content-Type", "application/json")
@@ -93,10 +92,9 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert orders to DTOs
 	orderDTOs := make([]dto.OrderDTO, len(orders))
 	for i, order := range orders {
-		orderDTOs[i] = convertToOrderDTO(order)
+		orderDTOs[i] = dto.ConvertToOrderDTO(order)
 	}
 
 	// Create response
@@ -144,10 +142,9 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert orders to DTOs
 	orderDTOs := make([]dto.OrderDTO, len(orders))
 	for i, order := range orders {
-		orderDTOs[i] = convertToOrderDTO(order)
+		orderDTOs[i] = dto.ConvertToOrderDTO(order)
 	}
 
 	// Create response
@@ -201,105 +198,9 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Convert order to DTO
-	orderDTO := convertToOrderDTO(updatedOrder)
+	orderDTO := dto.ConvertToOrderDTO(updatedOrder)
 
 	// Return updated order
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(orderDTO)
-}
-
-// Helper functions to convert between entities and DTOs
-
-func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
-	// Convert order items to DTOs
-	var items []dto.OrderItemDTO
-	if len(order.Items) > 0 {
-		items = make([]dto.OrderItemDTO, len(order.Items))
-		for i, item := range order.Items {
-			items[i] = dto.OrderItemDTO{
-				ID:         item.ID,
-				OrderID:    order.ID,
-				ProductID:  item.ProductID,
-				Quantity:   item.Quantity,
-				UnitPrice:  money.FromCents(item.Price),
-				TotalPrice: money.FromCents(item.Subtotal),
-				CreatedAt:  order.CreatedAt,
-				UpdatedAt:  order.UpdatedAt,
-			}
-		}
-	}
-
-	// Convert addresses to DTOs
-	var shippingAddr *dto.AddressDTO
-	if order.ShippingAddr.Street != "" {
-		shippingAddr = &dto.AddressDTO{
-			AddressLine1: order.ShippingAddr.Street,
-			City:         order.ShippingAddr.City,
-			State:        order.ShippingAddr.State,
-			PostalCode:   order.ShippingAddr.PostalCode,
-			Country:      order.ShippingAddr.Country,
-		}
-	}
-
-	var billingAddr *dto.AddressDTO
-	if order.BillingAddr.Street != "" {
-		billingAddr = &dto.AddressDTO{
-			AddressLine1: order.BillingAddr.Street,
-			City:         order.BillingAddr.City,
-			State:        order.BillingAddr.State,
-			PostalCode:   order.BillingAddr.PostalCode,
-			Country:      order.BillingAddr.Country,
-		}
-	}
-
-	customerDetails := dto.CustomerDetailsDTO{
-		Email:    order.CustomerDetails.Email,
-		Phone:    order.CustomerDetails.Phone,
-		FullName: order.CustomerDetails.FullName,
-	}
-
-	paymentDetails := dto.PaymentDetails{
-		PaymentID: order.PaymentID,
-		Provider:  dto.PaymentProvider(order.PaymentProvider),
-		Method:    dto.PaymentMethod(order.PaymentMethod),
-		Captured:  order.IsCaptured(),
-		Refunded:  order.IsRefunded(),
-	}
-
-	var discountDetails dto.AppliedDiscountDTO
-	if order.AppliedDiscount != nil {
-		discountDetails = dto.AppliedDiscountDTO{
-			ID:     order.AppliedDiscount.DiscountID,
-			Code:   order.AppliedDiscount.DiscountCode,
-			Amount: money.FromCents(order.AppliedDiscount.DiscountAmount),
-			Type:   "",
-			Method: "",
-			Value:  0,
-		}
-	}
-
-	var shippingDetails dto.ShippingOptionDTO
-	if order.ShippingOption != nil {
-		shippingDetails = dto.ConvertToShippingOptionDTO(order.ShippingOption)
-	}
-
-	return dto.OrderDTO{
-		ID:              order.ID,
-		OrderNumber:     order.OrderNumber,
-		UserID:          order.UserID,
-		Status:          dto.OrderStatus(order.Status),
-		TotalAmount:     money.FromCents(order.TotalAmount),
-		FinalAmount:     money.FromCents(order.FinalAmount),
-		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
-		Items:           items,
-		ShippingAddress: *shippingAddr,
-		BillingAddress:  *billingAddr,
-		PaymentDetails:  paymentDetails,
-		ShippingDetails: shippingDetails,
-		DiscountDetails: discountDetails,
-		Customer:        customerDetails,
-		CheckoutID:      order.CheckoutSessionID,
-		CreatedAt:       order.CreatedAt,
-		UpdatedAt:       order.UpdatedAt,
-	}
 }

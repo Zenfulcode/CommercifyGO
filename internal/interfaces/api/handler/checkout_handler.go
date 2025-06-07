@@ -64,23 +64,14 @@ func (h *CheckoutHandler) GetCheckout(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -94,13 +85,7 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	var request dto.AddToCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Invalid request body: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -115,10 +100,8 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -136,23 +119,15 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		h.logger.Error("Failed to add to checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -167,13 +142,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 	sku := vars["sku"]
 	if sku == "" {
 		h.logger.Error("SKU is required in URL path")
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "SKU is required in URL path",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "SKU is required in URL path", http.StatusBadRequest)
 		return
 	}
 
@@ -181,13 +150,7 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 	var request dto.UpdateCheckoutItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Invalid request body: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -196,10 +159,8 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -217,23 +178,15 @@ func (h *CheckoutHandler) UpdateCheckoutItem(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		h.logger.Error("Failed to update checkout item: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -248,13 +201,7 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 	sku := vars["sku"]
 	if sku == "" {
 		h.logger.Error("SKU is required in URL path")
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "SKU is required in URL path",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "SKU is required in URL path", http.StatusBadRequest)
 		return
 	}
 
@@ -263,10 +210,7 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -283,23 +227,15 @@ func (h *CheckoutHandler) RemoveFromCheckout(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		h.logger.Error("Failed to remove item from checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -314,10 +250,7 @@ func (h *CheckoutHandler) ClearCheckout(w http.ResponseWriter, r *http.Request) 
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(response)
@@ -329,22 +262,15 @@ func (h *CheckoutHandler) ClearCheckout(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		h.logger.Error("Failed to clear checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -358,13 +284,7 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 	var request dto.SetShippingAddressRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Failed to parse shipping address request: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -373,10 +293,8 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(response)
@@ -396,23 +314,15 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		h.logger.Error("Failed to set shipping address: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -426,13 +336,7 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 	var request dto.SetBillingAddressRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Failed to parse billing address request: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -440,10 +344,7 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -464,23 +365,14 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 
 	if err != nil {
 		h.logger.Error("Failed to set billing address: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -494,14 +386,7 @@ func (h *CheckoutHandler) SetCustomerDetails(w http.ResponseWriter, r *http.Requ
 	var request dto.SetCustomerDetailsRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Failed to parse customer details request: %v", err)
-
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -510,10 +395,8 @@ func (h *CheckoutHandler) SetCustomerDetails(w http.ResponseWriter, r *http.Requ
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -532,23 +415,16 @@ func (h *CheckoutHandler) SetCustomerDetails(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		h.logger.Error("Failed to set customer details: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
+	response := dto.CreateCheckoutResponse(checkout)
 
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -561,13 +437,7 @@ func (h *CheckoutHandler) SetShippingMethod(w http.ResponseWriter, r *http.Reque
 	var request dto.SetShippingMethodRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Failed to parse shipping method request: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -575,10 +445,8 @@ func (h *CheckoutHandler) SetShippingMethod(w http.ResponseWriter, r *http.Reque
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -589,22 +457,15 @@ func (h *CheckoutHandler) SetShippingMethod(w http.ResponseWriter, r *http.Reque
 
 	if err != nil {
 		h.logger.Error("Failed to set shipping method: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -617,6 +478,7 @@ func (h *CheckoutHandler) ApplyDiscount(w http.ResponseWriter, r *http.Request) 
 	// Parse request body
 	var request dto.ApplyDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		h.logger.Error("Failed to parse discount code request: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -624,7 +486,11 @@ func (h *CheckoutHandler) ApplyDiscount(w http.ResponseWriter, r *http.Request) 
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response := dto.ErrorResponse(err.Error())
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -632,22 +498,14 @@ func (h *CheckoutHandler) ApplyDiscount(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		h.logger.Error("Failed to apply discount: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -661,10 +519,8 @@ func (h *CheckoutHandler) RemoveDiscount(w http.ResponseWriter, r *http.Request)
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -677,22 +533,15 @@ func (h *CheckoutHandler) RemoveDiscount(w http.ResponseWriter, r *http.Request)
 
 	if err != nil {
 		h.logger.Error("Failed to remove discount: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -706,23 +555,15 @@ func (h *CheckoutHandler) SetCurrency(w http.ResponseWriter, r *http.Request) {
 	var request dto.SetCurrencyRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Failed to parse currency change request: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Validate currency code
 	if request.Currency == "" {
 		h.logger.Error("Currency code is required")
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Currency code is required",
-		}
+		response := dto.ErrorResponse("Currency code is required")
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -733,22 +574,14 @@ func (h *CheckoutHandler) SetCurrency(w http.ResponseWriter, r *http.Request) {
 	checkout, err := h.checkoutUseCase.ChangeCurrencyBySessionID(checkoutSessionID, request.Currency)
 	if err != nil {
 		h.logger.Error("Failed to change checkout currency: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to change checkout currency: " + err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert entity to DTO
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	// Return updated checkout
 	w.Header().Set("Content-Type", "application/json")
@@ -762,15 +595,7 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	var paymentInput dto.CompleteCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentInput); err != nil {
 		h.logger.Error("Failed to parse checkout completion request: %v", err)
-
-		errResponse := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   fmt.Sprintf("Invalid request format: %v", err),
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errResponse)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -787,10 +612,7 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		h.logger.Error("Failed to get checkout with session ID %s: %v", checkoutSessionID, err)
 
-		errResponse := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Checkout session not found or expired. Please restart the checkout process.",
-		}
+		errResponse := dto.ErrorResponse("Checkout not found. Please create a checkout first.")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
@@ -802,10 +624,7 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	if checkout == nil || len(checkout.Items) == 0 {
 		h.logger.Error("Checkout %s has no items", checkoutSessionID)
 
-		errResponse := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Checkout has no items. Please add items to your cart first.",
-		}
+		errResponse := dto.ErrorResponse("Checkout is empty. Please add items to the checkout before completing.")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -817,17 +636,19 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	order, err = h.checkoutUseCase.CreateOrderFromCheckout(checkout.ID)
 	if err != nil {
 		h.logger.Error("Failed to convert checkout to order: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ErrorResponse(err.Error())
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	// Validate payment data
 	if paymentInput.PaymentData.CardDetails == nil && paymentInput.PaymentData.PhoneNumber == "" {
 		h.logger.Error("Missing payment data: both CardDetails and PhoneNumber are empty")
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Payment data is required. Please provide either card details or a phone number.",
-		}
+		response := dto.ErrorResponse("Payment data is required. Please provide either card details or a phone number for wallet payments.")
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -837,10 +658,8 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	// Validate that the payment provider is specified
 	if paymentInput.PaymentProvider == "" {
 		h.logger.Error("Missing payment provider")
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Payment provider is required. Please specify a payment provider.",
-		}
+		response := dto.ErrorResponse("Payment provider is required. Please specify a payment provider.")
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -880,15 +699,12 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 		// print order
 		h.logger.Debug("Order details: %+v", order)
 
-		h.orderUseCase.FailOrder(order.ID)
+		h.orderUseCase.FailOrder(order)
 
 		h.logger.Error("Failed to process payment for order %d: %v", order.ID, err)
 
 		// Return a more informative error to the client
-		errResponse := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
+		errResponse := dto.ErrorResponse(err.Error())
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -896,33 +712,28 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Create response
+	response := dto.CreateCompleteCheckoutResponse(processedOrder)
+
 	// Return created order
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
-	// Create response
-	response := dto.ResponseDTO[dto.CheckoutCompleteResponse]{
-		Success: true,
-		Message: "Order created successfully",
-		Data: dto.CheckoutCompleteResponse{
-			Order:          convertToOrderDTO(processedOrder),
-			ActionRequired: order.Status == entity.OrderStatusPendingAction,
-			ActionURL:      order.ActionURL,
-		},
-	}
-
 	json.NewEncoder(w).Encode(response)
 }
 
 // ListAdminCheckouts handles listing all checkouts (admin only)
 func (h *CheckoutHandler) ListAdminCheckouts(w http.ResponseWriter, r *http.Request) {
 	// Parse pagination parameters
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 {
-		limit = 10 // Default limit
+	if page <= 0 {
+		page = 1 // Default to page 1
+	}
+
+	if pageSize <= 0 {
+		pageSize = 10 // Default limit
 	}
 
 	// Get checkouts by status if provided
@@ -930,41 +741,23 @@ func (h *CheckoutHandler) ListAdminCheckouts(w http.ResponseWriter, r *http.Requ
 	var err error
 
 	if status != "" {
-		checkouts, err = h.checkoutUseCase.GetCheckoutsByStatus(entity.CheckoutStatus(status), offset, limit)
+		checkouts, err = h.checkoutUseCase.GetCheckoutsByStatus(entity.CheckoutStatus(status), page, pageSize)
 	} else {
-		checkouts, err = h.checkoutUseCase.GetAllCheckouts(offset, limit)
+		checkouts, err = h.checkoutUseCase.GetAllCheckouts(page, pageSize)
 	}
 
 	if err != nil {
 		h.logger.Error("Failed to list checkouts: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to list checkouts: " + err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert checkouts to DTOs
-	checkoutDTOs := make([]dto.CheckoutDTO, len(checkouts))
-	for i, checkout := range checkouts {
-		checkoutDTOs[i] = dto.ConvertToCheckoutDTO(checkout)
-	}
-
 	// Create response
-	response := dto.CheckoutListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.CheckoutDTO]{
-			Success: true,
-			Data:    checkoutDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     offset/limit + 1,
-				PageSize: limit,
-				Total:    len(checkoutDTOs),
-			},
-		},
-	}
+	response := dto.CreateCheckoutsListResponse(checkouts, len(checkouts), page, pageSize)
 
 	// Return checkouts
 	w.Header().Set("Content-Type", "application/json")
@@ -978,13 +771,7 @@ func (h *CheckoutHandler) GetAdminCheckout(w http.ResponseWriter, r *http.Reques
 	checkoutID, err := strconv.ParseUint(vars["checkoutId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid checkout ID: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid checkout ID",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid checkout ID", http.StatusBadRequest)
 		return
 	}
 
@@ -992,34 +779,15 @@ func (h *CheckoutHandler) GetAdminCheckout(w http.ResponseWriter, r *http.Reques
 	checkout, err := h.checkoutUseCase.GetCheckoutByID(uint(checkoutID))
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to get checkout: " + err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	if checkout == nil {
-		h.logger.Error("Checkout with ID %d not found", checkoutID)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   fmt.Sprintf("Checkout with ID %d not found", checkoutID),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Convert checkout to DTO and return response
-	checkoutDTO := dto.ConvertToCheckoutDTO(checkout)
-	response := dto.ResponseDTO[dto.CheckoutDTO]{
-		Success: true,
-		Data:    checkoutDTO,
-	}
+	response := dto.CreateCheckoutResponse(checkout)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -1032,13 +800,7 @@ func (h *CheckoutHandler) DeleteAdminCheckout(w http.ResponseWriter, r *http.Req
 	checkoutID, err := strconv.ParseUint(vars["checkoutId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid checkout ID: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid checkout ID",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		http.Error(w, "Invalid checkout ID", http.StatusBadRequest)
 		return
 	}
 
@@ -1046,10 +808,8 @@ func (h *CheckoutHandler) DeleteAdminCheckout(w http.ResponseWriter, r *http.Req
 	err = h.checkoutUseCase.DeleteCheckout(uint(checkoutID))
 	if err != nil {
 		h.logger.Error("Failed to delete checkout: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to delete checkout: " + err.Error(),
-		}
+		response := dto.ErrorResponse(err.Error())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -1057,10 +817,7 @@ func (h *CheckoutHandler) DeleteAdminCheckout(w http.ResponseWriter, r *http.Req
 	}
 
 	// Return success response
-	response := dto.ResponseDTO[string]{
-		Success: true,
-		Message: "Checkout deleted successfully",
-	}
+	response := dto.SuccessResponseWithMessage(nil, "Checkout deleted successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)

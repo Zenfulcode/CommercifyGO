@@ -369,7 +369,7 @@ func TestConvertToCheckoutDTO(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ConvertToCheckoutDTO(tt.checkout)
+			result := toCheckoutDTO(tt.checkout)
 
 			// Compare fields individually for better error messages
 			if result.ID != tt.expected.ID {
@@ -506,7 +506,7 @@ func TestConvertToCheckoutDTO_CentsConversion(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	result := ConvertToCheckoutDTO(checkout)
+	result := toCheckoutDTO(checkout)
 
 	// Test cents to currency units conversion
 	if result.TotalAmount != 123.45 {
@@ -547,7 +547,7 @@ func TestConvertToCheckoutDTO_NilPointer(t *testing.T) {
 	// In a real scenario, this function should probably handle nil gracefully
 	// For now, we just test that calling it doesn't cause undefined behavior beyond the expected panic
 	shouldPanic := func() {
-		ConvertToCheckoutDTO(nil)
+		toCheckoutDTO(nil)
 	}
 
 	// Test that it panics as expected

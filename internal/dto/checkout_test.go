@@ -377,7 +377,7 @@ func TestConvertToCheckoutDTO_MinimalCheckout(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	dto := ConvertToCheckoutDTO(checkout)
+	dto := toCheckoutDTO(checkout)
 
 	// Test that conversion doesn't fail with minimal data
 	if dto.ID != 1 {
@@ -456,7 +456,7 @@ func TestConvertToCheckoutDTO_MultipleItems(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	dto := ConvertToCheckoutDTO(checkout)
+	dto := toCheckoutDTO(checkout)
 
 	// Test multiple items conversion
 	if len(dto.Items) != 2 {
