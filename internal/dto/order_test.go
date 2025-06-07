@@ -205,13 +205,9 @@ func TestPaymentDetails(t *testing.T) {
 
 func TestShippingDetails(t *testing.T) {
 	details := ShippingOptionDTO{
-		ShippingRateID:        2,
-		ShippingMethodID:      1,
-		Name:                  "Express Shipping",
-		Description:           "Delivery in 1-2 business days",
-		Cost:                  19.99,
-		EstimatedDeliveryDays: 2,
-		FreeShipping:          false,
+		ShippingMethodID: 2,
+		Name:             "Express Shipping",
+		Cost:             19.99,
 	}
 
 	if details.ShippingMethodID != 2 {
