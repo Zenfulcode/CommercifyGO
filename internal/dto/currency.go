@@ -120,8 +120,8 @@ func toCurrencySummary(currency *entity.Currency) CurrencySummaryDTO {
 	}
 }
 
-// fromCurrencyEntities converts a slice of Currency entities to CurrencyDTOs
-func fromCurrencyEntities(currencies []*entity.Currency) []CurrencyDTO {
+// toCurrencyDTOList converts a slice of Currency entities to CurrencyDTOs
+func toCurrencyDTOList(currencies []*entity.Currency) []CurrencyDTO {
 	dtos := make([]CurrencyDTO, len(currencies))
 	for i, currency := range currencies {
 		dtos[i] = toCurrencyDTO(currency)
@@ -129,8 +129,8 @@ func fromCurrencyEntities(currencies []*entity.Currency) []CurrencyDTO {
 	return dtos
 }
 
-// fromCurrencyEntitiesSummary converts a slice of Currency entities to CurrencySummaryDTOs
-func fromCurrencyEntitiesSummary(currencies []*entity.Currency) []CurrencySummaryDTO {
+// toCurrencySummaryDTOList converts a slice of Currency entities to CurrencySummaryDTOs
+func toCurrencySummaryDTOList(currencies []*entity.Currency) []CurrencySummaryDTO {
 	dtos := make([]CurrencySummaryDTO, len(currencies))
 	for i, currency := range currencies {
 		dtos[i] = toCurrencySummary(currency)
@@ -202,7 +202,7 @@ func CreateConvertAmountResponse(fromCurrency string, fromAmount float64, toCurr
 
 // CreateListCurrenciesResponse creates a response for listing currencies
 func CreateCurrenciesListResponse(currencies []*entity.Currency, page, pageSize, total int) ListResponseDTO[CurrencyDTO] {
-	dtos := fromCurrencyEntities(currencies)
+	dtos := toCurrencyDTOList(currencies)
 	return ListResponseDTO[CurrencyDTO]{
 		Success: true,
 		Data:    dtos,
@@ -215,7 +215,7 @@ func CreateCurrenciesListResponse(currencies []*entity.Currency, page, pageSize,
 }
 
 func CreateCurrencySummaryResponse(currencies []*entity.Currency, page, size, total int) ListResponseDTO[CurrencySummaryDTO] {
-	dtos := fromCurrencyEntitiesSummary(currencies)
+	dtos := toCurrencySummaryDTOList(currencies)
 	return ListResponseDTO[CurrencySummaryDTO]{
 		Success: true,
 		Data:    dtos,

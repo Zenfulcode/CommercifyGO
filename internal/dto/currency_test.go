@@ -133,7 +133,7 @@ func TestFromCurrencyEntities(t *testing.T) {
 		},
 	}
 
-	dtos := fromCurrencyEntities(currencies)
+	dtos := toCurrencyDTOList(currencies)
 
 	if len(dtos) != len(currencies) {
 		t.Errorf("Expected %d DTOs, got %d", len(currencies), len(dtos))
@@ -167,7 +167,7 @@ func TestFromCurrencyEntitiesSummary(t *testing.T) {
 		},
 	}
 
-	dtos := fromCurrencyEntitiesSummary(currencies)
+	dtos := toCurrencySummaryDTOList(currencies)
 
 	if len(dtos) != len(currencies) {
 		t.Errorf("Expected %d DTOs, got %d", len(currencies), len(dtos))
