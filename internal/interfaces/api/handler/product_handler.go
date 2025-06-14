@@ -286,9 +286,6 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		Active:      request.Active,
 	}
 
-	if request.Weight != nil {
-		input.Weight = *request.Weight
-	}
 	if request.CategoryID != nil {
 		input.CategoryID = *request.CategoryID
 	}

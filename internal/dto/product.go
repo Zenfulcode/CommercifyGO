@@ -56,7 +56,7 @@ type CreateProductRequest struct {
 // CreateVariantRequest represents the data needed to create a new product variant
 type CreateVariantRequest struct {
 	SKU        string                `json:"sku"`
-	Price      float64               `json:"price,omitempty"`
+	Price      float64               `json:"price"`
 	Stock      int                   `json:"stock"`
 	Attributes []VariantAttributeDTO `json:"attributes"`
 	Images     []string              `json:"images,omitempty"`
@@ -65,14 +65,11 @@ type CreateVariantRequest struct {
 
 // UpdateProductRequest represents the data needed to update an existing product
 type UpdateProductRequest struct {
-	Name          string   `json:"name,omitempty"`
-	Description   string   `json:"description,omitempty"`
-	Price         *float64 `json:"price,omitempty"`
-	StockQuantity *int     `json:"stock,omitempty"`
-	Weight        *float64 `json:"weight,omitempty"`
-	CategoryID    *uint    `json:"category_id,omitempty"`
-	Images        []string `json:"images,omitempty"`
-	Active        bool     `json:"active,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	CategoryID  *uint    `json:"category_id,omitempty"`
+	Images      []string `json:"images,omitempty"`
+	Active      bool     `json:"active,omitempty"`
 }
 
 // UpdateVariantRequest represents the data needed to update an existing product variant

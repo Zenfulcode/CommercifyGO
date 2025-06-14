@@ -248,20 +248,14 @@ func TestCreateVariantRequest(t *testing.T) {
 }
 
 func TestUpdateProductRequest(t *testing.T) {
-	price := 79.99
-	stock := 120
-	weight := 3.0
 	categoryID := uint(7)
 
 	request := UpdateProductRequest{
-		Name:          "Updated Product",
-		Description:   "Updated description",
-		Price:         &price,
-		StockQuantity: &stock,
-		Weight:        &weight,
-		CategoryID:    &categoryID,
-		Images:        []string{"updated1.jpg"},
-		Active:        true,
+		Name:        "Updated Product",
+		Description: "Updated description",
+		CategoryID:  &categoryID,
+		Images:      []string{"updated1.jpg"},
+		Active:      true,
 	}
 
 	if request.Name != "Updated Product" {
@@ -270,15 +264,7 @@ func TestUpdateProductRequest(t *testing.T) {
 	if request.Description != "Updated description" {
 		t.Errorf("Expected Description 'Updated description', got %s", request.Description)
 	}
-	if request.Price == nil || *request.Price != 79.99 {
-		t.Errorf("Expected Price 79.99, got %v", request.Price)
-	}
-	if request.StockQuantity == nil || *request.StockQuantity != 120 {
-		t.Errorf("Expected StockQuantity 120, got %v", request.StockQuantity)
-	}
-	if request.Weight == nil || *request.Weight != 3.0 {
-		t.Errorf("Expected Weight 3.0, got %v", request.Weight)
-	}
+
 	if request.CategoryID == nil || *request.CategoryID != 7 {
 		t.Errorf("Expected CategoryID 7, got %v", request.CategoryID)
 	}
@@ -302,15 +288,6 @@ func TestUpdateProductRequestWithNilValues(t *testing.T) {
 	}
 	if request.Description != "Only Description Updated" {
 		t.Errorf("Expected Description 'Only Description Updated', got %s", request.Description)
-	}
-	if request.Price != nil {
-		t.Errorf("Expected Price nil, got %v", request.Price)
-	}
-	if request.StockQuantity != nil {
-		t.Errorf("Expected StockQuantity nil, got %v", request.StockQuantity)
-	}
-	if request.Weight != nil {
-		t.Errorf("Expected Weight nil, got %v", request.Weight)
 	}
 	if request.CategoryID != nil {
 		t.Errorf("Expected CategoryID nil, got %v", request.CategoryID)

@@ -255,7 +255,6 @@ type UpdateProductInput struct {
 	CategoryID  uint
 	Images      []string
 	Active      bool
-	Weight      float64
 }
 
 // UpdateProduct updates a product
@@ -285,9 +284,6 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 
 	if len(input.Images) > 0 {
 		product.Images = input.Images
-	}
-	if input.Weight > 0 {
-		product.Weight = input.Weight
 	}
 	if input.Active != product.Active {
 		product.Active = input.Active

@@ -607,7 +607,7 @@ export interface CreateProductRequest {
  */
 export interface CreateVariantRequest {
   sku: string;
-  price?: number /* float64 */;
+  price: number /* float64 */;
   stock: number /* int */;
   attributes: VariantAttributeDTO[];
   images?: string[];
@@ -619,9 +619,6 @@ export interface CreateVariantRequest {
 export interface UpdateProductRequest {
   name?: string;
   description?: string;
-  price?: number /* float64 */;
-  stock?: number /* int */;
-  weight?: number /* float64 */;
   category_id?: number /* uint */;
   images?: string[];
   active?: boolean;
