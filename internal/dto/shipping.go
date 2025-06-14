@@ -21,16 +21,16 @@ type ShippingMethodDetailDTO struct {
 
 // CreateShippingMethodRequest represents the data needed to create a new shipping method
 type CreateShippingMethodRequest struct {
-	Name                  string `json:"name" validate:"required,min=1,max=100"`
-	Description           string `json:"description" validate:"max=500"`
-	EstimatedDeliveryDays int    `json:"estimated_delivery_days" validate:"required,gte=0"`
+	Name                  string `json:"name"`
+	Description           string `json:"description"`
+	EstimatedDeliveryDays int    `json:"estimated_delivery_days"`
 }
 
 // UpdateShippingMethodRequest represents the data needed to update a shipping method
 type UpdateShippingMethodRequest struct {
-	Name                  string `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	Description           string `json:"description,omitempty" validate:"omitempty,max=500"`
-	EstimatedDeliveryDays int    `json:"estimated_delivery_days,omitempty" validate:"omitempty,gte=0"`
+	Name                  string `json:"name,omitempty"`
+	Description           string `json:"description,omitempty"`
+	EstimatedDeliveryDays int    `json:"estimated_delivery_days,omitempty"`
 	Active                bool   `json:"active"`
 }
 
@@ -49,20 +49,20 @@ type ShippingZoneDTO struct {
 
 // CreateShippingZoneRequest represents the data needed to create a new shipping zone
 type CreateShippingZoneRequest struct {
-	Name        string   `json:"name" validate:"required,min=1,max=100"`
-	Description string   `json:"description" validate:"max=500"`
-	Countries   []string `json:"countries" validate:"dive,len=2"`
-	States      []string `json:"states" validate:"dive,min=1,max=10"`
-	ZipCodes    []string `json:"zip_codes" validate:"dive,min=1,max=20"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Countries   []string `json:"countries"`
+	States      []string `json:"states"`
+	ZipCodes    []string `json:"zip_codes"`
 }
 
 // UpdateShippingZoneRequest represents the data needed to update a shipping zone
 type UpdateShippingZoneRequest struct {
-	Name        string   `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	Description string   `json:"description,omitempty" validate:"omitempty,max=500"`
-	Countries   []string `json:"countries,omitempty" validate:"omitempty,dive,len=2"`
-	States      []string `json:"states,omitempty" validate:"omitempty,dive,min=1,max=10"`
-	ZipCodes    []string `json:"zip_codes,omitempty" validate:"omitempty,dive,min=1,max=20"`
+	Name        string   `json:"name,omitempty" `
+	Description string   `json:"description,omitempty"`
+	Countries   []string `json:"countries,omitempty"`
+	States      []string `json:"states,omitempty"`
+	ZipCodes    []string `json:"zip_codes,omitempty"`
 	Active      bool     `json:"active"`
 }
 
@@ -85,19 +85,19 @@ type ShippingRateDTO struct {
 
 // CreateShippingRateRequest represents the data needed to create a new shipping rate
 type CreateShippingRateRequest struct {
-	ShippingMethodID      uint     `json:"shipping_method_id" validate:"required,gt=0"`
-	ShippingZoneID        uint     `json:"shipping_zone_id" validate:"required,gt=0"`
-	BaseRate              float64  `json:"base_rate" validate:"required,gte=0"`
-	MinOrderValue         float64  `json:"min_order_value" validate:"gte=0"`
-	FreeShippingThreshold *float64 `json:"free_shipping_threshold" validate:"omitempty,gte=0"`
+	ShippingMethodID      uint     `json:"shipping_method_id"`
+	ShippingZoneID        uint     `json:"shipping_zone_id"`
+	BaseRate              float64  `json:"base_rate"`
+	MinOrderValue         float64  `json:"min_order_value"`
+	FreeShippingThreshold *float64 `json:"free_shipping_threshold"`
 	Active                bool     `json:"active"`
 }
 
 // UpdateShippingRateRequest represents the data needed to update a shipping rate
 type UpdateShippingRateRequest struct {
-	BaseRate              float64  `json:"base_rate,omitempty" validate:"omitempty,gte=0"`
-	MinOrderValue         float64  `json:"min_order_value,omitempty" validate:"omitempty,gte=0"`
-	FreeShippingThreshold *float64 `json:"free_shipping_threshold" validate:"omitempty,gte=0"`
+	BaseRate              float64  `json:"base_rate,omitempty"`
+	MinOrderValue         float64  `json:"min_order_value,omitempty"`
+	FreeShippingThreshold *float64 `json:"free_shipping_threshold"`
 	Active                bool     `json:"active"`
 }
 
@@ -114,10 +114,10 @@ type WeightBasedRateDTO struct {
 
 // CreateWeightBasedRateRequest represents the data needed to create a weight-based rate
 type CreateWeightBasedRateRequest struct {
-	ShippingRateID uint    `json:"shipping_rate_id" validate:"required,gt=0"`
-	MinWeight      float64 `json:"min_weight" validate:"required,gte=0"`
-	MaxWeight      float64 `json:"max_weight" validate:"required,gte=0,gtfield=MinWeight"`
-	Rate           float64 `json:"rate" validate:"required"`
+	ShippingRateID uint    `json:"shipping_rate_id"`
+	MinWeight      float64 `json:"min_weight"`
+	MaxWeight      float64 `json:"max_weight"`
+	Rate           float64 `json:"rate"`
 }
 
 // ValueBasedRateDTO represents a value-based rate in the system
@@ -133,10 +133,10 @@ type ValueBasedRateDTO struct {
 
 // CreateValueBasedRateRequest represents the data needed to create a value-based rate
 type CreateValueBasedRateRequest struct {
-	ShippingRateID uint    `json:"shipping_rate_id" validate:"required,gt=0"`
-	MinOrderValue  float64 `json:"min_order_value" validate:"required,gte=0"`
-	MaxOrderValue  float64 `json:"max_order_value" validate:"required,gte=0,gtfield=MinOrderValue"`
-	Rate           float64 `json:"rate" validate:"required"`
+	ShippingRateID uint    `json:"shipping_rate_id"`
+	MinOrderValue  float64 `json:"min_order_value"`
+	MaxOrderValue  float64 `json:"max_order_value"`
+	Rate           float64 `json:"rate"`
 }
 
 // ShippingOptionDTO represents a shipping option with calculated cost
@@ -152,9 +152,9 @@ type ShippingOptionDTO struct {
 
 // CalculateShippingOptionsRequest represents the request to calculate shipping options
 type CalculateShippingOptionsRequest struct {
-	Address     AddressDTO `json:"address" validate:"required"`
-	OrderValue  float64    `json:"order_value" validate:"required,gt=0"`
-	OrderWeight float64    `json:"order_weight" validate:"required,gt=0"`
+	Address     AddressDTO `json:"address"`
+	OrderValue  float64    `json:"order_value"`
+	OrderWeight float64    `json:"order_weight"`
 }
 
 // CalculateShippingOptionsResponse represents the response with available shipping options
@@ -164,8 +164,8 @@ type CalculateShippingOptionsResponse struct {
 
 // CalculateShippingCostRequest represents the request to calculate shipping cost for a specific rate
 type CalculateShippingCostRequest struct {
-	OrderValue  float64 `json:"order_value" validate:"required,gt=0"`
-	OrderWeight float64 `json:"order_weight" validate:"required,gt=0"`
+	OrderValue  float64 `json:"order_value"`
+	OrderWeight float64 `json:"order_weight"`
 }
 
 // CalculateShippingCostResponse represents the response with calculated shipping cost

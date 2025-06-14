@@ -29,7 +29,7 @@ func TestConvertToDiscountDTO(t *testing.T) {
 		discount.ID = 1
 
 		// Convert to DTO
-		dto := ConvertToDiscountDTO(discount)
+		dto := toDiscountDTO(discount)
 
 		// Assert all fields are correctly converted
 		assert.Equal(t, uint(1), dto.ID)
@@ -49,7 +49,7 @@ func TestConvertToDiscountDTO(t *testing.T) {
 	})
 
 	t.Run("Convert nil discount returns empty DTO", func(t *testing.T) {
-		dto := ConvertToDiscountDTO(nil)
+		dto := toDiscountDTO(nil)
 		assert.Equal(t, DiscountDTO{}, dto)
 	})
 }

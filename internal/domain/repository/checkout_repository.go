@@ -36,4 +36,7 @@ type CheckoutRepository interface {
 
 	// GetCompletedCheckoutsByUserID retrieves all completed checkouts for a user
 	GetCompletedCheckoutsByUserID(userID uint, offset, limit int) ([]*entity.Checkout, error)
+
+	// HasActiveCheckoutsWithProduct checks if a product has any active checkouts
+	HasActiveCheckoutsWithProduct(productID uint) (bool, error)
 }

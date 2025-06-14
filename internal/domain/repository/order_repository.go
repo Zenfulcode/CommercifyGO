@@ -12,4 +12,5 @@ type OrderRepository interface {
 	IsDiscountIdUsed(discountID uint) (bool, error)
 	GetByPaymentID(paymentID string) (*entity.Order, error)
 	ListAll(offset, limit int) ([]*entity.Order, error)
+	HasOrdersWithProduct(productID uint) (bool, error)
 }

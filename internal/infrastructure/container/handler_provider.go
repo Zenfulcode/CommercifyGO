@@ -10,6 +10,7 @@ import (
 type HandlerProvider interface {
 	UserHandler() *handler.UserHandler
 	ProductHandler() *handler.ProductHandler
+	CategoryHandler() *handler.CategoryHandler
 	CheckoutHandler() *handler.CheckoutHandler
 	OrderHandler() *handler.OrderHandler
 	PaymentHandler() *handler.PaymentHandler
@@ -26,6 +27,7 @@ type handlerProvider struct {
 
 	userHandler     *handler.UserHandler
 	productHandler  *handler.ProductHandler
+	categoryHandler *handler.CategoryHandler
 	checkoutHandler *handler.CheckoutHandler
 	orderHandler    *handler.OrderHandler
 	paymentHandler  *handler.PaymentHandler
@@ -70,6 +72,20 @@ func (p *handlerProvider) ProductHandler() *handler.ProductHandler {
 		)
 	}
 	return p.productHandler
+}
+
+// CategoryHandler returns the category handler
+func (p *handlerProvider) CategoryHandler() *handler.CategoryHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.categoryHandler == nil {
+		p.categoryHandler = handler.NewCategoryHandler(
+			p.container.UseCases().CategoryUseCase(),
+			p.container.Logger(),
+		)
+	}
+	return p.categoryHandler
 }
 
 // OrderHandler returns the order handler

@@ -4,35 +4,36 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 )
 
 // CheckoutDTO represents a checkout session in the system
 type CheckoutDTO struct {
-	ID               uint                     `json:"id"`
-	UserID           uint                     `json:"user_id,omitempty"`
-	SessionID        string                   `json:"session_id,omitempty"`
-	Items            []CheckoutItemDTO        `json:"items"`
-	Status           string                   `json:"status"`
-	ShippingAddress  AddressDTO               `json:"shipping_address"`
-	BillingAddress   AddressDTO               `json:"billing_address"`
-	ShippingMethodID uint                     `json:"shipping_method_id,omitempty"`
-	ShippingMethod   *ShippingMethodDetailDTO `json:"shipping_method,omitempty"`
-	PaymentProvider  string                   `json:"payment_provider,omitempty"`
-	TotalAmount      float64                  `json:"total_amount"`
-	ShippingCost     float64                  `json:"shipping_cost"`
-	TotalWeight      float64                  `json:"total_weight"`
-	CustomerDetails  CustomerDetailsDTO       `json:"customer_details"`
-	Currency         string                   `json:"currency"`
-	DiscountCode     string                   `json:"discount_code,omitempty"`
-	DiscountAmount   float64                  `json:"discount_amount"`
-	FinalAmount      float64                  `json:"final_amount"`
-	AppliedDiscount  *AppliedDiscountDTO      `json:"applied_discount,omitempty"`
-	CreatedAt        time.Time                `json:"created_at"`
-	UpdatedAt        time.Time                `json:"updated_at"`
-	LastActivityAt   time.Time                `json:"last_activity_at"`
-	ExpiresAt        time.Time                `json:"expires_at"`
-	CompletedAt      *time.Time               `json:"completed_at,omitempty"`
-	ConvertedOrderID uint                     `json:"converted_order_id,omitempty"`
+	ID               uint                `json:"id"`
+	UserID           uint                `json:"user_id,omitempty"`
+	SessionID        string              `json:"session_id,omitempty"`
+	Items            []CheckoutItemDTO   `json:"items"`
+	Status           string              `json:"status"`
+	ShippingAddress  AddressDTO          `json:"shipping_address"`
+	BillingAddress   AddressDTO          `json:"billing_address"`
+	ShippingMethodID uint                `json:"shipping_method_id,omitempty"`
+	ShippingOption   *ShippingOptionDTO  `json:"shipping_option,omitempty"`
+	PaymentProvider  string              `json:"payment_provider,omitempty"`
+	TotalAmount      float64             `json:"total_amount"`
+	ShippingCost     float64             `json:"shipping_cost"`
+	TotalWeight      float64             `json:"total_weight"`
+	CustomerDetails  CustomerDetailsDTO  `json:"customer_details"`
+	Currency         string              `json:"currency"`
+	DiscountCode     string              `json:"discount_code,omitempty"`
+	DiscountAmount   float64             `json:"discount_amount"`
+	FinalAmount      float64             `json:"final_amount"`
+	AppliedDiscount  *AppliedDiscountDTO `json:"applied_discount,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	UpdatedAt        time.Time           `json:"updated_at"`
+	LastActivityAt   time.Time           `json:"last_activity_at"`
+	ExpiresAt        time.Time           `json:"expires_at"`
+	CompletedAt      *time.Time          `json:"completed_at,omitempty"`
+	ConvertedOrderID uint                `json:"converted_order_id,omitempty"`
 }
 
 // CheckoutItemDTO represents an item in a checkout
@@ -50,23 +51,6 @@ type CheckoutItemDTO struct {
 	Subtotal    float64   `json:"subtotal"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// CustomerDetailsDTO represents customer information for a checkout
-type CustomerDetailsDTO struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	FullName string `json:"full_name"`
-}
-
-// AppliedDiscountDTO represents an applied discount in a checkout
-type AppliedDiscountDTO struct {
-	ID     uint    `json:"id"`
-	Code   string  `json:"code"`
-	Type   string  `json:"type"`
-	Method string  `json:"method"`
-	Value  float64 `json:"value"`
-	Amount float64 `json:"amount"`
 }
 
 // AddToCheckoutRequest represents the data needed to add an item to a checkout
@@ -135,9 +119,9 @@ type CheckoutSearchRequest struct {
 }
 
 type CheckoutCompleteResponse struct {
-	Order          OrderDTO `json:"order"`
-	ActionRequired bool     `json:"action_required,omitempty"`
-	ActionURL      string   `json:"redirect_url,omitempty"`
+	Order          OrderSummaryDTO `json:"order"`
+	ActionRequired bool            `json:"action_required,omitempty"`
+	ActionURL      string          `json:"redirect_url,omitempty"`
 }
 
 // CompleteCheckoutRequest represents the data needed to convert a checkout to an order
@@ -162,8 +146,38 @@ type CardDetailsDTO struct {
 	Token          string `json:"token,omitempty"` // Optional token for saved cards
 }
 
+func CreateCheckoutsListResponse(checkouts []*entity.Checkout, totalCount, page, pageSize int) ListResponseDTO[CheckoutDTO] {
+	var checkoutDTOs []CheckoutDTO
+	for _, checkout := range checkouts {
+		checkoutDTOs = append(checkoutDTOs, toCheckoutDTO(checkout))
+	}
+
+	return ListResponseDTO[CheckoutDTO]{
+		Success: true,
+		Data:    checkoutDTOs,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    totalCount,
+		},
+	}
+}
+
+func CreateCheckoutResponse(checkout *entity.Checkout) ResponseDTO[CheckoutDTO] {
+	return SuccessResponse(toCheckoutDTO(checkout))
+}
+
+func CreateCompleteCheckoutResponse(order *entity.Order) ResponseDTO[CheckoutCompleteResponse] {
+	response := CheckoutCompleteResponse{
+		Order:          ToOrderSummaryDTO(order),
+		ActionRequired: order.Status == entity.OrderStatusPendingAction,
+		ActionURL:      order.ActionURL,
+	}
+	return SuccessResponse(response)
+}
+
 // ConvertToCheckoutDTO converts a checkout entity to a DTO
-func ConvertToCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
+func toCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
 	dto := CheckoutDTO{
 		ID:               checkout.ID,
 		UserID:           checkout.UserID,
@@ -208,9 +222,17 @@ func ConvertToCheckoutDTO(checkout *entity.Checkout) CheckoutDTO {
 	dto.Items = items
 
 	// Convert shipping method if present
-	if checkout.ShippingMethod != nil {
-		shippingMethodDTO := ConvertToShippingMethodDetailDTO(checkout.ShippingMethod)
-		dto.ShippingMethod = &shippingMethodDTO
+	if checkout.ShippingOption != nil {
+		option := ConvertToShippingOptionDTO(checkout.ShippingOption)
+		dto.ShippingOption = &ShippingOptionDTO{
+			ShippingMethodID:      option.ShippingMethodID,
+			ShippingRateID:        option.ShippingRateID,
+			Name:                  option.Name,
+			Description:           option.Description,
+			Cost:                  money.FromCents(int64(option.Cost)), // Convert cents to currency units
+			EstimatedDeliveryDays: option.EstimatedDeliveryDays,
+			FreeShipping:          option.FreeShipping,
+		}
 	}
 
 	// Convert shipping address

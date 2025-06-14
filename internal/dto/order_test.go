@@ -51,19 +51,23 @@ func TestOrderDTO(t *testing.T) {
 		Refunded:  false,
 	}
 
-	shippingDetails := ShippingDetails{
-		MethodID: 1,
-		Method:   "Standard Shipping",
-		Cost:     9.99,
+	shippingDetails := ShippingOptionDTO{
+		ShippingRateID:        2,
+		ShippingMethodID:      1,
+		Name:                  "Standard Shipping",
+		Description:           "Delivery in 5-7 business days",
+		Cost:                  9.99,
+		EstimatedDeliveryDays: 5,
+		FreeShipping:          false,
 	}
 
-	customer := CustomerDetails{
+	customer := CustomerDetailsDTO{
 		Email:    "customer@example.com",
 		Phone:    "+1234567890",
 		FullName: "John Doe",
 	}
 
-	discountDetails := DiscountDetails{
+	discountDetails := AppliedDiscountDTO{
 		Code:   "SAVE10",
 		Amount: 10.00,
 	}
@@ -200,17 +204,17 @@ func TestPaymentDetails(t *testing.T) {
 }
 
 func TestShippingDetails(t *testing.T) {
-	details := ShippingDetails{
-		MethodID: 2,
-		Method:   "Express Shipping",
-		Cost:     19.99,
+	details := ShippingOptionDTO{
+		ShippingMethodID: 2,
+		Name:             "Express Shipping",
+		Cost:             19.99,
 	}
 
-	if details.MethodID != 2 {
-		t.Errorf("Expected MethodID 2, got %d", details.MethodID)
+	if details.ShippingMethodID != 2 {
+		t.Errorf("Expected MethodID 2, got %d", details.ShippingMethodID)
 	}
-	if details.Method != "Express Shipping" {
-		t.Errorf("Expected Method 'Express Shipping', got %s", details.Method)
+	if details.Name != "Express Shipping" {
+		t.Errorf("Expected Method 'Express Shipping', got %s", details.Name)
 	}
 	if details.Cost != 19.99 {
 		t.Errorf("Expected Cost 19.99, got %f", details.Cost)
@@ -218,7 +222,7 @@ func TestShippingDetails(t *testing.T) {
 }
 
 func TestCustomerDetails(t *testing.T) {
-	customer := CustomerDetails{
+	customer := CustomerDetailsDTO{
 		Email:    "test@example.com",
 		Phone:    "+1-555-123-4567",
 		FullName: "Jane Smith",
@@ -236,7 +240,7 @@ func TestCustomerDetails(t *testing.T) {
 }
 
 func TestDiscountDetails(t *testing.T) {
-	discount := DiscountDetails{
+	discount := AppliedDiscountDTO{
 		Code:   "WINTER20",
 		Amount: 15.50,
 	}
@@ -454,7 +458,7 @@ func TestPaymentProviderConstants(t *testing.T) {
 }
 
 func TestOrderListResponse(t *testing.T) {
-	orders := []OrderDTO{
+	orders := []OrderSummaryDTO{
 		{
 			ID:          1,
 			OrderNumber: "ORD-001",
@@ -477,12 +481,13 @@ func TestOrderListResponse(t *testing.T) {
 		Total:    2,
 	}
 
-	response := OrderListResponse{
-		ListResponseDTO: ListResponseDTO[OrderDTO]{
-			Success:    true,
-			Message:    "Orders retrieved successfully",
-			Data:       orders,
-			Pagination: pagination,
+	response := ListResponseDTO[OrderSummaryDTO]{
+		Success: true,
+		Data:    orders,
+		Pagination: PaginationDTO{
+			Page:     pagination.Page,
+			PageSize: pagination.PageSize,
+			Total:    pagination.Total,
 		},
 	}
 

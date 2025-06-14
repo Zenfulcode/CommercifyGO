@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
@@ -14,6 +15,8 @@ type ProductUseCase struct {
 	categoryRepo       repository.CategoryRepository
 	productVariantRepo repository.ProductVariantRepository
 	currencyRepo       repository.CurrencyRepository
+	orderRepo          repository.OrderRepository
+	checkoutRepo       repository.CheckoutRepository
 	defaultCurrency    *entity.Currency
 }
 
@@ -23,6 +26,8 @@ func NewProductUseCase(
 	categoryRepo repository.CategoryRepository,
 	productVariantRepo repository.ProductVariantRepository,
 	currencyRepo repository.CurrencyRepository,
+	orderRepo repository.OrderRepository,
+	checkoutRepo repository.CheckoutRepository,
 ) *ProductUseCase {
 	defaultCurrency, err := currencyRepo.GetDefault()
 	if err != nil {
@@ -34,6 +39,8 @@ func NewProductUseCase(
 		categoryRepo:       categoryRepo,
 		productVariantRepo: productVariantRepo,
 		currencyRepo:       currencyRepo,
+		orderRepo:          orderRepo,
+		checkoutRepo:       checkoutRepo,
 		defaultCurrency:    defaultCurrency,
 	}
 }
@@ -176,7 +183,8 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 
 		// Add variants to product
 		product.Variants = variants
-		product.HasVariants = true
+		// Only set has_variants=true if there are multiple variants
+		product.HasVariants = len(variants) > 1
 	} else {
 		// ALL PRODUCTS MUST HAVE AT LEAST ONE VARIANT
 		// Create a default variant using the product's basic information
@@ -198,7 +206,8 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 
 		// Add variant to product
 		product.Variants = []*entity.ProductVariant{defaultVariant}
-		product.HasVariants = true
+		// Single default variant means has_variants=false
+		product.HasVariants = false
 	}
 
 	return product, nil
@@ -241,14 +250,12 @@ func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.
 
 // UpdateProductInput contains the data needed to update a product (prices in dollars)
 type UpdateProductInput struct {
-	Name           string
-	Description    string
-	Price          float64
-	Stock          int
-	CategoryID     uint
-	Images         []string
-	CurrencyPrices []CurrencyPriceInput
-	Active         bool
+	Name        string
+	Description string
+	CategoryID  uint
+	Images      []string
+	Active      bool
+	Weight      float64
 }
 
 // UpdateProduct updates a product
@@ -275,40 +282,15 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 	if input.Description != "" {
 		product.Description = input.Description
 	}
-	if input.Price > 0 && !product.HasVariants {
-		product.Price = money.ToCents(input.Price) // Convert to cents
-	}
-	if input.Stock >= 0 && !product.HasVariants {
-		product.Stock = input.Stock
-	}
+
 	if len(input.Images) > 0 {
 		product.Images = input.Images
 	}
+	if input.Weight > 0 {
+		product.Weight = input.Weight
+	}
 	if input.Active != product.Active {
 		product.Active = input.Active
-	}
-
-	// Process currency-specific prices, if any
-	if len(input.CurrencyPrices) > 0 {
-		// Clear existing prices
-		product.Prices = make([]entity.ProductPrice, 0, len(input.CurrencyPrices))
-
-		for _, currPrice := range input.CurrencyPrices {
-			// Validate currency exists
-			_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-			if err != nil {
-				return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-			}
-
-			// Convert price to cents
-			priceCents := money.ToCents(currPrice.Price)
-
-			product.Prices = append(product.Prices, entity.ProductPrice{
-				ProductID:    product.ID,
-				CurrencyCode: currPrice.CurrencyCode,
-				Price:        priceCents,
-			})
-		}
 	}
 
 	// Update product in repository
@@ -471,18 +453,17 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		}
 	}
 
-	// If this is the first variant or it's set as default, update product
-	isFirstVariant := !product.HasVariants
-	if isFirstVariant || input.IsDefault {
-		// If this is the first variant, set product to have variants
-		if isFirstVariant {
+	// Check if this will be the second variant (making it a multi-variant product)
+	currentVariantCount := len(product.Variants)
+
+	if currentVariantCount >= 1 || input.IsDefault {
+		// If this will be the second or more variant, set product to have variants
+		if currentVariantCount >= 1 {
 			product.HasVariants = true
 		}
 
-		// If this is the default variant, update product price and weight
-		// TODO: Handle this in the repository
-		if input.IsDefault && isFirstVariant {
-			// If there are other variants, unset their default status
+		// If this is the default variant, unset any other default variants
+		if input.IsDefault {
 			variants := product.Variants
 
 			for _, v := range variants {
@@ -525,13 +506,31 @@ func (uc *ProductUseCase) DeleteVariant(productID uint, variantID uint) error {
 	return uc.productVariantRepo.Delete(variantID)
 }
 
-// DeleteProduct deletes a product
+// DeleteProduct deletes a product after checking it has no associated orders or active checkouts
 func (uc *ProductUseCase) DeleteProduct(id uint) error {
 	if id == 0 {
 		return errors.New("product ID is required")
 	}
 
-	// TODO: make sure no orders are associated with the product
+	// Check if product has any associated orders
+	hasOrders, err := uc.orderRepo.HasOrdersWithProduct(id)
+	if err != nil {
+		return fmt.Errorf("failed to check for product orders: %w", err)
+	}
+
+	if hasOrders {
+		return errors.New("cannot delete product that has existing orders")
+	}
+
+	// Check if product has any active checkouts
+	hasActiveCheckouts, err := uc.checkoutRepo.HasActiveCheckoutsWithProduct(id)
+	if err != nil {
+		return fmt.Errorf("failed to check for active checkouts: %w", err)
+	}
+
+	if hasActiveCheckouts {
+		return errors.New("cannot delete product that is in active checkouts. Please wait for checkouts to complete or expire")
+	}
 
 	return uc.productRepo.Delete(id)
 }

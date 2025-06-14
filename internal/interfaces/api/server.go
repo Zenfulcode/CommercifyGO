@@ -72,6 +72,7 @@ func (s *Server) setupRoutes() {
 	// Extract handlers from container
 	userHandler := s.container.Handlers().UserHandler()
 	productHandler := s.container.Handlers().ProductHandler()
+	categoryHandler := s.container.Handlers().CategoryHandler()
 	checkoutHandler := s.container.Handlers().CheckoutHandler()
 	orderHandler := s.container.Handlers().OrderHandler()
 	paymentHandler := s.container.Handlers().PaymentHandler()
@@ -92,7 +93,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/products/{productId:[0-9]+}", productHandler.GetProduct).Methods(http.MethodGet)
 
 	api.HandleFunc("/products/search", productHandler.SearchProducts).Methods(http.MethodGet)
-	api.HandleFunc("/categories", productHandler.ListCategories).Methods(http.MethodGet)
+	api.HandleFunc("/categories", categoryHandler.ListCategories).Methods(http.MethodGet)
+	api.HandleFunc("/categories/{id:[0-9]+}", categoryHandler.GetCategory).Methods(http.MethodGet)
+	api.HandleFunc("/categories/{id:[0-9]+}/children", categoryHandler.GetChildCategories).Methods(http.MethodGet)
 	api.HandleFunc("/payment/providers", paymentHandler.GetAvailablePaymentProviders).Methods(http.MethodGet)
 
 	// Public discount routes
@@ -161,6 +164,11 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/currencies", currencyHandler.DeleteCurrency).Methods(http.MethodDelete)
 	admin.HandleFunc("/currencies/default", currencyHandler.SetDefaultCurrency).Methods(http.MethodPut)
 
+	// Admin category routes
+	admin.HandleFunc("/categories", categoryHandler.CreateCategory).Methods(http.MethodPost)
+	admin.HandleFunc("/categories/{id:[0-9]+}", categoryHandler.UpdateCategory).Methods(http.MethodPut)
+	admin.HandleFunc("/categories/{id:[0-9]+}", categoryHandler.DeleteCategory).Methods(http.MethodDelete)
+
 	// Shipping management routes (admin only)
 	admin.HandleFunc("/shipping/methods", shippingHandler.CreateShippingMethod).Methods(http.MethodPost)
 	admin.HandleFunc("/shipping/methods/{shippingMethodId:[0-9]+}", shippingHandler.UpdateShippingMethod).Methods(http.MethodPut)
@@ -196,6 +204,7 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/webhooks/{webhookId:[0-9]+}", webhookHandler.DeleteWebhook).Methods(http.MethodDelete)
 	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.RegisterMobilePayWebhook).Methods(http.MethodPost)
 	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.GetMobilePayWebhooks).Methods(http.MethodGet)
+	admin.HandleFunc("/webhooks/mobilepay/{externalId}", webhookHandler.DeleteMobilePayWebhook).Methods(http.MethodDelete)
 
 	admin.HandleFunc("/products", productHandler.ListProducts).Methods(http.MethodGet)
 	admin.HandleFunc("/products", productHandler.CreateProduct).Methods(http.MethodPost)

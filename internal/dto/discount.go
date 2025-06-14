@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 )
@@ -27,40 +28,50 @@ type DiscountDTO struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// AppliedDiscountDTO represents an applied discount in a checkout
+type AppliedDiscountDTO struct {
+	ID     uint    `json:"id"`
+	Code   string  `json:"code"`
+	Type   string  `json:"type"`
+	Method string  `json:"method"`
+	Value  float64 `json:"value"`
+	Amount float64 `json:"amount"`
+}
+
 // CreateDiscountRequest represents the data needed to create a new discount
 type CreateDiscountRequest struct {
-	Code             string    `json:"code" validate:"required,min=3,max=50"`
-	Type             string    `json:"type" validate:"required,oneof=basket product"`
-	Method           string    `json:"method" validate:"required,oneof=fixed percentage"`
-	Value            float64   `json:"value" validate:"required,gt=0"`
-	MinOrderValue    float64   `json:"min_order_value" validate:"gte=0"`
-	MaxDiscountValue float64   `json:"max_discount_value" validate:"gte=0"`
+	Code             string    `json:"code"`
+	Type             string    `json:"type"`
+	Method           string    `json:"method"`
+	Value            float64   `json:"value"`
+	MinOrderValue    float64   `json:"min_order_value"`
+	MaxDiscountValue float64   `json:"max_discount_value"`
 	ProductIDs       []uint    `json:"product_ids,omitempty"`
 	CategoryIDs      []uint    `json:"category_ids,omitempty"`
-	StartDate        time.Time `json:"start_date" validate:"required"`
-	EndDate          time.Time `json:"end_date" validate:"required"`
-	UsageLimit       int       `json:"usage_limit" validate:"gte=0"`
+	StartDate        time.Time `json:"start_date"`
+	EndDate          time.Time `json:"end_date"`
+	UsageLimit       int       `json:"usage_limit"`
 }
 
 // UpdateDiscountRequest represents the data needed to update a discount
 type UpdateDiscountRequest struct {
-	Code             string    `json:"code,omitempty" validate:"omitempty,min=3,max=50"`
-	Type             string    `json:"type,omitempty" validate:"omitempty,oneof=basket product"`
-	Method           string    `json:"method,omitempty" validate:"omitempty,oneof=fixed percentage"`
-	Value            float64   `json:"value,omitempty" validate:"omitempty,gt=0"`
-	MinOrderValue    float64   `json:"min_order_value,omitempty" validate:"omitempty,gte=0"`
-	MaxDiscountValue float64   `json:"max_discount_value,omitempty" validate:"omitempty,gte=0"`
+	Code             string    `json:"code,omitempty"`
+	Type             string    `json:"type,omitempty"`
+	Method           string    `json:"method,omitempty"`
+	Value            float64   `json:"value,omitempty"`
+	MinOrderValue    float64   `json:"min_order_value,omitempty"`
+	MaxDiscountValue float64   `json:"max_discount_value,omitempty"`
 	ProductIDs       []uint    `json:"product_ids,omitempty"`
 	CategoryIDs      []uint    `json:"category_ids,omitempty"`
-	StartDate        time.Time `json:"start_date,omitempty"`
-	EndDate          time.Time `json:"end_date,omitempty"`
-	UsageLimit       int       `json:"usage_limit,omitempty" validate:"omitempty,gte=0"`
+	StartDate        time.Time `json:"start_date"`
+	EndDate          time.Time `json:"end_date"`
+	UsageLimit       int       `json:"usage_limit,omitempty"`
 	Active           bool      `json:"active"`
 }
 
 // ValidateDiscountRequest represents the data needed to validate a discount code
 type ValidateDiscountRequest struct {
-	DiscountCode string `json:"discount_code" validate:"required"`
+	DiscountCode string `json:"discount_code"`
 }
 
 // ValidateDiscountResponse represents the response for discount validation
@@ -76,8 +87,70 @@ type ValidateDiscountResponse struct {
 	MaxDiscountValue float64 `json:"max_discount_value,omitempty"`
 }
 
+func (r CreateDiscountRequest) ToUseCaseInput() usecase.CreateDiscountInput {
+	return usecase.CreateDiscountInput{
+		Code:             r.Code,
+		Type:             r.Type,
+		Method:           r.Method,
+		Value:            r.Value,
+		MinOrderValue:    r.MinOrderValue,
+		MaxDiscountValue: r.MaxDiscountValue,
+		ProductIDs:       r.ProductIDs,
+		CategoryIDs:      r.CategoryIDs,
+		StartDate:        r.StartDate,
+		EndDate:          r.EndDate,
+		UsageLimit:       r.UsageLimit,
+	}
+}
+
+func (r UpdateDiscountRequest) ToUseCaseInput() usecase.UpdateDiscountInput {
+	return usecase.UpdateDiscountInput{
+		Code:             r.Code,
+		Type:             r.Type,
+		Method:           r.Method,
+		Value:            r.Value,
+		MinOrderValue:    r.MinOrderValue,
+		MaxDiscountValue: r.MaxDiscountValue,
+		ProductIDs:       r.ProductIDs,
+		CategoryIDs:      r.CategoryIDs,
+		StartDate:        r.StartDate,
+		EndDate:          r.EndDate,
+		UsageLimit:       r.UsageLimit,
+		Active:           r.Active,
+	}
+}
+
+func DiscountCreateResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponseWithMessage(toDiscountDTO(discount), "Discount created successfully")
+}
+
+func DiscountRetrieveResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponse(toDiscountDTO(discount))
+}
+
+func DiscountUpdateResponse(discount *entity.Discount) ResponseDTO[DiscountDTO] {
+	return SuccessResponseWithMessage(toDiscountDTO(discount), "Discount updated successfully")
+}
+
+func DiscountDeleteResponse() ResponseDTO[any] {
+	return SuccessResponseMessage("Discount deleted successfully")
+}
+
+func DiscountListResponse(discounts []*entity.Discount, totalCount, page, pageSize int) ListResponseDTO[DiscountDTO] {
+	return ListResponseDTO[DiscountDTO]{
+		Success: true,
+		Data:    ConvertDiscountListToDTO(discounts),
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    totalCount,
+		},
+		Message: "Discounts retrieved successfully",
+	}
+}
+
 // ConvertToDiscountDTO converts a domain discount entity to a DTO
-func ConvertToDiscountDTO(discount *entity.Discount) DiscountDTO {
+func toDiscountDTO(discount *entity.Discount) DiscountDTO {
 	if discount == nil {
 		return DiscountDTO{}
 	}
@@ -122,7 +195,7 @@ func ConvertToAppliedDiscountDTO(appliedDiscount *entity.AppliedDiscount) Applie
 func ConvertDiscountListToDTO(discounts []*entity.Discount) []DiscountDTO {
 	dtos := make([]DiscountDTO, len(discounts))
 	for i, discount := range discounts {
-		dtos[i] = ConvertToDiscountDTO(discount)
+		dtos[i] = toDiscountDTO(discount)
 	}
 	return dtos
 }

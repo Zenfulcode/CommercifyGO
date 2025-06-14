@@ -118,19 +118,19 @@ func (r *ShippingRate) SetFreeShippingThreshold(threshold *int64) {
 }
 
 // CalculateShippingCost calculates the shipping cost for an order
-func (r *ShippingRate) CalculateShippingCost(orderValue int64, weight float64) int64 {
+func (r *ShippingRate) CalculateShippingCost(orderValue int64, weight float64) (int64, error) {
 	// Check if order qualifies for free shipping
 	if r.FreeShippingThreshold != nil && orderValue >= *r.FreeShippingThreshold {
-		return 0
+		return 0, nil // Free shipping applies
+	}
+
+	// Check if order meets minimum value
+	if orderValue < r.MinOrderValue {
+		return 0, errors.New("order value does not meet minimum requirement")
 	}
 
 	// Start with the base rate
 	cost := r.BaseRate
-
-	// Check if order meets minimum value
-	if orderValue < r.MinOrderValue {
-		return 0 // Order does not qualify for shipping with this rate
-	}
 
 	// Apply weight-based rates
 	for _, wbr := range r.WeightBasedRates {
@@ -148,7 +148,7 @@ func (r *ShippingRate) CalculateShippingCost(orderValue int64, weight float64) i
 		}
 	}
 
-	return cost
+	return cost, nil
 }
 
 // Activate activates a shipping rate

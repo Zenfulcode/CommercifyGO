@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/config"
@@ -98,10 +99,8 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in CreateProduct")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -111,10 +110,8 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var request dto.CreateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body",
-		}
+		h.logger.Error("Invalid request body in CreateProduct: %v", err)
+		response := dto.ErrorResponse("Invalid request body")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -157,12 +154,27 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	product, err := h.productUseCase.CreateProduct(input)
 	if err != nil {
 		h.logger.Error("Failed to create product: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
+
+		// Handle specific error cases
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to create product"
+
+		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
+			statusCode = http.StatusConflict
+			errorMessage = "Product with this SKU already exists"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid product data"
+		} else if strings.Contains(err.Error(), "category") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Category not found"
+		} else if strings.Contains(err.Error(), "unauthorized") {
+			statusCode = http.StatusForbidden
 		}
+
+		response := dto.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -170,10 +182,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	// Convert to DTO
 	productDTO := toProductDTO(product)
 
-	response := dto.ResponseDTO[dto.ProductDTO]{
-		Success: true,
-		Data:    productDTO,
-	}
+	response := dto.SuccessResponseWithMessage(productDTO, "Product created successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -186,10 +195,8 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in GetProduct: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -207,16 +214,21 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.logger.Error("Failed to get product: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
+
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to retrieve product"
+
 		if err.Error() == errors.ProductNotFoundError {
-			w.WriteHeader(http.StatusNotFound)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "currency") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid currency code"
 		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -224,10 +236,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	// Convert to DTO
 	productDTO := toProductDTO(product)
 
-	response := dto.ResponseDTO[dto.ProductDTO]{
-		Success: true,
-		Data:    productDTO,
-	}
+	response := dto.SuccessResponse(productDTO)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -238,10 +247,8 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in UpdateProduct")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -252,10 +259,8 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in UpdateProduct: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -265,10 +270,8 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var request dto.UpdateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body",
-		}
+		h.logger.Error("Invalid request body in UpdateProduct: %v", err)
+		response := dto.ErrorResponse("Invalid request body")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -279,39 +282,53 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	input := usecase.UpdateProductInput{
 		Name:        request.Name,
 		Description: request.Description,
-		Price:       *request.Price,
-		Stock:       *request.StockQuantity,
-		CategoryID:  *request.CategoryID,
 		Images:      request.Images,
 		Active:      request.Active,
+	}
+
+	if request.Weight != nil {
+		input.Weight = *request.Weight
+	}
+	if request.CategoryID != nil {
+		input.CategoryID = *request.CategoryID
 	}
 
 	// Update product
 	product, err := h.productUseCase.UpdateProduct(uint(id), input)
 	if err != nil {
 		h.logger.Error("Failed to update product: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err.Error() == "unauthorized: not the seller of this product" {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		json.NewEncoder(w).Encode(response)
 
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to update product"
+
+		if err.Error() == "unauthorized: not the seller of this product" {
+			statusCode = http.StatusForbidden
+			errorMessage = "Not authorized to update this product"
+		} else if err.Error() == errors.ProductNotFoundError {
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
+			statusCode = http.StatusConflict
+			errorMessage = "Product with this SKU already exists"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid product data"
+		} else if strings.Contains(err.Error(), "category") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Category not found"
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	// Convert to DTO
 	productDTO := toProductDTO(product)
 
-	response := dto.ResponseDTO[dto.ProductDTO]{
-		Success: true,
-		Data:    productDTO,
-	}
+	response := dto.SuccessResponseWithMessage(productDTO, "Product updated successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -322,10 +339,8 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in DeleteProduct")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -336,10 +351,8 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in DeleteProduct: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -350,25 +363,26 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	err = h.productUseCase.DeleteProduct(uint(id))
 	if err != nil {
 		h.logger.Error("Failed to delete product: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err.Error() == "unauthorized: not the seller of this product" {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		json.NewEncoder(w).Encode(response)
 
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to delete product"
+
+		if err.Error() == errors.ProductNotFoundError {
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "has orders") || strings.Contains(err.Error(), "cannot delete") {
+			statusCode = http.StatusConflict
+			errorMessage = "Cannot delete product with existing orders"
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.ResponseDTO[any]{
-		Success: true,
-		Message: "Product deleted successfully",
-	}
+	response := dto.SuccessResponseMessage("Product deleted successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -380,10 +394,8 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in ListProducts")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -392,6 +404,9 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 
 	// Parse pagination parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 {
+		page = 1 // Default page
+	}
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if pageSize <= 0 {
 		pageSize = 10 // Default page size
@@ -402,10 +417,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.logger.Error("Failed to list products: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to list products",
-		}
+		response := dto.ErrorResponse("Failed to list products")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -422,6 +434,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		ListResponseDTO: dto.ListResponseDTO[dto.ProductDTO]{
 			Success: true,
 			Data:    productDTOs,
+			Message: "Products retrieved successfully",
 			Pagination: dto.PaginationDTO{
 				Page:     page,
 				PageSize: pageSize,
@@ -506,14 +519,25 @@ func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) 
 	products, total, err := h.productUseCase.SearchProducts(input)
 	if err != nil {
 		h.logger.Error("Failed to search products: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to search products",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
 
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to search products"
+
+		if strings.Contains(err.Error(), "currency") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid currency code"
+		} else if strings.Contains(err.Error(), "category") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Category not found"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid search parameters"
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -527,6 +551,7 @@ func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) 
 		ListResponseDTO: dto.ListResponseDTO[dto.ProductDTO]{
 			Success: true,
 			Data:    productDTOs,
+			Message: "Products search completed successfully",
 			Pagination: dto.PaginationDTO{
 				Page:     page,
 				PageSize: pageSize,
@@ -544,21 +569,14 @@ func (h *ProductHandler) ListCategories(w http.ResponseWriter, r *http.Request) 
 	categories, err := h.productUseCase.ListCategories()
 	if err != nil {
 		h.logger.Error("Failed to list categories: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to list categories",
-		}
+		response := dto.ErrorResponse("Failed to list categories")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
-
 		return
 	}
 
-	response := dto.ResponseDTO[[]*entity.Category]{
-		Success: true,
-		Data:    categories,
-	}
+	response := dto.SuccessResponseWithMessage(categories, "Categories retrieved successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -569,10 +587,8 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in AddVariant")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -582,14 +598,11 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var request dto.CreateVariantRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body",
-		}
+		h.logger.Error("Invalid request body in AddVariant: %v", err)
+		response := dto.ErrorResponse("Invalid request body")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
-
 		return
 	}
 
@@ -597,10 +610,8 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	productID, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in AddVariant: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -631,16 +642,27 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	variant, err := h.productUseCase.AddVariant(input)
 	if err != nil {
 		h.logger.Error("Failed to add variant: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
+
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to add variant"
+
 		if err.Error() == "unauthorized: not the seller of this product" {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			statusCode = http.StatusForbidden
+			errorMessage = "Not authorized to add variant to this product"
+		} else if err.Error() == errors.ProductNotFoundError {
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
+			statusCode = http.StatusConflict
+			errorMessage = "Variant with this SKU already exists"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid variant data"
 		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -648,10 +670,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	// Convert to DTO
 	variantDTO := toVariantDTO(variant)
 
-	response := dto.ResponseDTO[dto.VariantDTO]{
-		Success: true,
-		Data:    variantDTO,
-	}
+	response := dto.SuccessResponseWithMessage(variantDTO, "Variant added successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -663,10 +682,8 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in UpdateVariant")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -677,10 +694,8 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	productID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in UpdateVariant: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -689,10 +704,8 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 
 	variantID, err := strconv.ParseUint(vars["variant_id"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid variant ID",
-		}
+		h.logger.Error("Invalid variant ID in UpdateVariant: %v", err)
+		response := dto.ErrorResponse("Invalid variant ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -702,10 +715,8 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var request dto.CreateVariantRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid request body",
-		}
+		h.logger.Error("Invalid request body in UpdateVariant: %v", err)
+		response := dto.ErrorResponse("Invalid request body")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -734,16 +745,30 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	variant, err := h.productUseCase.UpdateVariant(uint(productID), uint(variantID), input)
 	if err != nil {
 		h.logger.Error("Failed to update variant: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
+
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to update variant"
+
 		if err.Error() == "unauthorized: not the seller of this product" {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			statusCode = http.StatusForbidden
+			errorMessage = "Not authorized to update this variant"
+		} else if err.Error() == errors.ProductNotFoundError {
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant not found"
+		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
+			statusCode = http.StatusConflict
+			errorMessage = "Variant with this SKU already exists"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid variant data"
 		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -751,10 +776,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	// Convert to DTO
 	variantDTO := toVariantDTO(variant)
 
-	response := dto.ResponseDTO[dto.VariantDTO]{
-		Success: true,
-		Data:    variantDTO,
-	}
+	response := dto.SuccessResponseWithMessage(variantDTO, "Variant updated successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -765,10 +787,8 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+		h.logger.Error("Unauthorized access attempt in DeleteVariant")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -779,10 +799,8 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	productID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid product ID",
-		}
+		h.logger.Error("Invalid product ID in DeleteVariant: %v", err)
+		response := dto.ErrorResponse("Invalid product ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -791,10 +809,8 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 
 	variantID, err := strconv.ParseUint(vars["variant_id"], 10, 32)
 	if err != nil {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Invalid variant ID",
-		}
+		h.logger.Error("Invalid variant ID in DeleteVariant: %v", err)
+		response := dto.ErrorResponse("Invalid variant ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
@@ -806,24 +822,35 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		h.logger.Error("Failed to delete variant: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
+
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to delete variant"
+
 		if err.Error() == "unauthorized: not the seller of this product" {
-			w.WriteHeader(http.StatusForbidden)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			statusCode = http.StatusForbidden
+			errorMessage = "Not authorized to delete this variant"
+		} else if err.Error() == errors.ProductNotFoundError {
+			statusCode = http.StatusNotFound
+			errorMessage = "Product not found"
+		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant not found"
+		} else if strings.Contains(err.Error(), "last variant") || strings.Contains(err.Error(), "cannot delete") {
+			statusCode = http.StatusConflict
+			errorMessage = "Cannot delete the last variant of a product"
+		} else if strings.Contains(err.Error(), "has orders") {
+			statusCode = http.StatusConflict
+			errorMessage = "Cannot delete variant with existing orders"
 		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.ResponseDTO[any]{
-		Success: true,
-		Message: "Variant deleted successfully",
-	}
+	response := dto.SuccessResponseMessage("Variant deleted successfully")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)

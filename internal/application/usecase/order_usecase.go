@@ -89,7 +89,7 @@ func (uc *OrderUseCase) GetOrderByID(id uint) (*entity.Order, error) {
 
 	order, err := uc.orderRepo.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order by ID: %w", err)
+		return nil, err
 	}
 
 	return order, nil
@@ -119,13 +119,7 @@ func (uc *OrderUseCase) ListOrdersByStatus(status entity.OrderStatus, offset, li
 	return uc.orderRepo.ListByStatus(status, offset, limit)
 }
 
-func (uc *OrderUseCase) FailOrder(orderId uint) error {
-	// Get the order by ID
-	order, err := uc.orderRepo.GetByID(orderId)
-	if err != nil {
-		return fmt.Errorf("failed to get order by ID: %w", err)
-	}
-
+func (uc *OrderUseCase) FailOrder(order *entity.Order) error {
 	// Update the order status to failed
 	if err := order.UpdateStatus(entity.OrderStatusFailed); err != nil {
 		return fmt.Errorf("failed to update order status: %w", err)
@@ -134,11 +128,6 @@ func (uc *OrderUseCase) FailOrder(orderId uint) error {
 	// Save the updated order in the repository
 	if err := uc.orderRepo.Update(order); err != nil {
 		return fmt.Errorf("failed to save updated order: %w", err)
-	}
-
-	// Save the updated order with metadata
-	if err := uc.orderRepo.Update(order); err != nil {
-		return fmt.Errorf("failed to save order metadata: %w", err)
 	}
 
 	return nil

@@ -10,6 +10,7 @@ import (
 type UseCaseProvider interface {
 	UserUseCase() *usecase.UserUseCase
 	ProductUseCase() *usecase.ProductUseCase
+	CategoryUseCase() *usecase.CategoryUseCase
 	CheckoutUseCase() *usecase.CheckoutUseCase
 	OrderUseCase() *usecase.OrderUseCase
 	DiscountUseCase() *usecase.DiscountUseCase
@@ -25,6 +26,7 @@ type useCaseProvider struct {
 
 	userUseCase     *usecase.UserUseCase
 	productUseCase  *usecase.ProductUseCase
+	categoryUseCase *usecase.CategoryUseCase
 	checkoutUseCase *usecase.CheckoutUseCase
 	orderUseCase    *usecase.OrderUseCase
 	discountUseCase *usecase.DiscountUseCase
@@ -64,9 +66,24 @@ func (p *useCaseProvider) ProductUseCase() *usecase.ProductUseCase {
 			p.container.Repositories().CategoryRepository(),
 			p.container.Repositories().ProductVariantRepository(),
 			p.container.Repositories().CurrencyRepository(),
+			p.container.Repositories().OrderRepository(),
+			p.container.Repositories().CheckoutRepository(),
 		)
 	}
 	return p.productUseCase
+}
+
+// CategoryUseCase returns the category use case
+func (p *useCaseProvider) CategoryUseCase() *usecase.CategoryUseCase {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.categoryUseCase == nil {
+		p.categoryUseCase = usecase.NewCategoryUseCase(
+			p.container.Repositories().CategoryRepository(),
+		)
+	}
+	return p.categoryUseCase
 }
 
 // CheckoutUseCase returns the checkout use case
@@ -75,6 +92,15 @@ func (p *useCaseProvider) CheckoutUseCase() *usecase.CheckoutUseCase {
 	defer p.mu.Unlock()
 
 	if p.checkoutUseCase == nil {
+		// Initialize shipping use case directly to avoid circular dependency
+		if p.shippingUseCase == nil {
+			p.shippingUseCase = usecase.NewShippingUseCase(
+				p.container.Repositories().ShippingMethodRepository(),
+				p.container.Repositories().ShippingZoneRepository(),
+				p.container.Repositories().ShippingRateRepository(),
+			)
+		}
+
 		p.checkoutUseCase = usecase.NewCheckoutUseCase(
 			p.container.Repositories().CheckoutRepository(),
 			p.container.Repositories().ProductRepository(),
@@ -86,6 +112,7 @@ func (p *useCaseProvider) CheckoutUseCase() *usecase.CheckoutUseCase {
 			p.container.Repositories().CurrencyRepository(),
 			p.container.Repositories().PaymentTransactionRepository(),
 			p.container.Services().PaymentService(),
+			p.shippingUseCase,
 		)
 	}
 	return p.checkoutUseCase
@@ -145,15 +172,6 @@ func (p *useCaseProvider) ShippingUseCase() *usecase.ShippingUseCase {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.shippingUseCase == nil {
-		p.shippingUseCase = p.ShippingUsecase()
-	}
-	return p.shippingUseCase
-}
-
-// ShippingUsecase initializes the shipping use case without locking
-// Used to break circular dependencies
-func (p *useCaseProvider) ShippingUsecase() *usecase.ShippingUseCase {
 	if p.shippingUseCase == nil {
 		p.shippingUseCase = usecase.NewShippingUseCase(
 			p.container.Repositories().ShippingMethodRepository(),

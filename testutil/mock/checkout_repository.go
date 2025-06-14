@@ -241,3 +241,25 @@ func (r *MockCheckoutRepository) GetCompletedCheckoutsByUserID(userID uint, offs
 
 	return completedCheckouts[start:end], nil
 }
+
+// HasActiveCheckoutsWithProduct checks if a product has any associated active checkouts
+func (m *MockCheckoutRepository) HasActiveCheckoutsWithProduct(productID uint) (bool, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if productID == 0 {
+		return false, errors.New("product ID cannot be 0")
+	}
+
+	for _, checkout := range m.checkouts {
+		if checkout.Status == entity.CheckoutStatusActive {
+			for _, item := range checkout.Items {
+				if item.ProductID == productID {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}

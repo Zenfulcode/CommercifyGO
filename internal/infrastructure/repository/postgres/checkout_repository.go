@@ -838,6 +838,30 @@ func (r *CheckoutRepository) GetCompletedCheckoutsByUserID(userID uint, offset, 
 	return checkouts, nil
 }
 
+// HasActiveCheckoutsWithProduct checks if a product has any associated active checkouts
+func (r *CheckoutRepository) HasActiveCheckoutsWithProduct(productID uint) (bool, error) {
+	if productID == 0 {
+		return false, errors.New("product ID cannot be 0")
+	}
+
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM checkout_items ci
+			JOIN checkouts c ON ci.checkout_id = c.id
+			WHERE ci.product_id = $1 
+			AND c.status = 'active'
+		)
+	`
+
+	var exists bool
+	err := r.db.QueryRow(query, productID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if product has active checkouts: %w", err)
+	}
+
+	return exists, nil
+}
+
 // Helper to scan checkout rows
 func (r *CheckoutRepository) scanCheckout(row interface{}) (*entity.Checkout, error) {
 	var checkout entity.Checkout

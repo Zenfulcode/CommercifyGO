@@ -29,7 +29,7 @@ type Checkout struct {
 	ShippingAddr     Address          `json:"shipping_address"`
 	BillingAddr      Address          `json:"billing_address"`
 	ShippingMethodID uint             `json:"shipping_method_id,omitempty"`
-	ShippingMethod   *ShippingMethod  `json:"shipping_method,omitempty"`
+	ShippingOption   *ShippingOption  `json:"shipping_option,omitempty"`
 	PaymentProvider  string           `json:"payment_provider,omitempty"`
 	TotalAmount      int64            `json:"total_amount"`  // stored in cents
 	ShippingCost     int64            `json:"shipping_cost"` // stored in cents
@@ -229,10 +229,13 @@ func (c *Checkout) SetCustomerDetails(details CustomerDetails) {
 }
 
 // SetShippingMethod sets the shipping method for the checkout
-func (c *Checkout) SetShippingMethod(methodID uint, cost int64) {
-	c.ShippingMethodID = methodID
-	c.ShippingCost = cost
+func (c *Checkout) SetShippingMethod(option *ShippingOption) {
+	c.ShippingMethodID = option.ShippingMethodID
+	c.ShippingCost = option.Cost
+	c.ShippingOption = option
+
 	c.recalculateTotals()
+
 	c.UpdatedAt = time.Now()
 	c.LastActivityAt = time.Now()
 }
@@ -408,7 +411,7 @@ func (c *Checkout) ToOrder() *Order {
 		BillingAddr:       c.BillingAddr,
 		CustomerDetails:   &c.CustomerDetails,
 		ShippingMethodID:  c.ShippingMethodID,
-		ShippingMethod:    c.ShippingMethod,
+		ShippingOption:    c.ShippingOption,
 		PaymentProvider:   c.PaymentProvider,
 		IsGuestOrder:      isGuestOrder,
 		PaymentMethod:     "wallet", // Default payment method

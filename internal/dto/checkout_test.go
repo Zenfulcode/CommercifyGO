@@ -377,7 +377,7 @@ func TestConvertToCheckoutDTO_MinimalCheckout(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	dto := ConvertToCheckoutDTO(checkout)
+	dto := toCheckoutDTO(checkout)
 
 	// Test that conversion doesn't fail with minimal data
 	if dto.ID != 1 {
@@ -396,7 +396,7 @@ func TestConvertToCheckoutDTO_MinimalCheckout(t *testing.T) {
 		t.Errorf("Expected 0 items, got %d", len(dto.Items))
 	}
 
-	if dto.ShippingMethod != nil {
+	if dto.ShippingOption != nil {
 		t.Error("Expected shipping method to be nil")
 	}
 
@@ -456,7 +456,7 @@ func TestConvertToCheckoutDTO_MultipleItems(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	dto := ConvertToCheckoutDTO(checkout)
+	dto := toCheckoutDTO(checkout)
 
 	// Test multiple items conversion
 	if len(dto.Items) != 2 {
@@ -495,7 +495,7 @@ func TestConvertToCheckoutDTO_MultipleItems(t *testing.T) {
 func TestCheckoutCompleteResponse(t *testing.T) {
 	now := time.Now()
 
-	order := OrderDTO{
+	order := OrderSummaryDTO{
 		ID:          1,
 		Status:      "confirmed",
 		TotalAmount: 99.99,

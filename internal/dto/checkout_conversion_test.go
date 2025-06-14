@@ -74,14 +74,13 @@ func TestConvertToCheckoutDTO(t *testing.T) {
 					Phone:    "+1234567890",
 					FullName: "John Doe",
 				},
-				ShippingMethod: &entity.ShippingMethod{
-					ID:                    5,
+				ShippingOption: &entity.ShippingOption{
+					ShippingMethodID:      5,
+					ShippingRateID:        10,
 					Name:                  "Standard Shipping",
 					Description:           "5-7 business days",
 					EstimatedDeliveryDays: 7,
-					Active:                true,
-					CreatedAt:             testTime,
-					UpdatedAt:             testTime,
+					FreeShipping:          false,
 				},
 				AppliedDiscount: &entity.AppliedDiscount{
 					DiscountID:     1,
@@ -144,14 +143,13 @@ func TestConvertToCheckoutDTO(t *testing.T) {
 					Phone:    "+1234567890",
 					FullName: "John Doe",
 				},
-				ShippingMethod: &ShippingMethodDetailDTO{
-					ID:                    5,
+				ShippingOption: &ShippingOptionDTO{
+					ShippingMethodID:      5,
+					ShippingRateID:        10,
 					Name:                  "Standard Shipping",
 					Description:           "5-7 business days",
 					EstimatedDeliveryDays: 7,
-					Active:                true,
-					CreatedAt:             testTime,
-					UpdatedAt:             testTime,
+					FreeShipping:          false,
 				},
 				AppliedDiscount: &AppliedDiscountDTO{
 					ID:     1,
@@ -371,7 +369,7 @@ func TestConvertToCheckoutDTO(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ConvertToCheckoutDTO(tt.checkout)
+			result := toCheckoutDTO(tt.checkout)
 
 			// Compare fields individually for better error messages
 			if result.ID != tt.expected.ID {
@@ -434,14 +432,14 @@ func TestConvertToCheckoutDTO(t *testing.T) {
 			}
 
 			// Compare shipping method (if present)
-			if tt.expected.ShippingMethod != nil {
-				if result.ShippingMethod == nil {
+			if tt.expected.ShippingOption != nil {
+				if result.ShippingOption == nil {
 					t.Error("Expected ShippingMethod to be present, got nil")
-				} else if !reflect.DeepEqual(*result.ShippingMethod, *tt.expected.ShippingMethod) {
-					t.Errorf("ShippingMethod mismatch.\nGot: %+v\nWant: %+v", *result.ShippingMethod, *tt.expected.ShippingMethod)
+				} else if !reflect.DeepEqual(*result.ShippingOption, *tt.expected.ShippingOption) {
+					t.Errorf("ShippingMethod mismatch.\nGot: %+v\nWant: %+v", *result.ShippingOption, *tt.expected.ShippingOption)
 				}
-			} else if result.ShippingMethod != nil {
-				t.Errorf("Expected ShippingMethod to be nil, got: %+v", result.ShippingMethod)
+			} else if result.ShippingOption != nil {
+				t.Errorf("Expected ShippingMethod to be nil, got: %+v", result.ShippingOption)
 			}
 
 			// Compare applied discount (if present)
@@ -508,7 +506,7 @@ func TestConvertToCheckoutDTO_CentsConversion(t *testing.T) {
 		CustomerDetails: entity.CustomerDetails{},
 	}
 
-	result := ConvertToCheckoutDTO(checkout)
+	result := toCheckoutDTO(checkout)
 
 	// Test cents to currency units conversion
 	if result.TotalAmount != 123.45 {
@@ -549,7 +547,7 @@ func TestConvertToCheckoutDTO_NilPointer(t *testing.T) {
 	// In a real scenario, this function should probably handle nil gracefully
 	// For now, we just test that calling it doesn't cause undefined behavior beyond the expected panic
 	shouldPanic := func() {
-		ConvertToCheckoutDTO(nil)
+		toCheckoutDTO(nil)
 	}
 
 	// Test that it panics as expected

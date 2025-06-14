@@ -3,28 +3,43 @@ package dto
 import (
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
 // OrderDTO represents an order in the system
 type OrderDTO struct {
-	ID              uint            `json:"id"`
-	UserID          uint            `json:"user_id"`
-	OrderNumber     string          `json:"order_number"`
-	Items           []OrderItemDTO  `json:"items"`
-	Status          OrderStatus     `json:"status"`
-	TotalAmount     float64         `json:"total_amount"`
-	FinalAmount     float64         `json:"final_amount"`
-	Currency        string          `json:"currency"`
-	ShippingAddress AddressDTO      `json:"shipping_address"`
-	BillingAddress  AddressDTO      `json:"billing_address"`
-	PaymentDetails  PaymentDetails  `json:"payment_details"`
-	ShippingDetails ShippingDetails `json:"shipping_details"`
-	DiscountDetails DiscountDetails `json:"discount_details"`
-	Customer        CustomerDetails `json:"customer"`
-	CheckoutID      string          `json:"checkout_id,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              uint               `json:"id"`
+	UserID          uint               `json:"user_id"`
+	OrderNumber     string             `json:"order_number"`
+	Items           []OrderItemDTO     `json:"items"`
+	Status          OrderStatus        `json:"status"`
+	TotalAmount     float64            `json:"total_amount"`
+	FinalAmount     float64            `json:"final_amount"`
+	Currency        string             `json:"currency"`
+	ShippingAddress AddressDTO         `json:"shipping_address"`
+	BillingAddress  AddressDTO         `json:"billing_address"`
+	PaymentDetails  PaymentDetails     `json:"payment_details"`
+	ShippingDetails ShippingOptionDTO  `json:"shipping_details"`
+	DiscountDetails AppliedDiscountDTO `json:"discount_details"`
+	Customer        CustomerDetailsDTO `json:"customer"`
+	CheckoutID      string             `json:"checkout_id,omitempty"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+}
+
+type OrderSummaryDTO struct {
+	ID               uint        `json:"id"`
+	OrderNumber      string      `json:"order_number"`
+	UserID           uint        `json:"user_id"`
+	Status           OrderStatus `json:"status"`
+	TotalAmount      float64     `json:"total_amount"`
+	FinalAmount      float64     `json:"final_amount"`
+	OrderLinesAmount int         `json:"order_lines_amount"`
+	Currency         string      `json:"currency"`
+	CreatedAt        time.Time   `json:"created_at"`
+	UpdatedAt        time.Time   `json:"updated_at"`
 }
 
 type PaymentDetails struct {
@@ -34,23 +49,6 @@ type PaymentDetails struct {
 	Status    string          `json:"status"`
 	Captured  bool            `json:"captured"`
 	Refunded  bool            `json:"refunded"`
-}
-
-type ShippingDetails struct {
-	MethodID uint    `json:"method_id"`
-	Method   string  `json:"method"`
-	Cost     float64 `json:"cost"`
-}
-
-type CustomerDetails struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	FullName string `json:"full_name"`
-}
-
-type DiscountDetails struct {
-	Code   string  `json:"code"`
-	Amount float64 `json:"amount"`
 }
 
 // OrderItemDTO represents an item in an order
@@ -93,11 +91,6 @@ type UpdateOrderRequest struct {
 	PaymentStatus     string     `json:"payment_status,omitempty"`
 	TrackingNumber    string     `json:"tracking_number,omitempty"`
 	EstimatedDelivery *time.Time `json:"estimated_delivery,omitempty"`
-}
-
-// OrderListResponse represents a paginated list of orders
-type OrderListResponse struct {
-	ListResponseDTO[OrderDTO]
 }
 
 // OrderSearchRequest represents the parameters for searching orders
@@ -147,3 +140,137 @@ const (
 	PaymentProviderStripe    PaymentProvider = "stripe"
 	PaymentProviderMobilePay PaymentProvider = "mobilepay"
 )
+
+func OrderUpdateStatusResponse(order *entity.Order) ResponseDTO[OrderSummaryDTO] {
+	return SuccessResponseWithMessage(ToOrderSummaryDTO(order), "Order status updated successfully")
+}
+
+func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ResponseDTO[ListResponseDTO[OrderSummaryDTO]] {
+	var orderSummaries []OrderSummaryDTO
+	for _, order := range orders {
+		orderSummaries = append(orderSummaries, ToOrderSummaryDTO(order))
+	}
+
+	return SuccessResponseWithMessage(ListResponseDTO[OrderSummaryDTO]{
+		Data: orderSummaries,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+	}, "Orders retrieved successfully")
+}
+
+func OrderDetailResponse(order *entity.Order) ResponseDTO[OrderDTO] {
+	return SuccessResponse(toOrderDTO(order))
+}
+
+// toOrderSummaryDTO converts an Order entity to OrderSummaryDTO
+func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
+	return OrderSummaryDTO{
+		ID:               order.ID,
+		OrderNumber:      order.OrderNumber,
+		UserID:           order.UserID,
+		Status:           OrderStatus(order.Status),
+		TotalAmount:      money.FromCents(order.TotalAmount),
+		FinalAmount:      money.FromCents(order.FinalAmount),
+		OrderLinesAmount: len(order.Items),
+		Currency:         "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
+	}
+}
+
+func toOrderDTO(order *entity.Order) OrderDTO {
+	// Convert order items to DTOs
+	var items []OrderItemDTO
+	if len(order.Items) > 0 {
+		items = make([]OrderItemDTO, len(order.Items))
+		for i, item := range order.Items {
+			items[i] = OrderItemDTO{
+				ID:         item.ID,
+				OrderID:    order.ID,
+				ProductID:  item.ProductID,
+				Quantity:   item.Quantity,
+				UnitPrice:  money.FromCents(item.Price),
+				TotalPrice: money.FromCents(item.Subtotal),
+				CreatedAt:  order.CreatedAt,
+				UpdatedAt:  order.UpdatedAt,
+			}
+		}
+	}
+
+	// Convert addresses to DTOs
+	var shippingAddr *AddressDTO
+	if order.ShippingAddr.Street != "" {
+		shippingAddr = &AddressDTO{
+			AddressLine1: order.ShippingAddr.Street,
+			City:         order.ShippingAddr.City,
+			State:        order.ShippingAddr.State,
+			PostalCode:   order.ShippingAddr.PostalCode,
+			Country:      order.ShippingAddr.Country,
+		}
+	}
+
+	var billingAddr *AddressDTO
+	if order.BillingAddr.Street != "" {
+		billingAddr = &AddressDTO{
+			AddressLine1: order.BillingAddr.Street,
+			City:         order.BillingAddr.City,
+			State:        order.BillingAddr.State,
+			PostalCode:   order.BillingAddr.PostalCode,
+			Country:      order.BillingAddr.Country,
+		}
+	}
+
+	customerDetails := CustomerDetailsDTO{
+		Email:    order.CustomerDetails.Email,
+		Phone:    order.CustomerDetails.Phone,
+		FullName: order.CustomerDetails.FullName,
+	}
+
+	paymentDetails := PaymentDetails{
+		PaymentID: order.PaymentID,
+		Provider:  PaymentProvider(order.PaymentProvider),
+		Method:    PaymentMethod(order.PaymentMethod),
+		Captured:  order.IsCaptured(),
+		Refunded:  order.IsRefunded(),
+	}
+
+	var discountDetails AppliedDiscountDTO
+	if order.AppliedDiscount != nil {
+		discountDetails = AppliedDiscountDTO{
+			ID:     order.AppliedDiscount.DiscountID,
+			Code:   order.AppliedDiscount.DiscountCode,
+			Amount: money.FromCents(order.AppliedDiscount.DiscountAmount),
+			Type:   "",
+			Method: "",
+			Value:  0,
+		}
+	}
+
+	var shippingDetails ShippingOptionDTO
+	if order.ShippingOption != nil {
+		shippingDetails = ConvertToShippingOptionDTO(order.ShippingOption)
+	}
+
+	return OrderDTO{
+		ID:              order.ID,
+		OrderNumber:     order.OrderNumber,
+		UserID:          order.UserID,
+		Status:          OrderStatus(order.Status),
+		TotalAmount:     money.FromCents(order.TotalAmount),
+		FinalAmount:     money.FromCents(order.FinalAmount),
+		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Items:           items,
+		ShippingAddress: *shippingAddr,
+		BillingAddress:  *billingAddr,
+		PaymentDetails:  paymentDetails,
+		ShippingDetails: shippingDetails,
+		DiscountDetails: discountDetails,
+		Customer:        customerDetails,
+		CheckoutID:      order.CheckoutSessionID,
+		CreatedAt:       order.CreatedAt,
+		UpdatedAt:       order.UpdatedAt,
+	}
+}

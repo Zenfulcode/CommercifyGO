@@ -215,6 +215,7 @@ export class CommercifyClient {
       }
     );
   }
+
   // Product endpoints
   async getProducts(params?: {
     page?: number;

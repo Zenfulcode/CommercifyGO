@@ -99,14 +99,25 @@ func (s *WebhookService) RegisterMobilePayWebhook(url string, events []string) (
 	return webhook, nil
 }
 
-// DeleteMobilePayWebhook deletes a webhook from MobilePay
-func (s *WebhookService) DeleteMobilePayWebhook(id uint) error {
-	if err := s.ensureMobilePayService(); err != nil {
-		return err
+func (s *WebhookService) ForceDeleteMobilePayWebhook(externalID string) error {
+	// Force delete webhook from MobilePay
+	if err := s.deleteMobilePayWebhook(externalID); err != nil {
+		return fmt.Errorf("failed to force delete webhook from MobilePay: %v", err)
 	}
 
 	// Get webhook from database
-	webhook, err := s.webhookRepo.GetByID(id)
+	webhook, err := s.webhookRepo.GetByExternalID("mobilepay", externalID)
+	if err == nil {
+		s.webhookRepo.Delete(webhook.ID)
+	}
+
+	return nil
+}
+
+// DeleteMobilePayWebhook deletes a webhook from MobilePay
+func (s *WebhookService) DeleteMobilePayWebhook(externalID string) error {
+	// Get webhook from database
+	webhook, err := s.webhookRepo.GetByExternalID("mobilepay", externalID)
 	if err != nil {
 		return fmt.Errorf("webhook not found: %v", err)
 	}
@@ -116,12 +127,12 @@ func (s *WebhookService) DeleteMobilePayWebhook(id uint) error {
 	}
 
 	// Delete webhook from MobilePay
-	if err := s.deleteMobilePayWebhook(webhook.ExternalID); err != nil {
+	if err := s.deleteMobilePayWebhook(externalID); err != nil {
 		return fmt.Errorf("failed to delete webhook from MobilePay: %v", err)
 	}
 
 	// Delete webhook from database
-	if err := s.webhookRepo.Delete(id); err != nil {
+	if err := s.webhookRepo.Delete(webhook.ID); err != nil {
 		return fmt.Errorf("failed to delete webhook from database: %v", err)
 	}
 

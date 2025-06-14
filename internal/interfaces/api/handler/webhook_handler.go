@@ -98,6 +98,26 @@ func (h *WebhookHandler) GetMobilePayWebhooks(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(webhooks)
 }
 
+func (h *WebhookHandler) DeleteMobilePayWebhook(w http.ResponseWriter, r *http.Request) {
+	// Get webhook ID from URL
+	vars := mux.Vars(r)
+	mpWebhookID, ok := vars["externalId"]
+	if !ok {
+		http.Error(w, "External ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Delete webhook
+	if err := h.webhookUseCase.DeleteMobilePayWebhook(mpWebhookID); err != nil {
+		h.logger.Error("Failed to delete webhook: %v", err)
+		http.Error(w, "Failed to delete webhook", http.StatusInternalServerError)
+		return
+	}
+
+	// Return success
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ListWebhooks handles listing all webhooks
 func (h *WebhookHandler) ListWebhooks(w http.ResponseWriter, r *http.Request) {
 	webhooks, err := h.webhookUseCase.GetAllWebhooks()

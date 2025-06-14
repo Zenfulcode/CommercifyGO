@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -32,6 +31,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
+		h.logger.Error("Unauthorized access attempt")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -40,6 +40,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
 	if err != nil {
+		h.logger.Error("Invalid order ID: %v", err)
 		http.Error(w, "Invalid order ID", http.StatusBadRequest)
 		return
 	}
@@ -48,7 +49,10 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
 	if err != nil {
 		h.logger.Error("Failed to get order: %v", err)
-		http.Error(w, "Order not found", http.StatusNotFound)
+		response := dto.ErrorResponse(err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -56,13 +60,16 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	if order.UserID != userID {
 		role, ok := r.Context().Value("role").(string)
 		if !ok || role != "admin" {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
+			h.logger.Error("Unauthorized access to order %d by user %d", order.ID, userID)
+			response := dto.ErrorResponse("You are not authorized to view this order")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(response)
 			return
 		}
 	}
 
-	// Convert order to DTO
-	orderDTO := convertToOrderDTO(order)
+	orderDTO := dto.OrderDetailResponse(order)
 
 	// Return order
 	w.Header().Set("Content-Type", "application/json")
@@ -74,43 +81,37 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
+		h.logger.Error("Unauthorized access attempt")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Parse pagination parameters
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 {
-		limit = 10 // Default limit
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+
+	if page <= 0 {
+		page = 1 // Default to page 1
+	}
+
+	if pageSize <= 0 {
+		page = 10 // Default limit
 	}
 
 	// Get orders
-	orders, err := h.orderUseCase.GetUserOrders(userID, offset, limit)
+	orders, err := h.orderUseCase.GetUserOrders(userID, page, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
-		http.Error(w, "Failed to list orders", http.StatusInternalServerError)
+		// TODO: Add proper error handling
+		response := dto.ErrorResponse("Failed to list orders")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert orders to DTOs
-	orderDTOs := make([]dto.OrderDTO, len(orders))
-	for i, order := range orders {
-		orderDTOs[i] = convertToOrderDTO(order)
-	}
-
 	// Create response
-	response := dto.OrderListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.OrderDTO]{
-			Success: true,
-			Data:    orderDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     offset/limit + 1,
-				PageSize: limit,
-				Total:    len(orderDTOs),
-			},
-		},
-	}
+	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -120,12 +121,15 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 // ListAllOrders handles listing all orders (admin only)
 func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 	// Parse pagination parameters
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 {
-		limit = 10 // Default limit
+	if page <= 0 {
+		page = 1 // Default to page 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10 // Default page size
 	}
 
 	// Get orders by status if provided
@@ -133,35 +137,24 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if status != "" {
-		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), offset, limit)
+		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), page, pageSize)
 	} else {
-		orders, err = h.orderUseCase.ListAllOrders(offset, limit)
+		orders, err = h.orderUseCase.ListAllOrders(page, pageSize)
 	}
 
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
-		http.Error(w, "Failed to list orders", http.StatusInternalServerError)
+		// TODO: Add proper error handling
+		response := dto.ErrorResponse("Failed to list orders")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert orders to DTOs
-	orderDTOs := make([]dto.OrderDTO, len(orders))
-	for i, order := range orders {
-		orderDTOs[i] = convertToOrderDTO(order)
-	}
-
 	// Create response
-	response := dto.OrderListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.OrderDTO]{
-			Success: true,
-			Data:    orderDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     offset/limit + 1,
-				PageSize: limit,
-				Total:    len(orderDTOs),
-			},
-		},
-	}
+	// TODO: FIX total count logic
+	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -174,6 +167,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
 	if err != nil {
+		h.logger.Error("Invalid order ID: %v", err)
 		http.Error(w, "Invalid order ID", http.StatusBadRequest)
 		return
 	}
@@ -183,6 +177,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		Status string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&statusInput); err != nil {
+		h.logger.Error("Failed to decode request body: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -196,110 +191,17 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	updatedOrder, err := h.orderUseCase.UpdateOrderStatus(input)
 	if err != nil {
 		h.logger.Error("Failed to update order status: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response := dto.ErrorResponse(err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	// Convert order to DTO
-	orderDTO := convertToOrderDTO(updatedOrder)
+	orderDTO := dto.OrderUpdateStatusResponse(updatedOrder)
 
 	// Return updated order
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(orderDTO)
-}
-
-// Helper functions to convert between entities and DTOs
-
-func convertToOrderDTO(order *entity.Order) dto.OrderDTO {
-	// Convert order items to DTOs
-	var items []dto.OrderItemDTO
-	if len(order.Items) > 0 {
-		items = make([]dto.OrderItemDTO, len(order.Items))
-		for i, item := range order.Items {
-			items[i] = dto.OrderItemDTO{
-				ID:         item.ID,
-				OrderID:    order.ID,
-				ProductID:  item.ProductID,
-				Quantity:   item.Quantity,
-				UnitPrice:  money.FromCents(item.Price),
-				TotalPrice: money.FromCents(item.Subtotal),
-				CreatedAt:  order.CreatedAt,
-				UpdatedAt:  order.UpdatedAt,
-			}
-		}
-	}
-
-	// Convert addresses to DTOs
-	var shippingAddr *dto.AddressDTO
-	if order.ShippingAddr.Street != "" {
-		shippingAddr = &dto.AddressDTO{
-			AddressLine1: order.ShippingAddr.Street,
-			City:         order.ShippingAddr.City,
-			State:        order.ShippingAddr.State,
-			PostalCode:   order.ShippingAddr.PostalCode,
-			Country:      order.ShippingAddr.Country,
-		}
-	}
-
-	var billingAddr *dto.AddressDTO
-	if order.BillingAddr.Street != "" {
-		billingAddr = &dto.AddressDTO{
-			AddressLine1: order.BillingAddr.Street,
-			City:         order.BillingAddr.City,
-			State:        order.BillingAddr.State,
-			PostalCode:   order.BillingAddr.PostalCode,
-			Country:      order.BillingAddr.Country,
-		}
-	}
-
-	customerDetails := dto.CustomerDetails{
-		Email:    order.CustomerDetails.Email,
-		Phone:    order.CustomerDetails.Phone,
-		FullName: order.CustomerDetails.FullName,
-	}
-
-	paymentDetails := dto.PaymentDetails{
-		PaymentID: order.PaymentID,
-		Provider:  dto.PaymentProvider(order.PaymentProvider),
-		Method:    dto.PaymentMethod(order.PaymentMethod),
-		Captured:  order.IsCaptured(),
-		Refunded:  order.IsRefunded(),
-	}
-
-	var discountDetails dto.DiscountDetails
-	if order.AppliedDiscount != nil {
-		discountDetails = dto.DiscountDetails{
-			Code:   order.AppliedDiscount.DiscountCode,
-			Amount: money.FromCents(order.AppliedDiscount.DiscountAmount),
-		}
-	}
-
-	var shippingDetails dto.ShippingDetails
-	if order.ShippingMethod != nil {
-		shippingDetails = dto.ShippingDetails{
-			MethodID: order.ShippingMethodID,
-			Method:   order.ShippingMethod.Name,
-			Cost:     money.FromCents(order.ShippingCost),
-		}
-	}
-
-	return dto.OrderDTO{
-		ID:              order.ID,
-		OrderNumber:     order.OrderNumber,
-		UserID:          order.UserID,
-		Status:          dto.OrderStatus(order.Status),
-		TotalAmount:     money.FromCents(order.TotalAmount),
-		FinalAmount:     money.FromCents(order.FinalAmount),
-		Currency:        "USD",
-		Items:           items,
-		ShippingAddress: *shippingAddr,
-		BillingAddress:  *billingAddr,
-		PaymentDetails:  paymentDetails,
-		ShippingDetails: shippingDetails,
-		DiscountDetails: discountDetails,
-		Customer:        customerDetails,
-		CheckoutID:      order.CheckoutSessionID,
-		CreatedAt:       order.CreatedAt,
-		UpdatedAt:       order.UpdatedAt,
-	}
 }

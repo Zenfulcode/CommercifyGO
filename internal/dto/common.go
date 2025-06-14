@@ -33,3 +33,42 @@ type AddressDTO struct {
 	PostalCode   string `json:"postal_code"`
 	Country      string `json:"country"`
 }
+
+// CustomerDetailsDTO represents customer information for a checkout
+type CustomerDetailsDTO struct {
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	FullName string `json:"full_name"`
+}
+
+func ErrorResponse(message string) ResponseDTO[any] {
+	return ResponseDTO[any]{
+		Success: false,
+		Error:   message,
+	}
+}
+
+func SuccessResponseWithMessage[T any](data T, message string) ResponseDTO[T] {
+	return ResponseDTO[T]{
+		Success: true,
+		Message: message,
+		Data:    data,
+	}
+}
+
+func SuccessResponseMessage(message string) ResponseDTO[any] {
+	return ResponseDTO[any]{
+		Success: true,
+		Message: message,
+		Data:    nil,
+	}
+}
+
+func SuccessResponse[T any](data T) ResponseDTO[T] {
+	response := ResponseDTO[T]{
+		Success: true,
+		Data:    data,
+	}
+
+	return response
+}

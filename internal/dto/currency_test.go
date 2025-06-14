@@ -21,7 +21,7 @@ func TestFromCurrencyEntity(t *testing.T) {
 		UpdatedAt:    now,
 	}
 
-	dto := FromCurrencyEntity(currency)
+	dto := toCurrencyDTO(currency)
 
 	if dto.Code != currency.Code {
 		t.Errorf("Expected Code %s, got %s", currency.Code, dto.Code)
@@ -62,7 +62,7 @@ func TestFromCurrencyEntityDetail(t *testing.T) {
 		UpdatedAt:    now,
 	}
 
-	dto := FromCurrencyEntityDetail(currency)
+	dto := toCurrencyDTO(currency)
 
 	if dto.Code != currency.Code {
 		t.Errorf("Expected Code %s, got %s", currency.Code, dto.Code)
@@ -94,7 +94,7 @@ func TestFromCurrencyEntitySummary(t *testing.T) {
 		IsDefault:    false,
 	}
 
-	dto := FromCurrencyEntitySummary(currency)
+	dto := toCurrencyDTO(currency)
 
 	if dto.Code != currency.Code {
 		t.Errorf("Expected Code %s, got %s", currency.Code, dto.Code)
@@ -133,7 +133,7 @@ func TestFromCurrencyEntities(t *testing.T) {
 		},
 	}
 
-	dtos := FromCurrencyEntities(currencies)
+	dtos := toCurrencyDTOList(currencies)
 
 	if len(dtos) != len(currencies) {
 		t.Errorf("Expected %d DTOs, got %d", len(currencies), len(dtos))
@@ -167,7 +167,7 @@ func TestFromCurrencyEntitiesSummary(t *testing.T) {
 		},
 	}
 
-	dtos := FromCurrencyEntitiesSummary(currencies)
+	dtos := toCurrencySummaryDTOList(currencies)
 
 	if len(dtos) != len(currencies) {
 		t.Errorf("Expected %d DTOs, got %d", len(currencies), len(dtos))
@@ -279,7 +279,7 @@ func TestCreateConvertedAmountDTO(t *testing.T) {
 	currency := "USD"
 	amountCents := int64(12345) // $123.45
 
-	dto := CreateConvertedAmountDTO(currency, amountCents)
+	dto := createConvertedAmountDTO(currency, amountCents)
 
 	if dto.Currency != currency {
 		t.Errorf("Expected Currency %s, got %s", currency, dto.Currency)
@@ -346,16 +346,16 @@ func TestCreateListCurrenciesResponse(t *testing.T) {
 		},
 	}
 
-	response := CreateListCurrenciesResponse(currencies)
+	response := CreateCurrenciesListResponse(currencies, 1, 10, len(currencies))
 
-	if response.Total != len(currencies) {
-		t.Errorf("Expected Total %d, got %d", len(currencies), response.Total)
+	if response.Pagination.Total != len(currencies) {
+		t.Errorf("Expected Total %d, got %d", len(currencies), response.Pagination.Total)
 	}
-	if len(response.Currencies) != len(currencies) {
-		t.Errorf("Expected %d currencies, got %d", len(currencies), len(response.Currencies))
+	if len(response.Data) != len(currencies) {
+		t.Errorf("Expected %d currencies, got %d", len(currencies), len(response.Data))
 	}
 
-	for i, dto := range response.Currencies {
+	for i, dto := range response.Data {
 		if dto.Code != currencies[i].Code {
 			t.Errorf("Expected Currency[%d].Code %s, got %s", i, currencies[i].Code, dto.Code)
 		}
@@ -380,16 +380,16 @@ func TestCreateListEnabledCurrenciesResponse(t *testing.T) {
 		},
 	}
 
-	response := CreateListEnabledCurrenciesResponse(currencies)
+	response := CreateCurrenciesListResponse(currencies, 1, 10, len(currencies))
 
-	if response.Total != len(currencies) {
-		t.Errorf("Expected Total %d, got %d", len(currencies), response.Total)
+	if response.Pagination.Total != len(currencies) {
+		t.Errorf("Expected Total %d, got %d", len(currencies), response.Pagination.Total)
 	}
-	if len(response.Currencies) != len(currencies) {
-		t.Errorf("Expected %d currencies, got %d", len(currencies), len(response.Currencies))
+	if len(response.Data) != len(currencies) {
+		t.Errorf("Expected %d currencies, got %d", len(currencies), len(response.Data))
 	}
 
-	for i, dto := range response.Currencies {
+	for i, dto := range response.Data {
 		if dto.Code != currencies[i].Code {
 			t.Errorf("Expected Currency[%d].Code %s, got %s", i, currencies[i].Code, dto.Code)
 		}
@@ -402,10 +402,10 @@ func TestCreateDeleteCurrencyResponse(t *testing.T) {
 	expectedStatus := "success"
 	expectedMessage := "Currency deleted successfully"
 
-	if response.Status != expectedStatus {
-		t.Errorf("Expected Status %s, got %s", expectedStatus, response.Status)
+	if response.Data.Status != expectedStatus {
+		t.Errorf("Expected Status %s, got %s", expectedStatus, response.Data.Status)
 	}
-	if response.Message != expectedMessage {
-		t.Errorf("Expected Message %s, got %s", expectedMessage, response.Message)
+	if response.Data.Message != expectedMessage {
+		t.Errorf("Expected Message %s, got %s", expectedMessage, response.Data.Message)
 	}
 }

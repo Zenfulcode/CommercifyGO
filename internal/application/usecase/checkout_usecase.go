@@ -46,6 +46,7 @@ type CheckoutUseCase struct {
 	currencyRepo       repository.CurrencyRepository
 	paymentTxnRepo     repository.PaymentTransactionRepository
 	paymentSvc         service.PaymentService
+	shippingUsecase    *ShippingUseCase
 }
 
 type ProcessPaymentInput struct {
@@ -254,6 +255,7 @@ func NewCheckoutUseCase(
 	currencyRepo repository.CurrencyRepository,
 	paymentTxnRepo repository.PaymentTransactionRepository,
 	paymentSvc service.PaymentService,
+	shippingUsecase *ShippingUseCase,
 
 ) *CheckoutUseCase {
 	return &CheckoutUseCase{
@@ -267,6 +269,7 @@ func NewCheckoutUseCase(
 		paymentTxnRepo:     paymentTxnRepo,
 		currencyRepo:       currencyRepo,
 		paymentSvc:         paymentSvc,
+		shippingUsecase:    shippingUsecase,
 	}
 }
 
@@ -355,59 +358,61 @@ func (uc *CheckoutUseCase) SetCustomerDetails(userID uint, details entity.Custom
 
 // SetShippingMethod sets the shipping method for the user's checkout
 func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID uint) (*entity.Checkout, error) {
-	// Get shipping method
-	shippingMethod, err := uc.shippingMethodRepo.GetByID(methodID)
-	if err != nil {
-		return nil, err
+	// Validate inputs
+	if checkout == nil {
+		return nil, errors.New("checkout cannot be nil")
 	}
 
-	// Calculate shipping cost
-	var shippingCost int64
-	if checkout.ShippingAddr.Street != "" && checkout.ShippingAddr.Country != "" {
-		rates, err := uc.shippingRateRepo.GetAvailableRatesForAddress(checkout.ShippingAddr, checkout.TotalAmount)
-		if err != nil {
-			return nil, err
+	if methodID == 0 {
+		return nil, errors.New("shipping method ID is required")
+	}
+
+	// Check if checkout is active
+	if checkout.Status != entity.CheckoutStatusActive {
+		return nil, errors.New("cannot modify a non-active checkout")
+	}
+
+	// Validate shipping address is set
+	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+		return nil, errors.New("shipping address is required to calculate shipping options")
+	}
+
+	// Verify shipping method exists
+	method, err := uc.shippingMethodRepo.GetByID(methodID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shipping method: %w", err)
+	}
+
+	// Check if shipping method is active
+	if !method.Active {
+		return nil, errors.New("shipping method is not available")
+	}
+
+	// Calculate shipping options
+	options, err := uc.shippingUsecase.CalculateShippingOptions(checkout.ShippingAddr, checkout.TotalAmount, checkout.TotalWeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate shipping options: %w", err)
+	}
+
+	// Find the selected shipping option
+	var selectedOption *entity.ShippingOption
+	for _, option := range options.Options {
+		if option.ShippingMethodID == methodID {
+			selectedOption = option
+			break
 		}
+	}
 
-		for _, rate := range rates {
-			if rate.ShippingMethodID == methodID {
-				shippingCost = rate.BaseRate
-
-				// Check for weight-based rates
-				weightRates, err := uc.shippingRateRepo.GetWeightBasedRates(rate.ID)
-				if err == nil && len(weightRates) > 0 {
-					for _, weightRate := range weightRates {
-						if checkout.TotalWeight >= weightRate.MinWeight && (weightRate.MaxWeight == 0 || checkout.TotalWeight <= weightRate.MaxWeight) {
-							shippingCost = weightRate.Rate
-							break
-						}
-					}
-				}
-
-				// Check for value-based rates
-				valueRates, err := uc.shippingRateRepo.GetValueBasedRates(rate.ID)
-				if err == nil && len(valueRates) > 0 {
-					for _, valueRate := range valueRates {
-						if checkout.TotalAmount >= valueRate.MinOrderValue && (valueRate.MaxOrderValue == 0 || checkout.TotalAmount <= valueRate.MaxOrderValue) {
-							shippingCost = valueRate.Rate
-							break
-						}
-					}
-				}
-
-				break
-			}
-		}
+	if selectedOption == nil {
+		return nil, fmt.Errorf("shipping method %d is not available for the current checkout", methodID)
 	}
 
 	// Set shipping method and cost
-	checkout.SetShippingMethod(methodID, shippingCost)
-	checkout.ShippingMethod = shippingMethod
+	checkout.SetShippingMethod(selectedOption)
 
 	// Update checkout in repository
-	err = uc.checkoutRepo.Update(checkout)
-	if err != nil {
-		return nil, err
+	if err := uc.checkoutRepo.Update(checkout); err != nil {
+		return nil, fmt.Errorf("failed to update checkout: %w", err)
 	}
 
 	return checkout, nil
