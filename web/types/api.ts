@@ -627,6 +627,17 @@ export interface UpdateProductRequest {
   active?: boolean;
 }
 /**
+ * UpdateVariantRequest represents the data needed to update an existing product variant
+ */
+export interface UpdateVariantRequest {
+  sku?: string;
+  price?: number /* float64 */;
+  stock?: number /* int */;
+  attributes?: VariantAttributeDTO[];
+  images?: string[];
+  is_default?: boolean;
+}
+/**
  * ProductListResponse represents a paginated list of products
  */
 export interface ProductListResponse {

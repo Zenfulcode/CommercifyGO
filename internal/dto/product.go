@@ -75,6 +75,16 @@ type UpdateProductRequest struct {
 	Active        bool     `json:"active,omitempty"`
 }
 
+// UpdateVariantRequest represents the data needed to update an existing product variant
+type UpdateVariantRequest struct {
+	SKU        string                `json:"sku,omitempty"`
+	Price      *float64              `json:"price,omitempty"`
+	Stock      *int                  `json:"stock,omitempty"`
+	Attributes []VariantAttributeDTO `json:"attributes,omitempty"`
+	Images     []string              `json:"images,omitempty"`
+	IsDefault  *bool                 `json:"is_default,omitempty"`
+}
+
 // ProductListResponse represents a paginated list of products
 type ProductListResponse struct {
 	ListResponseDTO[ProductDTO]

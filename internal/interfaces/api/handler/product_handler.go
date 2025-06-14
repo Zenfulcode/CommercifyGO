@@ -646,10 +646,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to add variant"
 
-		if err.Error() == "unauthorized: not the seller of this product" {
-			statusCode = http.StatusForbidden
-			errorMessage = "Not authorized to add variant to this product"
-		} else if err.Error() == errors.ProductNotFoundError {
+		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
 			errorMessage = "Product not found"
 		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
@@ -692,7 +689,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 
 	// Get IDs from URL
 	vars := mux.Vars(r)
-	productID, err := strconv.ParseUint(vars["id"], 10, 32)
+	productID, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid product ID in UpdateVariant: %v", err)
 		response := dto.ErrorResponse("Invalid product ID")
@@ -702,7 +699,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variantID, err := strconv.ParseUint(vars["variant_id"], 10, 32)
+	variantID, err := strconv.ParseUint(vars["variantId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid variant ID in UpdateVariant: %v", err)
 		response := dto.ErrorResponse("Invalid variant ID")
@@ -713,7 +710,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request body
-	var request dto.CreateVariantRequest
+	var request dto.UpdateVariantRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		h.logger.Error("Invalid request body in UpdateVariant: %v", err)
 		response := dto.ErrorResponse("Invalid request body")
@@ -734,11 +731,18 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	// Convert DTO to usecase input
 	input := usecase.UpdateVariantInput{
 		SKU:        request.SKU,
-		Price:      request.Price,
-		Stock:      request.Stock,
 		Attributes: attributesDTO,
 		Images:     request.Images,
-		IsDefault:  request.IsDefault,
+	}
+
+	if request.Price != nil {
+		input.Price = *request.Price
+	}
+	if request.Stock != nil {
+		input.Stock = *request.Stock
+	}
+	if request.IsDefault != nil {
+		input.IsDefault = *request.IsDefault
 	}
 
 	// Update variant
@@ -749,10 +753,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to update variant"
 
-		if err.Error() == "unauthorized: not the seller of this product" {
-			statusCode = http.StatusForbidden
-			errorMessage = "Not authorized to update this variant"
-		} else if err.Error() == errors.ProductNotFoundError {
+		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
 			errorMessage = "Product not found"
 		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
@@ -797,7 +798,7 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 
 	// Get IDs from URL
 	vars := mux.Vars(r)
-	productID, err := strconv.ParseUint(vars["id"], 10, 32)
+	productID, err := strconv.ParseUint(vars["productId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid product ID in DeleteVariant: %v", err)
 		response := dto.ErrorResponse("Invalid product ID")
@@ -807,7 +808,7 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variantID, err := strconv.ParseUint(vars["variant_id"], 10, 32)
+	variantID, err := strconv.ParseUint(vars["variantId"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid variant ID in DeleteVariant: %v", err)
 		response := dto.ErrorResponse("Invalid variant ID")
@@ -826,10 +827,7 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to delete variant"
 
-		if err.Error() == "unauthorized: not the seller of this product" {
-			statusCode = http.StatusForbidden
-			errorMessage = "Not authorized to delete this variant"
-		} else if err.Error() == errors.ProductNotFoundError {
+		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
 			errorMessage = "Product not found"
 		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
