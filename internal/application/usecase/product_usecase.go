@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
@@ -14,6 +15,8 @@ type ProductUseCase struct {
 	categoryRepo       repository.CategoryRepository
 	productVariantRepo repository.ProductVariantRepository
 	currencyRepo       repository.CurrencyRepository
+	orderRepo          repository.OrderRepository
+	checkoutRepo       repository.CheckoutRepository
 	defaultCurrency    *entity.Currency
 }
 
@@ -23,6 +26,8 @@ func NewProductUseCase(
 	categoryRepo repository.CategoryRepository,
 	productVariantRepo repository.ProductVariantRepository,
 	currencyRepo repository.CurrencyRepository,
+	orderRepo repository.OrderRepository,
+	checkoutRepo repository.CheckoutRepository,
 ) *ProductUseCase {
 	defaultCurrency, err := currencyRepo.GetDefault()
 	if err != nil {
@@ -34,6 +39,8 @@ func NewProductUseCase(
 		categoryRepo:       categoryRepo,
 		productVariantRepo: productVariantRepo,
 		currencyRepo:       currencyRepo,
+		orderRepo:          orderRepo,
+		checkoutRepo:       checkoutRepo,
 		defaultCurrency:    defaultCurrency,
 	}
 }
@@ -499,13 +506,31 @@ func (uc *ProductUseCase) DeleteVariant(productID uint, variantID uint) error {
 	return uc.productVariantRepo.Delete(variantID)
 }
 
-// DeleteProduct deletes a product
+// DeleteProduct deletes a product after checking it has no associated orders or active checkouts
 func (uc *ProductUseCase) DeleteProduct(id uint) error {
 	if id == 0 {
 		return errors.New("product ID is required")
 	}
 
-	// TODO: make sure no orders are associated with the product
+	// Check if product has any associated orders
+	hasOrders, err := uc.orderRepo.HasOrdersWithProduct(id)
+	if err != nil {
+		return fmt.Errorf("failed to check for product orders: %w", err)
+	}
+
+	if hasOrders {
+		return errors.New("cannot delete product that has existing orders")
+	}
+
+	// Check if product has any active checkouts
+	hasActiveCheckouts, err := uc.checkoutRepo.HasActiveCheckoutsWithProduct(id)
+	if err != nil {
+		return fmt.Errorf("failed to check for active checkouts: %w", err)
+	}
+
+	if hasActiveCheckouts {
+		return errors.New("cannot delete product that is in active checkouts. Please wait for checkouts to complete or expire")
+	}
 
 	return uc.productRepo.Delete(id)
 }

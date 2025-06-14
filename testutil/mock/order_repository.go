@@ -170,3 +170,20 @@ func (r *OrderRepository) AddMockGetByPaymentID(order *entity.Order) {
 		r.paymentIDIndex[order.PaymentID] = order
 	}
 }
+
+// HasOrdersWithProduct checks if any orders contain items with the specified product ID
+func (r *OrderRepository) HasOrdersWithProduct(productID uint) (bool, error) {
+	if productID == 0 {
+		return false, errors.New("product ID cannot be 0")
+	}
+
+	for _, order := range r.orders {
+		for _, item := range order.Items {
+			if item.ProductID == productID {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}

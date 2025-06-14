@@ -66,6 +66,8 @@ func (p *useCaseProvider) ProductUseCase() *usecase.ProductUseCase {
 			p.container.Repositories().CategoryRepository(),
 			p.container.Repositories().ProductVariantRepository(),
 			p.container.Repositories().CurrencyRepository(),
+			p.container.Repositories().OrderRepository(),
+			p.container.Repositories().CheckoutRepository(),
 		)
 	}
 	return p.productUseCase

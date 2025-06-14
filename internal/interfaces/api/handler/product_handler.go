@@ -367,10 +367,7 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to delete product"
 
-		if err.Error() == "unauthorized: not the seller of this product" {
-			statusCode = http.StatusForbidden
-			errorMessage = "Not authorized to delete this product"
-		} else if err.Error() == errors.ProductNotFoundError {
+		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
 			errorMessage = "Product not found"
 		} else if strings.Contains(err.Error(), "has orders") || strings.Contains(err.Error(), "cannot delete") {

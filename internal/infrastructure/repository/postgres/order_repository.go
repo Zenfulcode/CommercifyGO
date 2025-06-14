@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
@@ -670,6 +671,28 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 	}
 
 	return orders, nil
+}
+
+// HasOrdersWithProduct checks if a product has any associated orders
+func (r *OrderRepository) HasOrdersWithProduct(productID uint) (bool, error) {
+	if productID == 0 {
+		return false, errors.New("product ID cannot be 0")
+	}
+
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM order_items 
+			WHERE product_id = $1
+		)
+	`
+
+	var exists bool
+	err := r.db.QueryRow(query, productID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if product has orders: %w", err)
+	}
+
+	return exists, nil
 }
 
 func (r *OrderRepository) IsDiscountIdUsed(discountID uint) (bool, error) {

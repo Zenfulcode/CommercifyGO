@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -251,37 +252,16 @@ func (r *ProductVariantRepository) Update(variant *entity.ProductVariant) error 
 }
 
 // Delete deletes a product variant
+// Prevents deletion of the last variant to ensure products always have at least one variant
 func (r *ProductVariantRepository) Delete(variantID uint) error {
-	// Check if this is the only variant or if it's the default variant
-	var isDefault bool
-	var productID uint
-	var variantCount int
-
-	// First verify the variant exists and get its product ID
-	err := r.db.QueryRow(
-		"SELECT is_default, product_id FROM product_variants WHERE id = $1",
-		variantID,
-	).Scan(&isDefault, &productID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("variant not found")
-		}
-		return err
+	if variantID == 0 {
+		return fmt.Errorf("invalid variant ID: %d", variantID)
 	}
 
-	// Count variants for this product
-	err = r.db.QueryRow(
-		"SELECT COUNT(*) FROM product_variants WHERE product_id = $1",
-		productID,
-	).Scan(&variantCount)
-	if err != nil {
-		return err
-	}
-
-	// Start a transaction
+	// Start a transaction for atomic operations
 	tx, err := r.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -289,46 +269,56 @@ func (r *ProductVariantRepository) Delete(variantID uint) error {
 		}
 	}()
 
-	// Delete the variant
+	// Get variant details and count of variants for this product
+	var isDefault bool
+	var productID uint
+	var variantCount int
+
+	err = tx.QueryRow(`
+		SELECT 
+			pv.is_default, 
+			pv.product_id,
+			(SELECT COUNT(*) FROM product_variants WHERE product_id = pv.product_id)
+		FROM product_variants pv 
+		WHERE pv.id = $1
+	`, variantID).Scan(&isDefault, &productID, &variantCount)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("variant with ID %d not found", variantID)
+		}
+		return fmt.Errorf("failed to get variant details: %w", err)
+	}
+
+	// Prevent deletion of the last variant
+	if variantCount <= 1 {
+		return fmt.Errorf("cannot delete the last variant of a product. Products must have at least one variant")
+	}
+
+	// Delete the variant (variant prices will be cascade deleted)
 	result, err := tx.Exec("DELETE FROM product_variants WHERE id = $1", variantID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete variant: %w", err)
 	}
 
-	// Check if any rows were affected
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check deletion result: %w", err)
 	}
 	if rowsAffected == 0 {
-		return errors.New("variant not found or already deleted")
+		return fmt.Errorf("variant with ID %d not found", variantID)
 	}
 
-	// If this deletion will leave only one variant, update product to not have multiple variants
-	if variantCount == 2 {
-		_, err = tx.Exec(
-			"UPDATE products SET has_variants = false WHERE id = $1",
-			productID,
-		)
-		if err != nil {
-			return err
-		}
-	} else if isDefault {
-		// If this was the default variant, set another variant as default
+	// If this was the default variant, set another variant as default
+	if isDefault {
 		_, err = tx.Exec(`
 			UPDATE product_variants 
 			SET is_default = true 
-			WHERE id = (
-				SELECT id 
-				FROM product_variants 
-				WHERE product_id = $1 
-				AND id != $2 
-				ORDER BY id ASC 
-				LIMIT 1
-			)
-		`, productID, variantID)
+			WHERE product_id = $1 
+			AND id = (SELECT MIN(id) FROM product_variants WHERE product_id = $1)
+		`, productID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update default variant: %w", err)
 		}
 	}
 

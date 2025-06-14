@@ -327,41 +327,28 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 	return nil
 }
 
-// Delete deletes a product
+// Delete deletes a product and all its related data
+// This operation cascades to delete variants, variant prices, and product prices
 func (r *ProductRepository) Delete(productID uint) error {
-	// Start a transaction to delete variants as well
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Delete variant prices and  variants first
-	_, err = tx.Exec("DELETE FROM product_variant_prices WHERE product_id = $1", productID)
-	if err != nil {
-		return err
+	if productID == 0 {
+		return fmt.Errorf("invalid product ID: %d", productID)
 	}
 
-	// Delete variants
-	_, err = tx.Exec("DELETE FROM product_variants WHERE product_id = $1", productID)
+	result, err := r.db.Exec("DELETE FROM products WHERE id = $1", productID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete product: %w", err)
 	}
 
-	// Delete the product price
-	_, err = tx.Exec("DELETE FROM product_prices WHERE product_id = $1", productID)
+	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check deletion result: %w", err)
 	}
 
-	// Delete the product
-	_, err = tx.Exec("DELETE FROM products WHERE id = $1", productID)
+	if rowsAffected == 0 {
+		return fmt.Errorf("product with ID %d not found", productID)
+	}
 
-	return tx.Commit()
+	return nil
 }
 
 // List lists products with pagination
