@@ -3,6 +3,8 @@ package entity
 import (
 	"errors"
 	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/money"
 )
 
 // VariantAttribute represents a single attribute of a product variant
@@ -28,7 +30,7 @@ type ProductVariant struct {
 }
 
 // NewProductVariant creates a new product variant
-func NewProductVariant(productID uint, sku string, price int64, currencyCode string, stock int, attributes []VariantAttribute, images []string, isDefault bool) (*ProductVariant, error) {
+func NewProductVariant(productID uint, sku string, price float64, currencyCode string, stock int, attributes []VariantAttribute, images []string, isDefault bool) (*ProductVariant, error) {
 	if productID == 0 {
 		return nil, errors.New("product ID cannot be empty")
 	}
@@ -43,11 +45,14 @@ func NewProductVariant(productID uint, sku string, price int64, currencyCode str
 	}
 	// Note: attributes can be empty for default variants
 
+	// Convert price to cents
+	priceInCents := money.ToCents(price)
+
 	now := time.Now()
 	return &ProductVariant{
 		ProductID:    productID,
 		SKU:          sku,
-		Price:        price, // Already in cents
+		Price:        priceInCents, // Already in cents
 		CurrencyCode: currencyCode,
 		Stock:        stock,
 		Attributes:   attributes,
@@ -56,12 +61,6 @@ func NewProductVariant(productID uint, sku string, price int64, currencyCode str
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}, nil
-}
-
-// NewDefaultProductVariant creates a default product variant using the product's basic information
-// This is used when a product needs at least one variant but no specific variants are provided
-func NewDefaultProductVariant(productID uint, sku string, price int64, currencyCode string, stock int) (*ProductVariant, error) {
-	return NewProductVariant(productID, sku, price, currencyCode, stock, []VariantAttribute{}, []string{}, true)
 }
 
 // UpdateStock updates the variant's stock

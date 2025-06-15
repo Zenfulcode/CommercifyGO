@@ -175,9 +175,6 @@ func TestCreateProductRequest(t *testing.T) {
 	request := CreateProductRequest{
 		Name:        "New Product",
 		Description: "New product description",
-		Price:       49.99,
-		Stock:       75,
-		Weight:      1.5,
 		CategoryID:  3,
 		Images:      []string{"new1.jpg", "new2.jpg"},
 		Variants:    variants,
@@ -189,15 +186,7 @@ func TestCreateProductRequest(t *testing.T) {
 	if request.Description != "New product description" {
 		t.Errorf("Expected Description 'New product description', got %s", request.Description)
 	}
-	if request.Price != 49.99 {
-		t.Errorf("Expected Price 49.99, got %f", request.Price)
-	}
-	if request.Stock != 75 {
-		t.Errorf("Expected Stock 75, got %d", request.Stock)
-	}
-	if request.Weight != 1.5 {
-		t.Errorf("Expected Weight 1.5, got %f", request.Weight)
-	}
+
 	if request.CategoryID != 3 {
 		t.Errorf("Expected CategoryID 3, got %d", request.CategoryID)
 	}

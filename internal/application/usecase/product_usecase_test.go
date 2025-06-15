@@ -11,7 +11,7 @@ import (
 )
 
 func TestProductUseCase_CreateProduct(t *testing.T) {
-	t.Run("Create simple product successfully", func(t *testing.T) {
+	t.Run("Create simple product successfully (In complete)", func(t *testing.T) {
 		// Setup mocks
 		productRepo := mock.NewMockProductRepository()
 		categoryRepo := mock.NewMockCategoryRepository()
@@ -41,8 +41,6 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		input := usecase.CreateProductInput{
 			Name:        "Test Product",
 			Description: "This is a test product",
-			Price:       99.99,
-			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
 		}
@@ -55,13 +53,12 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		assert.NotNil(t, product)
 		assert.Equal(t, input.Name, product.Name)
 		assert.Equal(t, input.Description, product.Description)
-		assert.Equal(t, money.ToCents(input.Price), product.Price)
-		assert.Equal(t, input.Stock, product.Stock)
 		assert.Equal(t, input.CategoryID, product.CategoryID)
 		assert.Equal(t, input.Images, product.Images)
-		assert.False(t, product.HasVariants, "Product should have variants set to false for single default variant")
-		assert.Len(t, product.Variants, 1, "Product should have one default variant")
-		assert.Equal(t, product.ProductNumber, product.Variants[0].SKU, "Default variant SKU should match product number")
+		assert.Equal(t, int64(0), product.Price, "Price should be zero for incomplete product")
+		assert.Equal(t, 0, product.Stock, "Stock should be zero for incomplete product")
+		assert.False(t, product.HasVariants, "HasVariants should be false for incomplete product")
+		assert.False(t, product.Active, "Product should be active by default")
 	})
 
 	t.Run("Create product with variants successfully", func(t *testing.T) {
@@ -94,8 +91,7 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		input := usecase.CreateProductInput{
 			Name:        "Test Product with Variants",
 			Description: "This is a test product with variants",
-			Price:       99.99,
-			Stock:       100,
+			Currency:    "USD",
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
 			Variants: []usecase.CreateVariantInput{
@@ -120,12 +116,14 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 
 		// Execute
 		product, err := productUseCase.CreateProduct(input)
+		productPrice, _ := product.GetPriceInCurrency("USD")
 
 		// Assert
 		assert.NoError(t, err)
 		assert.NotNil(t, product)
 		assert.Equal(t, input.Name, product.Name)
 		assert.Len(t, product.Variants, 2)
+		assert.Equal(t, productPrice, money.ToCents(99.99), "Price should be set to the first variant's price")
 
 		// Check variants
 		assert.Equal(t, "SKU-1", product.Variants[0].SKU)
@@ -156,8 +154,6 @@ func TestProductUseCase_CreateProduct(t *testing.T) {
 		input := usecase.CreateProductInput{
 			Name:        "Test Product",
 			Description: "This is a test product",
-			Price:       99.99,
-			Stock:       100,
 			CategoryID:  999, // Non-existent category
 			Images:      []string{"image1.jpg", "image2.jpg"},
 		}

@@ -142,9 +142,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	input := usecase.CreateProductInput{
 		Name:        request.Name,
 		Description: request.Description,
-		Price:       request.Price,
-		Stock:       request.Stock,
-		Weight:      request.Weight,
+		Currency:    request.Currency,
 		CategoryID:  request.CategoryID,
 		Images:      request.Images,
 		Variants:    variantInputs,

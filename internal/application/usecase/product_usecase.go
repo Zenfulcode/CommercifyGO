@@ -45,34 +45,25 @@ func NewProductUseCase(
 	}
 }
 
-// CurrencyPriceInput represents a price in a specific currency
-type CurrencyPriceInput struct {
-	CurrencyCode string
-	Price        float64
-}
-
-// CreateProductInput contains the data needed to create a product (prices in dollars)
+// CreateProductInput contains the data needed to create a product
 type CreateProductInput struct {
-	Name           string
-	Description    string
-	Price          float64
-	Stock          int
-	Weight         float64
-	CategoryID     uint
-	Images         []string
-	Variants       []CreateVariantInput
-	CurrencyPrices []CurrencyPriceInput
+	Name        string
+	Description string
+	Currency    string
+	CategoryID  uint
+	Images      []string
+	Variants    []CreateVariantInput
+	Active      bool
 }
 
 // CreateVariantInput contains the data needed to create a product variant
 type CreateVariantInput struct {
-	SKU            string
-	Price          float64
-	Stock          int
-	Attributes     []entity.VariantAttribute
-	Images         []string
-	IsDefault      bool
-	CurrencyPrices []CurrencyPriceInput
+	SKU        string
+	Price      float64
+	Stock      int
+	Attributes []entity.VariantAttribute
+	Images     []string
+	IsDefault  bool
 }
 
 // CreateProduct creates a new product
@@ -83,46 +74,23 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 		return nil, errors.New("category not found")
 	}
 
-	// Convert price to cents
-	priceCents := money.ToCents(input.Price)
+	// Validate currency exists
+	_, err = uc.currencyRepo.GetByCode(input.Currency)
+	if err != nil {
+		return nil, errors.New("invalid currency code: " + input.Currency)
+	}
 
 	// Create product
 	product, err := entity.NewProduct(
 		input.Name,
 		input.Description,
-		priceCents, // Use cents
-		uc.defaultCurrency.Code,
-		input.Stock,
-		input.Weight,
+		input.Currency,
 		input.CategoryID,
 		input.Images,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	// Process currency-specific prices, if any
-	if len(input.CurrencyPrices) > 0 {
-		product.Prices = make([]entity.ProductPrice, 0, len(input.CurrencyPrices))
-
-		for _, currPrice := range input.CurrencyPrices {
-			// Validate currency exists
-			_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-			if err != nil {
-				return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-			}
-
-			// Convert price to cents
-			priceCents := money.ToCents(currPrice.Price)
-
-			product.Prices = append(product.Prices, entity.ProductPrice{
-				CurrencyCode: currPrice.CurrencyCode,
-				Price:        priceCents,
-			})
-		}
-	}
-
-	product.HasVariants = false
 
 	// Save product
 	if err := uc.productRepo.Create(product); err != nil {
@@ -133,13 +101,11 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 	if len(input.Variants) > 0 {
 		variants := make([]*entity.ProductVariant, 0, len(input.Variants))
 		for _, variantInput := range input.Variants {
-			// Convert variant prices to cents
-			variantPriceCents := money.ToCents(variantInput.Price)
 
 			variant, err := entity.NewProductVariant(
 				product.ID,
 				variantInput.SKU,
-				variantPriceCents, // Use cents
+				variantInput.Price,
 				product.CurrencyCode,
 				variantInput.Stock,
 				variantInput.Attributes,
@@ -148,27 +114,6 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 			)
 			if err != nil {
 				return nil, err
-			}
-
-			// Process currency-specific prices for variant, if any
-			if len(variantInput.CurrencyPrices) > 0 {
-				variant.Prices = make([]entity.ProductVariantPrice, 0, len(variantInput.CurrencyPrices))
-
-				for _, currPrice := range variantInput.CurrencyPrices {
-					// Validate currency exists
-					_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-					if err != nil {
-						return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-					}
-
-					// Convert price to cents
-					priceCents := money.ToCents(currPrice.Price)
-
-					variant.Prices = append(variant.Prices, entity.ProductVariantPrice{
-						CurrencyCode: currPrice.CurrencyCode,
-						Price:        priceCents,
-					})
-				}
 			}
 
 			variants = append(variants, variant)
@@ -185,29 +130,7 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 		product.Variants = variants
 		// Only set has_variants=true if there are multiple variants
 		product.HasVariants = len(variants) > 1
-	} else {
-		// ALL PRODUCTS MUST HAVE AT LEAST ONE VARIANT
-		// Create a default variant using the product's basic information
-		defaultVariant, err := entity.NewDefaultProductVariant(
-			product.ID,
-			product.ProductNumber, // Use product number as SKU
-			product.Price,         // Use product price
-			product.CurrencyCode,
-			product.Stock, // Use product stock
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Save the default variant
-		if err := uc.productVariantRepo.Create(defaultVariant); err != nil {
-			return nil, err
-		}
-
-		// Add variant to product
-		product.Variants = []*entity.ProductVariant{defaultVariant}
-		// Single default variant means has_variants=false
-		product.HasVariants = false
+		product.Active = input.Active
 	}
 
 	return product, nil
@@ -299,13 +222,12 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 
 // UpdateVariantInput contains the data needed to update a product variant (prices in dollars)
 type UpdateVariantInput struct {
-	SKU            string
-	Price          float64
-	Stock          int
-	Attributes     []entity.VariantAttribute
-	Images         []string
-	IsDefault      bool
-	CurrencyPrices []CurrencyPriceInput
+	SKU        string
+	Price      float64
+	Stock      int
+	Attributes []entity.VariantAttribute
+	Images     []string
+	IsDefault  bool
 }
 
 // UpdateVariant updates a product variant
@@ -336,29 +258,6 @@ func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input Up
 	}
 	if len(input.Images) > 0 {
 		variant.Images = input.Images
-	}
-
-	// Process currency-specific prices, if any
-	if len(input.CurrencyPrices) > 0 {
-		// Clear existing prices
-		variant.Prices = make([]entity.ProductVariantPrice, 0, len(input.CurrencyPrices))
-
-		for _, currPrice := range input.CurrencyPrices {
-			// Validate currency exists
-			_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-			if err != nil {
-				return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-			}
-
-			// Convert price to cents
-			priceCents := money.ToCents(currPrice.Price)
-
-			variant.Prices = append(variant.Prices, entity.ProductVariantPrice{
-				VariantID:    variant.ID,
-				CurrencyCode: currPrice.CurrencyCode,
-				Price:        priceCents,
-			})
-		}
 	}
 
 	// Handle default status
@@ -393,14 +292,13 @@ func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input Up
 
 // AddVariantInput contains the data needed to add a variant to a product
 type AddVariantInput struct {
-	ProductID      uint
-	SKU            string
-	Price          float64
-	Stock          int
-	Attributes     []entity.VariantAttribute
-	Images         []string
-	IsDefault      bool
-	CurrencyPrices []CurrencyPriceInput
+	ProductID  uint
+	SKU        string
+	Price      float64
+	Stock      int
+	Attributes []entity.VariantAttribute
+	Images     []string
+	IsDefault  bool
 }
 
 // AddVariant adds a new variant to a product
@@ -410,14 +308,11 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		return nil, err
 	}
 
-	// Convert prices to cents
-	priceCents := money.ToCents(input.Price)
-
 	// Create variant
 	variant, err := entity.NewProductVariant(
 		input.ProductID,
 		input.SKU,
-		priceCents, // Use cents
+		input.Price, // Use cents
 		product.CurrencyCode,
 		input.Stock,
 		input.Attributes,
@@ -428,53 +323,21 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		return nil, err
 	}
 
-	// Process currency-specific prices, if any
-	if len(input.CurrencyPrices) > 0 {
-		variant.Prices = make([]entity.ProductVariantPrice, 0, len(input.CurrencyPrices))
-
-		for _, currPrice := range input.CurrencyPrices {
-			// Validate currency exists
-			_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-			if err != nil {
-				return nil, errors.New("invalid currency code: " + currPrice.CurrencyCode)
-			}
-
-			// Convert price to cents
-			priceCents := money.ToCents(currPrice.Price)
-
-			variant.Prices = append(variant.Prices, entity.ProductVariantPrice{
-				CurrencyCode: currPrice.CurrencyCode,
-				Price:        priceCents,
-			})
-		}
+	err = product.AddVariant(variant)
+	if err != nil {
+		return nil, err
 	}
 
-	// Check if this will be the second variant (making it a multi-variant product)
-	currentVariantCount := len(product.Variants)
+	if input.IsDefault {
+		variants := product.Variants
 
-	if currentVariantCount >= 1 || input.IsDefault {
-		// If this will be the second or more variant, set product to have variants
-		if currentVariantCount >= 1 {
-			product.HasVariants = true
-		}
-
-		// If this is the default variant, unset any other default variants
-		if input.IsDefault {
-			variants := product.Variants
-
-			for _, v := range variants {
-				if v.IsDefault {
-					v.IsDefault = false
-					if err := uc.productVariantRepo.Update(v); err != nil {
-						return nil, err
-					}
+		for _, v := range variants {
+			if v.ID != variant.ID && v.IsDefault {
+				v.IsDefault = false
+				if err := uc.productVariantRepo.Update(v); err != nil {
+					return nil, err
 				}
 			}
-		}
-
-		// Update product
-		if err := uc.productRepo.Update(product); err != nil {
-			return nil, err
 		}
 	}
 
@@ -542,6 +405,7 @@ type SearchProductsInput struct {
 	Limit        int     `json:"limit"`
 }
 
+// TODO: Fix currency search logic
 // SearchProducts searches for products based on criteria
 func (uc *ProductUseCase) SearchProducts(input SearchProductsInput) ([]*entity.Product, int, error) {
 	// If currency is specified and not the default, convert price ranges
@@ -549,22 +413,16 @@ func (uc *ProductUseCase) SearchProducts(input SearchProductsInput) ([]*entity.P
 
 	if input.CurrencyCode != "" && input.CurrencyCode != uc.defaultCurrency.Code {
 		// Get the currency
-		currency, err := uc.currencyRepo.GetByCode(input.CurrencyCode)
+		_, err := uc.currencyRepo.GetByCode(input.CurrencyCode)
 		if err != nil {
 			return nil, 0, errors.New("invalid currency code: " + input.CurrencyCode)
 		}
 
-		// Convert min/max prices to default currency using exchange rate
-		defaultPrice := input.MinPrice / currency.ExchangeRate
-		minPriceCents = money.ToCents(defaultPrice)
-
-		defaultPrice = input.MaxPrice / currency.ExchangeRate
-		maxPriceCents = money.ToCents(defaultPrice)
-	} else {
-		// Convert min/max prices to cents for repository search
-		minPriceCents = money.ToCents(input.MinPrice)
-		maxPriceCents = money.ToCents(input.MaxPrice)
 	}
+
+	// Convert min/max prices to cents for repository search
+	minPriceCents = money.ToCents(input.MinPrice)
+	maxPriceCents = money.ToCents(input.MaxPrice)
 
 	products, err := uc.productRepo.Search(
 		input.Query,
@@ -609,70 +467,4 @@ func (uc *ProductUseCase) ListProducts(offset, limit int) ([]*entity.Product, in
 // ListCategories lists all product categories
 func (uc *ProductUseCase) ListCategories() ([]*entity.Category, error) {
 	return uc.categoryRepo.List()
-}
-
-// SetProductCurrencyPrices sets currency-specific prices for a product
-func (uc *ProductUseCase) SetProductCurrencyPrices(productID uint, currencyPrices []CurrencyPriceInput) error {
-	// Get product to check ownership
-	product, err := uc.productRepo.GetByID(productID)
-	if err != nil {
-		return err
-	}
-
-	// Clear existing currency prices
-	product.Prices = make([]entity.ProductPrice, 0, len(currencyPrices))
-
-	// Add new currency prices
-	for _, currPrice := range currencyPrices {
-		// Validate currency exists
-		_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-		if err != nil {
-			return errors.New("invalid currency code: " + currPrice.CurrencyCode)
-		}
-
-		// Convert prices to cents
-		priceCents := money.ToCents(currPrice.Price)
-
-		product.Prices = append(product.Prices, entity.ProductPrice{
-			ProductID:    productID,
-			CurrencyCode: currPrice.CurrencyCode,
-			Price:        priceCents,
-		})
-	}
-
-	// Update product in repository
-	return uc.productRepo.Update(product)
-}
-
-// SetVariantCurrencyPrices sets currency-specific prices for a product variant
-func (uc *ProductUseCase) SetVariantCurrencyPrices(productID uint, variantID uint, currencyPrices []CurrencyPriceInput) error {
-	// Get variant
-	variant, err := uc.productVariantRepo.GetByID(variantID)
-	if err != nil {
-		return err
-	}
-
-	// Clear existing currency prices
-	variant.Prices = make([]entity.ProductVariantPrice, 0, len(currencyPrices))
-
-	// Add new currency prices
-	for _, currPrice := range currencyPrices {
-		// Validate currency exists
-		_, err := uc.currencyRepo.GetByCode(currPrice.CurrencyCode)
-		if err != nil {
-			return errors.New("invalid currency code: " + currPrice.CurrencyCode)
-		}
-
-		// Convert prices to cents
-		priceCents := money.ToCents(currPrice.Price)
-
-		variant.Prices = append(variant.Prices, entity.ProductVariantPrice{
-			VariantID:    variantID,
-			CurrencyCode: currPrice.CurrencyCode,
-			Price:        priceCents,
-		})
-	}
-
-	// Update variant in repository
-	return uc.productVariantRepo.Update(variant)
 }

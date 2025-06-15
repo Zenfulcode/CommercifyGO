@@ -45,11 +45,10 @@ type VariantAttributeDTO struct {
 type CreateProductRequest struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Price       float64                `json:"price"`
-	Stock       int                    `json:"stock"`
-	Weight      float64                `json:"weight"`
+	Currency    string                 `json:"currency"`
 	CategoryID  uint                   `json:"category_id"`
 	Images      []string               `json:"images"`
+	Active      bool                   `json:"active"`
 	Variants    []CreateVariantRequest `json:"variants,omitempty"`
 }
 
@@ -67,6 +66,7 @@ type CreateVariantRequest struct {
 type UpdateProductRequest struct {
 	Name        string   `json:"name,omitempty"`
 	Description string   `json:"description,omitempty"`
+	Currency    string   `json:"currency,omitempty"`
 	CategoryID  *uint    `json:"category_id,omitempty"`
 	Images      []string `json:"images,omitempty"`
 	Active      bool     `json:"active,omitempty"`

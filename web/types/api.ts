@@ -595,11 +595,10 @@ export interface VariantAttributeDTO {
 export interface CreateProductRequest {
   name: string;
   description: string;
-  price: number /* float64 */;
-  stock: number /* int */;
-  weight: number /* float64 */;
+  currency: string;
   category_id: number /* uint */;
   images: string[];
+  active: boolean;
   variants?: CreateVariantRequest[];
 }
 /**
@@ -619,6 +618,7 @@ export interface CreateVariantRequest {
 export interface UpdateProductRequest {
   name?: string;
   description?: string;
+  currency?: string;
   category_id?: number /* uint */;
   images?: string[];
   active?: boolean;
