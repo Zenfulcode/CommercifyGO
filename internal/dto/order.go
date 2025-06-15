@@ -100,7 +100,7 @@ type OrderSearchRequest struct {
 	PaymentStatus string      `json:"payment_status,omitempty"`
 	StartDate     *time.Time  `json:"start_date,omitempty"`
 	EndDate       *time.Time  `json:"end_date,omitempty"`
-	PaginationDTO
+	PaginationDTO `json:"pagination"`
 }
 
 // ProcessPaymentRequest represents the data needed to process a payment

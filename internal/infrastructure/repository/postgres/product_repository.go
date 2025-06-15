@@ -354,10 +354,14 @@ func (r *ProductRepository) Delete(productID uint) error {
 // List lists products with pagination
 func (r *ProductRepository) List(offset, limit int) ([]*entity.Product, error) {
 	query := `
-
-		SELECT id, product_number, name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at
-		FROM products
-		ORDER BY created_at DESC
+		SELECT 
+			p.id, p.product_number, p.name, p.description, 
+			COALESCE(pv.price, p.price) as price,
+			p.currency_code, p.stock, p.weight, p.category_id, p.images, p.has_variants, p.active, p.created_at, p.updated_at
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
+		WHERE p.active = true
+		ORDER BY p.created_at DESC
 		LIMIT $1 OFFSET $2
 	`
 
@@ -424,39 +428,43 @@ func (r *ProductRepository) List(offset, limit int) ([]*entity.Product, error) {
 func (r *ProductRepository) Search(query string, categoryID uint, minPriceCents, maxPriceCents int64, offset, limit int) ([]*entity.Product, error) {
 	// Build dynamic query parts
 	searchQuery := `
-		SELECT id, product_number, name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at
-		FROM products
-		WHERE 1=1
+		SELECT 
+			p.id, p.product_number, p.name, p.description, 
+			COALESCE(pv.price, p.price) as price,
+			p.currency_code, p.stock, p.weight, p.category_id, p.images, p.has_variants, p.active, p.created_at, p.updated_at
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
+		WHERE p.active = true
 	`
 	queryParams := []interface{}{}
 	paramCounter := 1
 
 	if query != "" {
-		searchQuery += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", paramCounter, paramCounter)
+		searchQuery += fmt.Sprintf(" AND (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
 		queryParams = append(queryParams, "%"+query+"%")
 		paramCounter++
 	}
 
 	if categoryID > 0 {
-		searchQuery += fmt.Sprintf(" AND category_id = $%d", paramCounter)
+		searchQuery += fmt.Sprintf(" AND p.category_id = $%d", paramCounter)
 		queryParams = append(queryParams, categoryID)
 		paramCounter++
 	}
 
 	if minPriceCents > 0 {
-		searchQuery += fmt.Sprintf(" AND price >= $%d", paramCounter)
+		searchQuery += fmt.Sprintf(" AND COALESCE(pv.price, p.price) >= $%d", paramCounter)
 		queryParams = append(queryParams, minPriceCents) // Use cents
 		paramCounter++
 	}
 
 	if maxPriceCents > 0 {
-		searchQuery += fmt.Sprintf(" AND price <= $%d", paramCounter)
+		searchQuery += fmt.Sprintf(" AND COALESCE(pv.price, p.price) <= $%d", paramCounter)
 		queryParams = append(queryParams, maxPriceCents) // Use cents
 		paramCounter++
 	}
 
 	// Add pagination
-	searchQuery += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(paramCounter) + " OFFSET $" + strconv.Itoa(paramCounter+1)
+	searchQuery += " ORDER BY p.created_at DESC LIMIT $" + strconv.Itoa(paramCounter) + " OFFSET $" + strconv.Itoa(paramCounter+1)
 	queryParams = append(queryParams, limit, offset)
 
 	// Execute query
@@ -531,33 +539,35 @@ func (r *ProductRepository) Count() (int, error) {
 
 func (r *ProductRepository) CountSearch(searchQuery string, categoryID uint, minPriceCents, maxPriceCents int64) (int, error) {
 	query := `
-		SELECT COUNT(*) FROM products
-		WHERE 1=1
+		SELECT COUNT(*) 
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
+		WHERE p.active = true
 	`
 
 	queryParams := []any{}
 	paramCounter := 1
 
 	if searchQuery != "" {
-		query += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", paramCounter, paramCounter)
+		query += fmt.Sprintf(" AND (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
 		queryParams = append(queryParams, "%"+searchQuery+"%")
 		paramCounter++
 	}
 
 	if categoryID > 0 {
-		query += fmt.Sprintf(" AND category_id = $%d", paramCounter)
+		query += fmt.Sprintf(" AND p.category_id = $%d", paramCounter)
 		queryParams = append(queryParams, categoryID)
 		paramCounter++
 	}
 
 	if minPriceCents > 0 {
-		query += fmt.Sprintf(" AND price >= $%d", paramCounter)
+		query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) >= $%d", paramCounter)
 		queryParams = append(queryParams, minPriceCents)
 		paramCounter++
 	}
 
 	if maxPriceCents > 0 {
-		query += fmt.Sprintf(" AND price <= $%d", paramCounter)
+		query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) <= $%d", paramCounter)
 		queryParams = append(queryParams, maxPriceCents)
 		paramCounter++
 	}
