@@ -146,6 +146,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		CategoryID:  request.CategoryID,
 		Images:      request.Images,
 		Variants:    variantInputs,
+		Active:      request.Active,
 	}
 
 	// Create product
@@ -155,7 +156,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 		// Handle specific error cases
 		statusCode := http.StatusInternalServerError
-		errorMessage := "Failed to create product"
+		errorMessage := err.Error()
 
 		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
 			statusCode = http.StatusConflict

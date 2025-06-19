@@ -463,11 +463,9 @@ func TestProductUseCase_AddVariant(t *testing.T) {
 			ID:          1,
 			Name:        "Test Product",
 			Description: "This is a test product",
-			Price:       9999,
-			Stock:       100,
 			CategoryID:  1,
 			Images:      []string{"image1.jpg", "image2.jpg"},
-			HasVariants: false, // Starts with false since it has only one variant
+			HasVariants: false,
 		}
 		productRepo.Create(product)
 
@@ -524,7 +522,7 @@ func TestProductUseCase_AddVariant(t *testing.T) {
 		updatedProductPrice, err := productUseCase.GetProductByID(1, "USD")
 
 		assert.NoError(t, err)
-		assert.True(t, updatedProduct.HasVariants)
+		assert.True(t, updatedProduct.IsComplete())
 		assert.Equal(t, money.ToCents(input.Price), updatedProductPrice.Price)
 	})
 }
