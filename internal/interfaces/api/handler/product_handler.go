@@ -11,7 +11,6 @@ import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	errors "github.com/zenfulcode/commercify/internal/domain/error"
-	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
@@ -30,64 +29,6 @@ func NewProductHandler(productUseCase *usecase.ProductUseCase, logger logger.Log
 		productUseCase: productUseCase,
 		logger:         logger,
 		config:         config,
-	}
-}
-
-// --- Helper Functions --- //
-
-func toVariantDTO(variant *entity.ProductVariant) dto.VariantDTO {
-	if variant == nil {
-		return dto.VariantDTO{}
-	}
-
-	attributesDTO := make([]dto.VariantAttributeDTO, len(variant.Attributes))
-	for i, a := range variant.Attributes {
-		attributesDTO[i] = dto.VariantAttributeDTO{
-			Name:  a.Name,
-			Value: a.Value,
-		}
-	}
-
-	return dto.VariantDTO{
-		ID:         variant.ID,
-		ProductID:  variant.ProductID,
-		SKU:        variant.SKU,
-		Price:      money.FromCents(variant.Price),
-		Currency:   variant.CurrencyCode,
-		Stock:      variant.Stock,
-		Attributes: attributesDTO,
-		Images:     variant.Images,
-		IsDefault:  variant.IsDefault,
-		CreatedAt:  variant.CreatedAt,
-		UpdatedAt:  variant.UpdatedAt,
-	}
-}
-
-func toProductDTO(product *entity.Product) dto.ProductDTO {
-	if product == nil {
-		return dto.ProductDTO{}
-	}
-	variantsDTO := make([]dto.VariantDTO, len(product.Variants))
-	for i, v := range product.Variants {
-		variantsDTO[i] = toVariantDTO(v)
-	}
-
-	return dto.ProductDTO{
-		ID:          product.ID,
-		Name:        product.Name,
-		Description: product.Description,
-		SKU:         product.ProductNumber,
-		Price:       money.FromCents(product.Price),
-		Currency:    product.CurrencyCode,
-		Stock:       product.Stock,
-		Weight:      product.Weight,
-		CategoryID:  product.CategoryID,
-		Images:      product.Images,
-		HasVariants: product.HasVariants,
-		Variants:    variantsDTO,
-		CreatedAt:   product.CreatedAt,
-		UpdatedAt:   product.UpdatedAt,
-		Active:      product.Active,
 	}
 }
 
@@ -118,36 +59,9 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variantInputs := make([]usecase.CreateVariantInput, len(request.Variants))
-	for i, v := range request.Variants {
-		attributes := make([]entity.VariantAttribute, len(v.Attributes))
-		for j, a := range v.Attributes {
-			attributes[j] = entity.VariantAttribute{
-				Name:  a.Name,
-				Value: a.Value,
-			}
-		}
+	h.logger.Info("Creating product:", request)
 
-		variantInputs[i] = usecase.CreateVariantInput{
-			SKU:        v.SKU,
-			Price:      v.Price,
-			Stock:      v.Stock,
-			Attributes: attributes,
-			Images:     v.Images,
-			IsDefault:  v.IsDefault,
-		}
-	}
-
-	// Convert DTO to usecase input
-	input := usecase.CreateProductInput{
-		Name:        request.Name,
-		Description: request.Description,
-		Currency:    request.Currency,
-		CategoryID:  request.CategoryID,
-		Images:      request.Images,
-		Variants:    variantInputs,
-		Active:      request.Active,
-	}
+	input := request.ToUseCaseInput()
 
 	// Create product
 	product, err := h.productUseCase.CreateProduct(input)
@@ -179,7 +93,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to DTO
-	productDTO := toProductDTO(product)
+	productDTO := dto.ToProductDTO(product)
 
 	response := dto.SuccessResponseWithMessage(productDTO, "Product created successfully")
 
@@ -233,7 +147,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to DTO
-	productDTO := toProductDTO(product)
+	productDTO := dto.ToProductDTO(product)
 
 	response := dto.SuccessResponse(productDTO)
 
@@ -277,17 +191,12 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert DTO to usecase input
-	input := usecase.UpdateProductInput{
-		Name:        request.Name,
-		Description: request.Description,
-		Images:      request.Images,
-		Active:      request.Active,
-	}
+	h.logger.Info("Updating product ID %d with data: %v", id, request)
 
-	if request.CategoryID != nil {
-		input.CategoryID = *request.CategoryID
-	}
+	// Convert DTO to usecase input
+	input := request.ToUseCaseInput()
+
+	h.logger.Debug("UpdateProduct input %v:", input)
 
 	// Update product
 	product, err := h.productUseCase.UpdateProduct(uint(id), input)
@@ -322,7 +231,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to DTO
-	productDTO := toProductDTO(product)
+	productDTO := dto.ToProductDTO(product)
 
 	response := dto.SuccessResponseWithMessage(productDTO, "Product updated successfully")
 
@@ -423,7 +332,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	// Convert to DTOs
 	productDTOs := make([]dto.ProductDTO, len(products))
 	for i, product := range products {
-		productDTOs[i] = toProductDTO(product)
+		productDTOs[i] = dto.ToProductDTO(product)
 	}
 
 	response := dto.ProductListResponse{
@@ -540,7 +449,7 @@ func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) 
 	// Convert to DTOs
 	productDTOs := make([]dto.ProductDTO, len(products))
 	for i, product := range products {
-		productDTOs[i] = toProductDTO(product)
+		productDTOs[i] = dto.ToProductDTO(product)
 	}
 
 	response := dto.ProductListResponse{
@@ -661,7 +570,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to DTO
-	variantDTO := toVariantDTO(variant)
+	variantDTO := dto.ToVariantDTO(variant)
 
 	response := dto.SuccessResponseWithMessage(variantDTO, "Variant added successfully")
 
@@ -771,7 +680,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to DTO
-	variantDTO := toVariantDTO(variant)
+	variantDTO := dto.ToVariantDTO(variant)
 
 	response := dto.SuccessResponseWithMessage(variantDTO, "Variant updated successfully")
 

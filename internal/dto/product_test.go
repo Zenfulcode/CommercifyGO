@@ -242,7 +242,7 @@ func TestUpdateProductRequest(t *testing.T) {
 	request := UpdateProductRequest{
 		Name:        "Updated Product",
 		Description: "Updated description",
-		CategoryID:  &categoryID,
+		CategoryID:  categoryID,
 		Images:      []string{"updated1.jpg"},
 		Active:      true,
 	}
@@ -254,7 +254,7 @@ func TestUpdateProductRequest(t *testing.T) {
 		t.Errorf("Expected Description 'Updated description', got %s", request.Description)
 	}
 
-	if request.CategoryID == nil || *request.CategoryID != 7 {
+	if request.CategoryID != 7 {
 		t.Errorf("Expected CategoryID 7, got %v", request.CategoryID)
 	}
 	if !request.Active {
@@ -278,8 +278,8 @@ func TestUpdateProductRequestWithNilValues(t *testing.T) {
 	if request.Description != "Only Description Updated" {
 		t.Errorf("Expected Description 'Only Description Updated', got %s", request.Description)
 	}
-	if request.CategoryID != nil {
-		t.Errorf("Expected CategoryID nil, got %v", request.CategoryID)
+	if request.CategoryID != 0 {
+		t.Errorf("Expected CategoryID 0, got %v", request.CategoryID)
 	}
 	if request.Active {
 		t.Errorf("Expected Active false, got %t", request.Active)
