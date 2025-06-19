@@ -106,9 +106,30 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 	// Only set has_variants=true if there are now multiple variants
 	p.HasVariants = len(p.Variants) > 1
 
+	p.CalculateStock()
+
 	p.UpdatedAt = time.Now()
 
 	return nil
+}
+
+// RemoveVariant removes a variant from the product by its ID
+func (p *Product) RemoveVariant(variantID uint) error {
+	if len(p.Variants) == 0 {
+		return errors.New("no variants available to remove")
+	}
+
+	for i, variant := range p.Variants {
+		if variant.ID == variantID {
+			// Remove the variant from the slice
+			p.Variants = append(p.Variants[:i], p.Variants[i+1:]...)
+			p.CalculateStock()
+			p.UpdatedAt = time.Now()
+			return nil
+		}
+	}
+
+	return fmt.Errorf("variant with ID %d not found", variantID)
 }
 
 // GetDefaultVariant returns the default variant of the product
@@ -185,6 +206,28 @@ func (p *Product) GetPriceInCurrency(currencyCode string) (int64, bool) {
 	}
 
 	return p.Price, false
+}
+
+func (p *Product) GetStockForVariant(variantID uint) (int, error) {
+	if len(p.Variants) == 0 {
+		return 0, errors.New("no variants available for this product")
+	}
+
+	for _, variant := range p.Variants {
+		if variant.ID == variantID {
+			return variant.Stock, nil
+		}
+	}
+
+	return 0, fmt.Errorf("variant with ID %d not found", variantID)
+}
+
+func (p *Product) CalculateStock() {
+	totalStock := 0
+	for _, variant := range p.Variants {
+		totalStock += variant.Stock
+	}
+	p.Stock = totalStock
 }
 
 // Category represents a product category

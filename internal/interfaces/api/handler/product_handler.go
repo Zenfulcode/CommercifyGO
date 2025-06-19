@@ -191,12 +191,8 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("Updating product ID %d with data: %v", id, request)
-
 	// Convert DTO to usecase input
 	input := request.ToUseCaseInput()
-
-	h.logger.Debug("UpdateProduct input %v:", input)
 
 	// Update product
 	product, err := h.productUseCase.UpdateProduct(uint(id), input)

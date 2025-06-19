@@ -280,8 +280,8 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 	query := `
 			UPDATE products
 			SET name = $1, description = $2, price = $3, currency_code = $4, stock = $5, weight = $6, category_id = $7, 
-		    images = $8, has_variants = $9, updated_at = $10
-			WHERE id = $11
+		    images = $8, has_variants = $9, updated_at = $10, active = $11
+			WHERE id = $12
 			`
 
 	imagesJSON, err := json.Marshal(product.Images)
@@ -301,6 +301,7 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 		imagesJSON,
 		product.HasVariants,
 		time.Now(),
+		product.Active,
 		product.ID,
 	)
 	if err != nil {
