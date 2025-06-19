@@ -833,7 +833,7 @@ func TestProductUseCase_SearchProducts(t *testing.T) {
 			Offset: 0,
 			Limit:  10,
 		}
-		results, _, err := productUseCase.SearchProducts(input)
+		results, _, err := productUseCase.ListProducts(input)
 
 		// Assert
 		assert.NoError(t, err)
@@ -847,7 +847,7 @@ func TestProductUseCase_SearchProducts(t *testing.T) {
 			Offset:     0,
 			Limit:      10,
 		}
-		results, _, err = productUseCase.SearchProducts(input)
+		results, _, err = productUseCase.ListProducts(input)
 
 		// Assert
 		assert.NoError(t, err)
@@ -861,7 +861,7 @@ func TestProductUseCase_SearchProducts(t *testing.T) {
 			Offset:   0,
 			Limit:    10,
 		}
-		results, _, err = productUseCase.SearchProducts(input)
+		results, _, err = productUseCase.ListProducts(input)
 
 		// Assert
 		assert.NoError(t, err)

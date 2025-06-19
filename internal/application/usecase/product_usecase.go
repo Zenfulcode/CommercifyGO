@@ -397,66 +397,42 @@ func (uc *ProductUseCase) DeleteProduct(id uint) error {
 // SearchProductsInput contains the data needed to search for products (prices in dollars)
 type SearchProductsInput struct {
 	Query        string  `json:"query"`
-	CategoryID   uint    `json:"category_id"`
-	MinPrice     float64 `json:"min_price"`     // Price in dollars
-	MaxPrice     float64 `json:"max_price"`     // Price in dollars
 	CurrencyCode string  `json:"currency_code"` // Optional currency code for prices
-	Offset       int     `json:"offset"`
-	Limit        int     `json:"limit"`
-}
-
-// TODO: Fix currency search logic
-// SearchProducts searches for products based on criteria
-func (uc *ProductUseCase) SearchProducts(input SearchProductsInput) ([]*entity.Product, int, error) {
-	// If currency is specified and not the default, convert price ranges
-	var minPriceCents, maxPriceCents int64
-
-	if input.CurrencyCode != "" && input.CurrencyCode != uc.defaultCurrency.Code {
-		// Get the currency
-		_, err := uc.currencyRepo.GetByCode(input.CurrencyCode)
-		if err != nil {
-			return nil, 0, errors.New("invalid currency code: " + input.CurrencyCode)
-		}
-
-	}
-
-	// Convert min/max prices to cents for repository search
-	minPriceCents = money.ToCents(input.MinPrice)
-	maxPriceCents = money.ToCents(input.MaxPrice)
-
-	products, err := uc.productRepo.Search(
-		input.Query,
-		input.CategoryID,
-		minPriceCents, // Pass cents
-		maxPriceCents, // Pass cents
-		input.Offset,
-		input.Limit,
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	total, err := uc.productRepo.CountSearch(
-		input.Query,
-		input.CategoryID,
-		minPriceCents, // Pass cents
-		maxPriceCents, // Pass cents
-	)
-	if err != nil {
-		return products, 0, err
-	}
-
-	return products, total, nil
+	MaxPrice     float64 `json:"max_price"`     // Price in dollars
+	MinPrice     float64 `json:"min_price"`     // Price in dollars
+	CategoryID   uint    `json:"category_id"`
+	Offset       uint    `json:"offset"`
+	Limit        uint    `json:"limit"`
+	ActiveOnly   bool    `json:"active_only"` // Whether to filter active products only
 }
 
 // ListProducts lists all products with pagination and returns total count
-func (uc *ProductUseCase) ListProducts(offset, limit int) ([]*entity.Product, int, error) {
-	products, err := uc.productRepo.List(offset, limit)
+func (uc *ProductUseCase) ListProducts(input SearchProductsInput) ([]*entity.Product, int, error) {
+	minPriceCents := money.ToCents(input.MinPrice)
+	maxPriceCents := money.ToCents(input.MaxPrice)
+
+	products, err := uc.productRepo.List(
+		input.Query,
+		input.CurrencyCode,
+		input.CategoryID,
+		input.Offset,
+		input.Limit,
+		minPriceCents, // Convert to cents
+		maxPriceCents, // Convert to cents
+		input.ActiveOnly,
+	)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := uc.productRepo.Count()
+	total, err := uc.productRepo.Count(
+		input.Query,
+		input.CurrencyCode,
+		input.CategoryID,
+		minPriceCents, // Pass cents
+		maxPriceCents, // Pass cents
+		input.ActiveOnly,
+	)
 	if err != nil {
 		return products, 0, err
 	}

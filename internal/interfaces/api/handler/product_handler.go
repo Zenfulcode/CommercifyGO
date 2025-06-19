@@ -307,24 +307,94 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse pagination parameters
+	// Parse query parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page <= 0 {
 		page = 1 // Default page
 	}
+
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 	if pageSize <= 0 {
 		pageSize = 10 // Default page size
 	}
 
-	offset := (page - 1) * pageSize
-	products, total, err := h.productUseCase.ListProducts(offset, pageSize)
+	// Parse optional parameters
+	var query *string
+	if queryStr := r.URL.Query().Get("query"); queryStr != "" {
+		query = &queryStr
+	}
 
+	var categoryID *uint
+	if catIDStr := r.URL.Query().Get("category_id"); catIDStr != "" {
+		if catID, err := strconv.ParseUint(catIDStr, 10, 32); err == nil {
+			catIDUint := uint(catID)
+			categoryID = &catIDUint
+		}
+	}
+
+	var minPrice *float64
+	if minPriceStr := r.URL.Query().Get("min_price"); minPriceStr != "" {
+		if minPriceVal, err := strconv.ParseFloat(minPriceStr, 64); err == nil {
+			minPrice = &minPriceVal
+		}
+	}
+
+	var maxPrice *float64
+	if maxPriceStr := r.URL.Query().Get("max_price"); maxPriceStr != "" {
+		if maxPriceVal, err := strconv.ParseFloat(maxPriceStr, 64); err == nil {
+			maxPrice = &maxPriceVal
+		}
+	}
+
+	var currencyCode string
+	if currencyCodeStr := r.URL.Query().Get("currency"); currencyCodeStr != "" {
+		currencyCode = currencyCodeStr
+	}
+
+	offset := (page - 1) * pageSize
+
+	// Convert to usecase input
+	input := usecase.SearchProductsInput{
+		Offset:       uint(offset),
+		Limit:        uint(pageSize),
+		CurrencyCode: currencyCode,
+	}
+
+	// Handle optional fields
+	if query != nil {
+		input.Query = *query
+	}
+	if categoryID != nil {
+		input.CategoryID = *categoryID
+	}
+	if minPrice != nil {
+		input.MinPrice = *minPrice
+	}
+	if maxPrice != nil {
+		input.MaxPrice = *maxPrice
+	}
+
+	products, total, err := h.productUseCase.ListProducts(input)
 	if err != nil {
-		h.logger.Error("Failed to list products: %v", err)
-		response := dto.ErrorResponse("Failed to list products")
+		h.logger.Error("Failed to search products: %v", err)
+
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to search products"
+
+		if strings.Contains(err.Error(), "currency") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid currency code"
+		} else if strings.Contains(err.Error(), "category") && strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Category not found"
+		} else if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "validation") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid search parameters"
+		}
+
+		response := dto.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -402,9 +472,10 @@ func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) 
 
 	// Convert to usecase input
 	input := usecase.SearchProductsInput{
-		Offset:       offset,
-		Limit:        pageSize,
+		Offset:       uint(offset),
+		Limit:        uint(pageSize),
 		CurrencyCode: currencyCode,
+		ActiveOnly:   true, // Only active products by default
 	}
 
 	// Handle optional fields
@@ -421,7 +492,7 @@ func (h *ProductHandler) SearchProducts(w http.ResponseWriter, r *http.Request) 
 		input.MaxPrice = *maxPrice
 	}
 
-	products, total, err := h.productUseCase.SearchProducts(input)
+	products, total, err := h.productUseCase.ListProducts(input)
 	if err != nil {
 		h.logger.Error("Failed to search products: %v", err)
 
