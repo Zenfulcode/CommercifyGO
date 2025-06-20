@@ -423,8 +423,9 @@ export interface OrderDTO {
   order_number: string;
   items: OrderItemDTO[];
   status: OrderStatus;
-  total_amount: number /* float64 */;
-  final_amount: number /* float64 */;
+  total_amount: number /* float64 */; // Subtotal (items only)
+  shipping_cost: number /* float64 */; // Shipping cost
+  final_amount: number /* float64 */; // Total including shipping and discounts
   currency: string;
   shipping_address: AddressDTO;
   billing_address: AddressDTO;
@@ -441,8 +442,9 @@ export interface OrderSummaryDTO {
   order_number: string;
   user_id: number /* uint */;
   status: OrderStatus;
-  total_amount: number /* float64 */;
-  final_amount: number /* float64 */;
+  total_amount: number /* float64 */; // Subtotal (items only)
+  shipping_cost: number /* float64 */; // Shipping cost
+  final_amount: number /* float64 */; // Total including shipping and discounts
   order_lines_amount: number /* int */;
   currency: string;
   created_at: string;
