@@ -90,6 +90,7 @@ export interface CheckoutItemDTO {
 export interface AddToCheckoutRequest {
   sku: string;
   quantity: number /* int */;
+  currency?: string; // Optional currency for checkout creation/updates
 }
 /**
  * UpdateCheckoutItemRequest represents the data needed to update a checkout item
@@ -364,13 +365,13 @@ export interface CreateDiscountRequest {
   type: string;
   method: string;
   value: number /* float64 */;
-  min_order_value: number /* float64 */;
-  max_discount_value: number /* float64 */;
+  min_order_value?: number /* float64 */;
+  max_discount_value?: number /* float64 */;
   product_ids?: number /* uint */[];
   category_ids?: number /* uint */[];
-  start_date: string;
-  end_date: string;
-  usage_limit: number /* int */;
+  start_date?: string;
+  end_date?: string;
+  usage_limit?: number /* int */;
 }
 /**
  * UpdateDiscountRequest represents the data needed to update a discount
@@ -584,6 +585,7 @@ export interface VariantDTO {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  prices?: { [key: string]: number /* float64 */}; // All prices in different currencies
 }
 export interface VariantAttributeDTO {
   name: string;
@@ -639,6 +641,26 @@ export interface UpdateVariantRequest {
  */
 export interface ProductListResponse {
   ListResponseDTO: ListResponseDTO<ProductDTO>;
+}
+/**
+ * SetVariantPriceRequest represents the request to set a price for a variant in a specific currency
+ */
+export interface SetVariantPriceRequest {
+  currency_code: string;
+  price: number /* float64 */;
+}
+/**
+ * SetMultipleVariantPricesRequest represents the request to set multiple prices for a variant
+ */
+export interface SetMultipleVariantPricesRequest {
+  prices: { [key: string]: number /* float64 */}; // currency_code -> price
+}
+/**
+ * VariantPricesResponse represents the response containing all prices for a variant
+ */
+export interface VariantPricesResponse {
+  variant_id: number /* uint */;
+  prices: { [key: string]: number /* float64 */}; // currency_code -> price
 }
 
 //////////

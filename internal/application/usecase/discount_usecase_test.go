@@ -453,6 +453,7 @@ func TestDiscountUseCase_ProductSpecificDiscount(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -549,6 +550,7 @@ func TestDiscountUseCase_ProductSpecificDiscount(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -645,6 +647,7 @@ func TestDiscountUseCase_ProductSpecificDiscount(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -1141,6 +1144,7 @@ func TestDiscountUseCase_ApplyDiscountToOrder(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -1250,6 +1254,7 @@ func TestDiscountUseCase_ApplyDiscountToOrder(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -1311,6 +1316,7 @@ func TestDiscountUseCase_ApplyDiscountToOrder(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{
@@ -1381,6 +1387,7 @@ func TestDiscountUseCase_RemoveDiscountFromOrder(t *testing.T) {
 		order, _ := entity.NewOrder(
 			1,
 			items,
+			"USD",
 			entity.Address{Street: "123 Main St"},
 			entity.Address{Street: "123 Main St"},
 			entity.CustomerDetails{

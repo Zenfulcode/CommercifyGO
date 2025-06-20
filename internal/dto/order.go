@@ -175,7 +175,7 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		TotalAmount:      money.FromCents(order.TotalAmount),
 		FinalAmount:      money.FromCents(order.FinalAmount),
 		OrderLinesAmount: len(order.Items),
-		Currency:         "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Currency:         order.Currency, // TODO: Assuming USD for simplicity, this should be dynamic
 		CreatedAt:        order.CreatedAt,
 		UpdatedAt:        order.UpdatedAt,
 	}
@@ -261,7 +261,7 @@ func toOrderDTO(order *entity.Order) OrderDTO {
 		Status:          OrderStatus(order.Status),
 		TotalAmount:     money.FromCents(order.TotalAmount),
 		FinalAmount:     money.FromCents(order.FinalAmount),
-		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Currency:        order.Currency,
 		Items:           items,
 		ShippingAddress: *shippingAddr,
 		BillingAddress:  *billingAddr,

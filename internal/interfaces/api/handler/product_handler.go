@@ -825,3 +825,255 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
+
+// SetVariantPrice handles setting a price for a variant in a specific currency
+func (h *ProductHandler) SetVariantPrice(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok || userID == 0 {
+		h.logger.Error("Unauthorized access attempt in SetVariantPrice")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get variant ID from URL
+	vars := mux.Vars(r)
+	variantIDStr := vars["variantId"]
+	variantID, err := strconv.ParseUint(variantIDStr, 10, 32)
+	if err != nil {
+		response := dto.ErrorResponse("Invalid variant ID")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse request body
+	var request dto.SetVariantPriceRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		response := dto.ErrorResponse("Invalid request body")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create input
+	input := usecase.SetVariantPriceInput{
+		VariantID:    uint(variantID),
+		CurrencyCode: request.CurrencyCode,
+		Price:        request.Price,
+	}
+
+	// Set the price
+	variant, err := h.productUseCase.SetVariantPriceInCurrency(input)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to set variant price"
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant or currency not found"
+		} else if strings.Contains(err.Error(), "not enabled") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Currency is not enabled"
+		} else if strings.Contains(err.Error(), "greater than zero") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Price must be greater than zero"
+		} else if strings.Contains(err.Error(), "required") {
+			statusCode = http.StatusBadRequest
+			errorMessage = err.Error()
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create response
+	response := dto.CreateProductVariantResponse(variant)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// RemoveVariantPrice handles removing a price for a variant in a specific currency
+func (h *ProductHandler) RemoveVariantPrice(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok || userID == 0 {
+		h.logger.Error("Unauthorized access attempt in RemoveVariantPrice")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get variant ID from URL
+	vars := mux.Vars(r)
+	variantIDStr := vars["variantId"]
+	variantID, err := strconv.ParseUint(variantIDStr, 10, 32)
+	if err != nil {
+		response := dto.ErrorResponse("Invalid variant ID")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get currency code from URL
+	currencyCode := vars["currency"]
+	if currencyCode == "" {
+		response := dto.ErrorResponse("Currency code is required")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Remove the price
+	variant, err := h.productUseCase.RemoveVariantPriceInCurrency(uint(variantID), currencyCode)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to remove variant price"
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant not found or price not set for this currency"
+		} else if strings.Contains(err.Error(), "cannot remove default") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Cannot remove default currency price"
+		} else if strings.Contains(err.Error(), "required") {
+			statusCode = http.StatusBadRequest
+			errorMessage = err.Error()
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create response
+	response := dto.CreateProductVariantResponse(variant)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetVariantPrices handles getting all prices for a variant
+func (h *ProductHandler) GetVariantPrices(w http.ResponseWriter, r *http.Request) {
+	// Get variant ID from URL
+	vars := mux.Vars(r)
+	variantIDStr := vars["variantId"]
+	variantID, err := strconv.ParseUint(variantIDStr, 10, 32)
+	if err != nil {
+		response := dto.ErrorResponse("Invalid variant ID")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get all prices
+	prices, err := h.productUseCase.GetVariantPrices(uint(variantID))
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to get variant prices"
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant not found"
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create response
+	response := dto.CreateVariantPricesResponse(prices)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// SetMultipleVariantPrices handles setting multiple prices for a variant at once
+func (h *ProductHandler) SetMultipleVariantPrices(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok || userID == 0 {
+		h.logger.Error("Unauthorized access attempt in SetMultipleVariantPrices")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get variant ID from URL
+	vars := mux.Vars(r)
+	variantIDStr := vars["variantId"]
+	variantID, err := strconv.ParseUint(variantIDStr, 10, 32)
+	if err != nil {
+		response := dto.ErrorResponse("Invalid variant ID")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Parse request body
+	var request dto.SetMultipleVariantPricesRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		response := dto.ErrorResponse("Invalid request body")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create input
+	input := usecase.SetMultipleVariantPricesInput{
+		VariantID: uint(variantID),
+		Prices:    request.Prices,
+	}
+
+	// Set the prices
+	variant, err := h.productUseCase.SetMultipleVariantPrices(input)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to set variant prices"
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			errorMessage = "Variant or currency not found"
+		} else if strings.Contains(err.Error(), "not enabled") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "One or more currencies are not enabled"
+		} else if strings.Contains(err.Error(), "greater than zero") {
+			statusCode = http.StatusBadRequest
+			errorMessage = "All prices must be greater than zero"
+		} else if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "empty") {
+			statusCode = http.StatusBadRequest
+			errorMessage = err.Error()
+		}
+
+		response := dto.ErrorResponse(errorMessage)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Create response
+	response := dto.CreateProductVariantResponse(variant)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

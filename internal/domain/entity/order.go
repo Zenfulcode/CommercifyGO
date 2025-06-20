@@ -26,7 +26,8 @@ const (
 type Order struct {
 	ID                uint
 	OrderNumber       string
-	UserID            uint // 0 for guest orders
+	Currency          string // e.g., "USD", "EUR"
+	UserID            uint   // 0 for guest orders
 	Items             []OrderItem
 	TotalAmount       int64 // stored in cents
 	Status            OrderStatus
@@ -88,12 +89,15 @@ type CustomerDetails struct {
 }
 
 // NewOrder creates a new order
-func NewOrder(userID uint, items []OrderItem, shippingAddr, billingAddr Address, customerDetails CustomerDetails) (*Order, error) {
+func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, billingAddr Address, customerDetails CustomerDetails) (*Order, error) {
 	if userID == 0 {
 		return nil, errors.New("user ID cannot be empty")
 	}
 	if len(items) == 0 {
 		return nil, errors.New("order must have at least one item")
+	}
+	if currency == "" {
+		return nil, errors.New("currency cannot be empty")
 	}
 
 	var totalAmount int64
@@ -119,6 +123,7 @@ func NewOrder(userID uint, items []OrderItem, shippingAddr, billingAddr Address,
 	return &Order{
 		UserID:          userID,
 		OrderNumber:     orderNumber,
+		Currency:        currency,
 		Items:           items,
 		TotalAmount:     totalAmount,
 		TotalWeight:     totalWeight,

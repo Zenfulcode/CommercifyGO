@@ -599,40 +599,196 @@ Example response:
 
 ## Multi-Currency Product Management
 
-### Setting Product Currency Prices
+## Multi-Currency Variant Pricing
 
-When creating or updating products and their variants, you can specify prices in multiple currencies using the `currency_prices` array property. Each entry in this array should include:
+### Set Variant Price in Specific Currency
 
-- `currency_code`: The three-letter ISO code of the currency (e.g., "USD", "EUR", "GBP")
-- `price`: The price in the specified currency
-- `compare_price` (optional): The compare price (original/before discount price) in the specified currency
-
-The system always requires a price in the default currency, and additional currency prices are optional. If a currency price is not specified for a particular currency, the system will automatically convert the price from the default currency using the current exchange rate when needed.
-
-### Retrieving Products with Specific Currency Prices
-
-When retrieving products, you can specify a currency code in the query parameters to get prices in that currency:
-
-```
-GET /api/products/1?currency=EUR
+```plaintext
+POST /api/admin/variants/{variant_id}/prices
 ```
 
-This will return the product with prices in euros, either using the explicitly set euro prices or converting from the default currency if no specific euro prices are set.
+**Request Body:**
 
-## Example Workflow
+```json
+{
+  "currency_code": "DKK",
+  "price": 250.0
+}
+```
 
-### Product Management Flow (Seller)
+**Response Body:**
 
-1. Seller creates a base product through the seller interface
-2. If the product has variants, seller adds variants with different attributes (color, size, etc.)
-3. Seller can update product information or variant details as needed
-4. Seller can manage inventory levels for products and variants
-5. Seller can deactivate or delete products when they're no longer available
+```json
+{
+  "id": 1,
+  "product_id": 1,
+  "sku": "PROD-001-RED",
+  "price": 25.0,
+  "currency": "USD",
+  "stock": 10,
+  "attributes": [
+    {
+      "name": "Color",
+      "value": "Red"
+    }
+  ],
+  "images": [],
+  "is_default": true,
+  "created_at": "2025-06-20T10:00:00Z",
+  "updated_at": "2025-06-20T10:30:00Z",
+  "prices": {
+    "USD": 25.0,
+    "DKK": 250.0
+  }
+}
+```
 
-### Product Shopping Flow (Customer)
+**Status Codes:**
 
-1. Customers browse products by category or use the search function
-2. Customers can view detailed product information including available variants
-3. When adding to checkout, customers select specific variants if the product has them
-4. Products and variants are displayed with current inventory levels
-5. Out-of-stock products or variants can be marked as unavailable for purchase
+- `200 OK`: Price set successfully
+- `400 Bad Request`: Invalid request body or currency not enabled
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Variant or currency not found
+
+### Set Multiple Variant Prices
+
+```plaintext
+PUT /api/admin/variants/{variant_id}/prices
+```
+
+**Request Body:**
+
+```json
+{
+  "prices": {
+    "USD": 25.0,
+    "EUR": 21.25,
+    "DKK": 250.0
+  }
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 1,
+  "product_id": 1,
+  "sku": "PROD-001-RED",
+  "price": 25.0,
+  "currency": "USD",
+  "stock": 10,
+  "attributes": [
+    {
+      "name": "Color",
+      "value": "Red"
+    }
+  ],
+  "images": [],
+  "is_default": true,
+  "created_at": "2025-06-20T10:00:00Z",
+  "updated_at": "2025-06-20T10:30:00Z",
+  "prices": {
+    "USD": 25.0,
+    "EUR": 21.25,
+    "DKK": 250.0
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Prices set successfully
+- `400 Bad Request`: Invalid request body or one or more currencies not enabled
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Variant not found
+
+### Get Variant Prices
+
+```plaintext
+GET /api/variants/{variant_id}/prices
+```
+
+**Response Body:**
+
+```json
+{
+  "prices": {
+    "USD": 25.0,
+    "EUR": 21.25,
+    "DKK": 250.0
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Prices retrieved successfully
+- `404 Not Found`: Variant not found
+
+### Remove Variant Price in Specific Currency
+
+```plaintext
+DELETE /api/admin/variants/{variant_id}/prices/{currency_code}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 1,
+  "product_id": 1,
+  "sku": "PROD-001-RED",
+  "price": 25.0,
+  "currency": "USD",
+  "stock": 10,
+  "attributes": [
+    {
+      "name": "Color",
+      "value": "Red"
+    }
+  ],
+  "images": [],
+  "is_default": true,
+  "created_at": "2025-06-20T10:00:00Z",
+  "updated_at": "2025-06-20T10:30:00Z",
+  "prices": {
+    "USD": 25.0,
+    "EUR": 21.25
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Price removed successfully
+- `400 Bad Request`: Cannot remove default currency price
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Variant not found or price not set for this currency
+
+## Benefits of Multi-Currency Pricing
+
+### Precision and Accuracy
+
+- **No conversion errors**: Set exact prices in each currency to avoid floating-point precision issues
+- **Local pricing**: Set appropriate prices for each market without relying on exchange rate calculations
+- **Price consistency**: Ensure consistent pricing across all customer touchpoints
+
+### Checkout Integration
+
+- **Automatic price selection**: When customers checkout in a specific currency, the system automatically uses the exact price set for that currency
+- **Fallback conversion**: If no specific price is set for a currency, the system falls back to conversion from the default currency
+- **Currency parameter**: API clients can specify the desired checkout currency as a parameter
+
+### Example Use Case
+
+A product originally priced at 25.00 USD might be set to exactly:
+
+- 250.00 DKK (instead of 249.96 DKK from conversion)
+- 21.25 EUR (instead of 21.24 EUR from conversion)
+- 19.99 GBP (psychological pricing)
+
+This eliminates the reported issue where a 250 DKK product was showing as 249.89 DKK due to conversion precision problems.

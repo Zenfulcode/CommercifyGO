@@ -57,6 +57,7 @@ type CheckoutItemDTO struct {
 type AddToCheckoutRequest struct {
 	SKU      string `json:"sku"`
 	Quantity int    `json:"quantity"`
+	Currency string `json:"currency,omitempty"` // Optional currency for checkout creation/updates
 }
 
 // UpdateCheckoutItemRequest represents the data needed to update a checkout item

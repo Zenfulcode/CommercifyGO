@@ -275,16 +275,16 @@ func NewCheckoutUseCase(
 
 // GetOrCreateCheckout retrieves or creates a checkout for a user
 func (uc *CheckoutUseCase) GetOrCreateCheckout(sessionId string) (*entity.Checkout, error) {
-	// If not found, create a new one
-	checkout, err := entity.NewCheckout(sessionId)
+	// Get default currency
+	defaultCurrency, err := uc.currencyRepo.GetDefault()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get default currency: %w", err)
 	}
 
-	// Set default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err == nil && defaultCurrency != nil {
-		checkout.Currency = defaultCurrency.Code
+	// If not found, create a new one
+	checkout, err := entity.NewCheckout(sessionId, defaultCurrency.Code)
+	if err != nil {
+		return nil, err
 	}
 
 	// Save to repository
@@ -662,6 +662,11 @@ func (uc *CheckoutUseCase) UpdateCheckout(checkout *entity.Checkout) (*entity.Ch
 
 // GetOrCreateCheckoutBySessionID retrieves or creates a checkout using a session ID
 func (uc *CheckoutUseCase) GetOrCreateCheckoutBySessionID(sessionID string) (*entity.Checkout, error) {
+	return uc.GetOrCreateCheckoutBySessionIDWithCurrency(sessionID, "")
+}
+
+// GetOrCreateCheckoutBySessionIDWithCurrency retrieves or creates a checkout using a session ID with optional currency
+func (uc *CheckoutUseCase) GetOrCreateCheckoutBySessionIDWithCurrency(sessionID string, currency string) (*entity.Checkout, error) {
 	if sessionID == "" {
 		return nil, errors.New("session ID cannot be empty")
 	}
@@ -669,20 +674,37 @@ func (uc *CheckoutUseCase) GetOrCreateCheckoutBySessionID(sessionID string) (*en
 	// Try to get an existing active checkout
 	checkout, err := uc.checkoutRepo.GetBySessionID(sessionID)
 	if err == nil {
-		// If found, return it
+		// If found and currency is specified, change currency if different
+		if currency != "" && checkout.Currency != currency {
+			return uc.ChangeCurrency(checkout, currency)
+		}
 		return checkout, nil
 	}
 
 	// If not found, create a new one
-	checkout, err = entity.NewCheckout(sessionID)
-	if err != nil {
-		return nil, err
+	var checkoutCurrency string
+	if currency != "" {
+		// Validate the provided currency
+		targetCurrency, err := uc.currencyRepo.GetByCode(currency)
+		if err != nil {
+			return nil, fmt.Errorf("invalid currency %s: %w", currency, err)
+		}
+		if !targetCurrency.IsEnabled {
+			return nil, fmt.Errorf("currency %s is not enabled", currency)
+		}
+		checkoutCurrency = currency
+	} else {
+		// Get default currency
+		defaultCurrency, err := uc.currencyRepo.GetDefault()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default currency: %w", err)
+		}
+		checkoutCurrency = defaultCurrency.Code
 	}
 
-	// Set default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err == nil && defaultCurrency != nil {
-		checkout.Currency = defaultCurrency.Code
+	checkout, err = entity.NewCheckout(sessionID, checkoutCurrency)
+	if err != nil {
+		return nil, err
 	}
 
 	// Save to repository
@@ -748,12 +770,18 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		}
 	}
 
+	// Get the price in the checkout's currency
+	priceInCheckoutCurrency, err := uc.getPriceInCurrency(variant, checkout.Currency)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get price in checkout currency: %w", err)
+	}
+
 	// Populate input with variant details
 	input.ProductID = variant.ProductID
 	input.VariantID = variant.ID
 	input.ProductName = product.Name
 	input.VariantName = variantName
-	input.Price = variant.Price
+	input.Price = priceInCheckoutCurrency
 	input.Weight = product.Weight
 
 	// Add the item to the checkout
@@ -932,4 +960,32 @@ func (uc *CheckoutUseCase) ChangeCurrencyByUserID(userID uint, newCurrencyCode s
 	}
 
 	return uc.ChangeCurrency(checkout, newCurrencyCode)
+}
+
+// getPriceInCurrency gets the price of a variant in the specified currency
+func (uc *CheckoutUseCase) getPriceInCurrency(variant *entity.ProductVariant, targetCurrency string) (int64, error) {
+	// If the variant already has a price in the target currency, use it
+	if price, found := variant.GetPriceInCurrency(targetCurrency); found {
+		return price, nil
+	}
+
+	// If the variant's default currency matches the target, return the default price
+	if variant.CurrencyCode == targetCurrency {
+		return variant.Price, nil
+	}
+
+	// Convert from variant's currency to target currency
+	fromCurrency, err := uc.currencyRepo.GetByCode(variant.CurrencyCode)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get variant currency %s: %w", variant.CurrencyCode, err)
+	}
+
+	toCurrency, err := uc.currencyRepo.GetByCode(targetCurrency)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get target currency %s: %w", targetCurrency, err)
+	}
+
+	// Convert the price
+	convertedPrice := fromCurrency.ConvertAmount(variant.Price, toCurrency)
+	return convertedPrice, nil
 }

@@ -60,7 +60,17 @@ func (h *CheckoutHandler) GetCheckout(w http.ResponseWriter, r *http.Request) {
 	// Always get checkout session ID, needed for all checkouts
 	checkoutSessionID := h.getCheckoutSessionID(w, r)
 
-	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
+	// Check for optional currency parameter
+	currency := r.URL.Query().Get("currency")
+
+	var checkout *entity.Checkout
+	var err error
+
+	if currency != "" {
+		checkout, err = h.checkoutUseCase.GetOrCreateCheckoutBySessionIDWithCurrency(checkoutSessionID, currency)
+	} else {
+		checkout, err = h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
+	}
 
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
@@ -97,7 +107,14 @@ func (h *CheckoutHandler) AddToCheckout(w http.ResponseWriter, r *http.Request) 
 	fmt.Printf("Checkout session ID: %s\n", checkoutSessionID)
 
 	// Try to find checkout by checkout session ID first
-	checkout, err := h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
+	var checkout *entity.Checkout
+	var err error
+
+	if request.Currency != "" {
+		checkout, err = h.checkoutUseCase.GetOrCreateCheckoutBySessionIDWithCurrency(checkoutSessionID, request.Currency)
+	} else {
+		checkout, err = h.checkoutUseCase.GetOrCreateCheckoutBySessionID(checkoutSessionID)
+	}
 	if err != nil {
 		h.logger.Error("Failed to get checkout: %v", err)
 		response := dto.ErrorResponse(err.Error())
