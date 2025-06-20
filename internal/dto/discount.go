@@ -44,13 +44,13 @@ type CreateDiscountRequest struct {
 	Type             string    `json:"type"`
 	Method           string    `json:"method"`
 	Value            float64   `json:"value"`
-	MinOrderValue    float64   `json:"min_order_value"`
-	MaxDiscountValue float64   `json:"max_discount_value"`
+	MinOrderValue    float64   `json:"min_order_value,omitempty"`
+	MaxDiscountValue float64   `json:"max_discount_value,omitempty"`
 	ProductIDs       []uint    `json:"product_ids,omitempty"`
 	CategoryIDs      []uint    `json:"category_ids,omitempty"`
-	StartDate        time.Time `json:"start_date"`
-	EndDate          time.Time `json:"end_date"`
-	UsageLimit       int       `json:"usage_limit"`
+	StartDate        time.Time `json:"start_date,omitempty"`
+	EndDate          time.Time `json:"end_date,omitempty"`
+	UsageLimit       int       `json:"usage_limit,omitempty"`
 }
 
 // UpdateDiscountRequest represents the data needed to update a discount
@@ -88,6 +88,28 @@ type ValidateDiscountResponse struct {
 }
 
 func (r CreateDiscountRequest) ToUseCaseInput() usecase.CreateDiscountInput {
+	if r.MinOrderValue < 0 {
+		r.MinOrderValue = 0
+	}
+	if r.MaxDiscountValue < 0 {
+		r.MaxDiscountValue = 0
+	}
+	if r.UsageLimit < 0 {
+		r.UsageLimit = 0
+	}
+	if r.StartDate.IsZero() {
+		r.StartDate = time.Now().Local()
+	}
+	if r.EndDate.IsZero() {
+		r.EndDate = time.Now().Local().AddDate(1, 0, 0) // Default to 1 year from now
+	}
+	if r.ProductIDs == nil {
+		r.ProductIDs = []uint{}
+	}
+	if r.CategoryIDs == nil {
+		r.CategoryIDs = []uint{}
+	}
+
 	return usecase.CreateDiscountInput{
 		Code:             r.Code,
 		Type:             r.Type,
