@@ -25,12 +25,7 @@ func NewMockProductRepository() repository.ProductRepository {
 }
 
 // Count returns the number of products in the repository
-func (r *MockProductRepository) Count() (int, error) {
-	return len(r.products), nil
-}
-
-// CountSearch implements repository.ProductRepository.
-func (r *MockProductRepository) CountSearch(searchQuery string, categoryID uint, minPriceCents int64, maxPriceCents int64) (int, error) {
+func (r *MockProductRepository) Count(searchQuery, currency string, categoryID uint, minPriceCents, maxPriceCents int64, active bool) (int, error) {
 	return len(r.products), nil
 }
 
@@ -91,33 +86,9 @@ func (r *MockProductRepository) Delete(id uint) error {
 }
 
 // List retrieves products with pagination
-func (r *MockProductRepository) List(offset, limit int) ([]*entity.Product, error) {
+func (r *MockProductRepository) List(query, currency string, categoryID, offset, limit uint, minPrice, maxPrice int64, active bool) ([]*entity.Product, error) {
 	result := make([]*entity.Product, 0)
-	count := 0
-	skip := offset
-
-	for _, product := range r.products {
-		if skip > 0 {
-			skip--
-			continue
-		}
-
-		result = append(result, product)
-		count++
-
-		if count >= limit {
-			break
-		}
-	}
-
-	return result, nil
-}
-
-// Search searches for products based on criteria
-func (r *MockProductRepository) Search(query string, categoryID uint, minPrice, maxPrice int64, offset, limit int) ([]*entity.Product, error) {
-
-	result := make([]*entity.Product, 0)
-	count := 0
+	count := uint(0)
 	skip := offset
 
 	for _, product := range r.products {

@@ -104,10 +104,10 @@ func NewDiscount(
 
 // IsValid checks if the discount is valid for the current time and usage
 func (d *Discount) IsValid() bool {
-	now := time.Now()
+	now := time.Now().Local()
 	return d.Active &&
-		now.After(d.StartDate) &&
-		now.Before(d.EndDate) &&
+		now.After(d.StartDate.Local()) &&
+		now.Before(d.EndDate.Local()) &&
 		(d.UsageLimit == 0 || d.CurrentUsage < d.UsageLimit)
 }
 
@@ -154,30 +154,33 @@ func (d *Discount) CalculateDiscount(order *Order) int64 {
 
 	var discountAmount int64
 
-	if d.Type == DiscountTypeBasket {
+	switch d.Type {
+	case DiscountTypeBasket:
 		// Calculate discount for the entire order
-		if d.Method == DiscountMethodFixed {
+		switch d.Method {
+		case DiscountMethodFixed:
 			// For fixed amount method, the value is in dollars and needs to be converted to cents
 			// But since we updated the structure, the database will provide the value already in cents
 			discountAmount = money.ToCents(d.Value)
-		} else if d.Method == DiscountMethodPercentage {
+		case DiscountMethodPercentage:
 			// For percentage, apply the percentage to the total amount
 			discountAmount = money.ApplyPercentage(order.TotalAmount, d.Value)
 		}
-	} else if d.Type == DiscountTypeProduct {
+	case DiscountTypeProduct:
 		// Calculate discount for eligible products only
 		for _, item := range order.Items {
 			isEligible := slices.Contains(d.ProductIDs, item.ProductID)
 
 			if isEligible {
 				itemTotal := item.Subtotal
-				if d.Method == DiscountMethodFixed {
+				switch d.Method {
+				case DiscountMethodFixed:
 					// For fixed discount, apply once per item (not per quantity)
 					// This matches with the current implementation in ApplyDiscountToOrder
 					fixedDiscountInCents := money.ToCents(d.Value)
 					itemDiscount := min(fixedDiscountInCents, itemTotal)
 					discountAmount += itemDiscount
-				} else if d.Method == DiscountMethodPercentage {
+				case DiscountMethodPercentage:
 					// For percentage discount, apply percentage to item total
 					discountAmount += money.ApplyPercentage(itemTotal, d.Value)
 				}

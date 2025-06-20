@@ -300,7 +300,7 @@ func (uc *DiscountUseCase) ApplyDiscountToOrder(input ApplyDiscountToOrderInput,
 		// Then find products that belong to the specified categories
 		for _, categoryID := range discount.CategoryIDs {
 			// Get all products in this category
-			products, err := uc.productRepo.Search("", categoryID, 0, 0, 0, 1000)
+			products, err := uc.productRepo.List("", "", categoryID, 0, 1000, 0, 0, true)
 			if err == nil && len(products) > 0 {
 				// Add these products to our eligibility map
 				for _, product := range products {
@@ -316,11 +316,12 @@ func (uc *DiscountUseCase) ApplyDiscountToOrder(input ApplyDiscountToOrderInput,
 			if eligibleProducts[item.ProductID] {
 				itemTotal := int64(item.Quantity) * item.Price
 
-				if discount.Method == entity.DiscountMethodFixed {
+				switch discount.Method {
+				case entity.DiscountMethodFixed:
 					// Apply fixed discount per item
 					itemDiscount := min(money.ToCents(discount.Value), itemTotal)
 					discountAmount += itemDiscount
-				} else if discount.Method == entity.DiscountMethodPercentage {
+				case entity.DiscountMethodPercentage:
 					// Apply percentage discount to the item
 					// itemTotal * (discount.Value / 100)
 					itemDiscount := money.ApplyPercentage(itemTotal, discount.Value)

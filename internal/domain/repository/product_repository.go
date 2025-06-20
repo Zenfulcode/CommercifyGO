@@ -10,11 +10,8 @@ type ProductRepository interface {
 	GetByProductNumber(productNumber string) (*entity.Product, error)
 	Update(product *entity.Product) error
 	Delete(productID uint) error
-	List(offset, limit int) ([]*entity.Product, error)
-	// Search expects minPriceCents and maxPriceCents as int64 (cents)
-	Search(query string, categoryID uint, minPriceCents, maxPriceCents int64, offset, limit int) ([]*entity.Product, error)
-	Count() (int, error)
-	CountSearch(searchQuery string, categoryID uint, minPriceCents, maxPriceCents int64) (int, error)
+	List(query, currency string, categoryID, offset, limit uint, minPriceCents, maxPriceCents int64, active bool) ([]*entity.Product, error)
+	Count(searchQuery, currency string, categoryID uint, minPriceCents, maxPriceCents int64, active bool) (int, error)
 }
 
 // CategoryRepository defines the interface for category data access

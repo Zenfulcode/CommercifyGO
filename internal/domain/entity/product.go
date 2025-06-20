@@ -29,18 +29,9 @@ type Product struct {
 
 // NewProduct creates a new product with the given details (price in cents)
 // Note: This creates a product structure, but at least one variant must be added before saving
-func NewProduct(name, description string, price int64, currencyCode string, stock int, weight float64, categoryID uint, images []string) (*Product, error) {
+func NewProduct(name, description string, currencyCode string, categoryID uint, images []string) (*Product, error) {
 	if name == "" {
 		return nil, errors.New("product name cannot be empty")
-	}
-	if price <= 0 { // Check cents
-		return nil, errors.New("price must be greater than zero")
-	}
-	if stock < 0 {
-		return nil, errors.New("stock cannot be negative")
-	}
-	if weight < 0 {
-		return nil, errors.New("weight cannot be negative")
 	}
 
 	now := time.Now()
@@ -52,29 +43,33 @@ func NewProduct(name, description string, price int64, currencyCode string, stoc
 		Name:          name,
 		ProductNumber: productNumber,
 		Description:   description,
-		Price:         price, // Already in cents
+		Price:         0, // Already in cents
 		CurrencyCode:  currencyCode,
-		Stock:         stock,
-		Weight:        weight,
+		Stock:         0,
+		Weight:        0.0,
 		CategoryID:    categoryID,
 		Images:        images,
-		HasVariants:   true, // Always true now - all products have variants
-		Active:        true,
+		HasVariants:   false,
+		Active:        false,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}, nil
 }
 
-// UpdateStock updates the product's stock
-func (p *Product) UpdateStock(quantity int) error {
-	newStock := p.Stock + quantity
-	if newStock < 0 {
-		return errors.New("insufficient stock")
+func (p *Product) IsComplete() bool {
+	// A product is complete if it has a name, description, and at least one variant
+	if p.Name == "" || p.Description == "" || len(p.Variants) == 0 {
+		return false
 	}
 
-	p.Stock = newStock
-	p.UpdatedAt = time.Now()
-	return nil
+	// Ensure at least one variant has a SKU and price
+	for _, variant := range p.Variants {
+		if variant.SKU == "" || variant.Price <= 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // IsAvailable checks if the product is available in the requested quantity
@@ -100,7 +95,10 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 	// If this is the first variant and it's the default, set product price to match
 	if len(p.Variants) == 0 && variant.IsDefault {
 		p.Price = variant.Price
+		p.Stock = variant.Stock
 	}
+
+	variant.CurrencyCode = p.CurrencyCode
 
 	// Add variant to product
 	p.Variants = append(p.Variants, variant)
@@ -108,9 +106,30 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 	// Only set has_variants=true if there are now multiple variants
 	p.HasVariants = len(p.Variants) > 1
 
+	p.CalculateStock()
+
 	p.UpdatedAt = time.Now()
 
 	return nil
+}
+
+// RemoveVariant removes a variant from the product by its ID
+func (p *Product) RemoveVariant(variantID uint) error {
+	if len(p.Variants) == 0 {
+		return errors.New("no variants available to remove")
+	}
+
+	for i, variant := range p.Variants {
+		if variant.ID == variantID {
+			// Remove the variant from the slice
+			p.Variants = append(p.Variants[:i], p.Variants[i+1:]...)
+			p.CalculateStock()
+			p.UpdatedAt = time.Now()
+			return nil
+		}
+	}
+
+	return fmt.Errorf("variant with ID %d not found", variantID)
 }
 
 // GetDefaultVariant returns the default variant of the product
@@ -187,6 +206,28 @@ func (p *Product) GetPriceInCurrency(currencyCode string) (int64, bool) {
 	}
 
 	return p.Price, false
+}
+
+func (p *Product) GetStockForVariant(variantID uint) (int, error) {
+	if len(p.Variants) == 0 {
+		return 0, errors.New("no variants available for this product")
+	}
+
+	for _, variant := range p.Variants {
+		if variant.ID == variantID {
+			return variant.Stock, nil
+		}
+	}
+
+	return 0, fmt.Errorf("variant with ID %d not found", variantID)
+}
+
+func (p *Product) CalculateStock() {
+	totalStock := 0
+	for _, variant := range p.Variants {
+		totalStock += variant.Stock
+	}
+	p.Stock = totalStock
 }
 
 // Category represents a product category

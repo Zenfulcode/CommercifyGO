@@ -44,14 +44,14 @@ type CreateCurrencyRequest struct {
 	Symbol       string  `json:"symbol"`
 	ExchangeRate float64 `json:"exchange_rate"`
 	IsEnabled    bool    `json:"is_enabled"`
-	IsDefault    bool    `json:"is_default"`
+	IsDefault    bool    `json:"is_default,omitempty"`
 }
 
 // UpdateCurrencyRequest represents a request to update an existing currency
 type UpdateCurrencyRequest struct {
-	Name         string  `json:"name"`
-	Symbol       string  `json:"symbol"`
-	ExchangeRate float64 `json:"exchange_rate"`
+	Name         string  `json:"name,omitempty"`
+	Symbol       string  `json:"symbol,omitempty"`
+	ExchangeRate float64 `json:"exchange_rate,omitempty"`
 	IsEnabled    *bool   `json:"is_enabled,omitempty"`
 	IsDefault    *bool   `json:"is_default,omitempty"`
 }

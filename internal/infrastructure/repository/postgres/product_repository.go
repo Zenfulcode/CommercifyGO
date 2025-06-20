@@ -280,8 +280,8 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 	query := `
 			UPDATE products
 			SET name = $1, description = $2, price = $3, currency_code = $4, stock = $5, weight = $6, category_id = $7, 
-		    images = $8, has_variants = $9, updated_at = $10
-			WHERE id = $11
+		    images = $8, has_variants = $9, updated_at = $10, active = $11
+			WHERE id = $12
 			`
 
 	imagesJSON, err := json.Marshal(product.Images)
@@ -301,6 +301,7 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 		imagesJSON,
 		product.HasVariants,
 		time.Now(),
+		product.Active,
 		product.ID,
 	)
 	if err != nil {
@@ -352,16 +353,85 @@ func (r *ProductRepository) Delete(productID uint) error {
 }
 
 // List lists products with pagination
-func (r *ProductRepository) List(offset, limit int) ([]*entity.Product, error) {
-	query := `
-
-		SELECT id, product_number, name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at
-		FROM products
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
+func (r *ProductRepository) List(query, currency string, categoryID, offset, limit uint, minPriceCents, maxPriceCents int64, active bool) ([]*entity.Product, error) {
+	// Build dynamic query parts
+	searchQuery := `
+		SELECT 
+			p.id, p.product_number, p.name, p.description, 
+			COALESCE(pv.price, p.price) as price,
+			p.currency_code, p.stock, p.weight, p.category_id, p.images, p.has_variants, p.active, p.created_at, p.updated_at
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
 	`
+	queryParams := []interface{}{}
+	paramCounter := 1
 
-	rows, err := r.db.Query(query, limit, offset)
+	var whereAdded bool
+	if active {
+		searchQuery += " WHERE p.active = true"
+		whereAdded = true
+	}
+
+	if query != "" {
+		if whereAdded {
+			searchQuery += fmt.Sprintf(" AND (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
+		} else {
+			searchQuery += fmt.Sprintf(" WHERE (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, "%"+query+"%")
+		paramCounter++
+	}
+
+	if currency != "" {
+		if whereAdded {
+			searchQuery += fmt.Sprintf(" AND p.currency_code = $%d", paramCounter)
+		} else {
+			searchQuery += fmt.Sprintf(" WHERE p.currency_code = $%d", paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, currency)
+		paramCounter++
+	}
+
+	if categoryID > 0 {
+		if whereAdded {
+			searchQuery += fmt.Sprintf(" AND p.category_id = $%d", paramCounter)
+		} else {
+			searchQuery += fmt.Sprintf(" WHERE p.category_id = $%d", paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, categoryID)
+		paramCounter++
+	}
+
+	if minPriceCents > 0 {
+		if whereAdded {
+			searchQuery += fmt.Sprintf(" AND COALESCE(pv.price, p.price) >= $%d", paramCounter)
+		} else {
+			searchQuery += fmt.Sprintf(" WHERE COALESCE(pv.price, p.price) >= $%d", paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, minPriceCents) // Use cents
+		paramCounter++
+	}
+
+	if maxPriceCents > 0 {
+		if whereAdded {
+			searchQuery += fmt.Sprintf(" AND COALESCE(pv.price, p.price) <= $%d", paramCounter)
+		} else {
+			searchQuery += fmt.Sprintf(" WHERE COALESCE(pv.price, p.price) <= $%d", paramCounter)
+		}
+		queryParams = append(queryParams, maxPriceCents) // Use cents
+		paramCounter++
+	}
+
+	// Add pagination
+	searchQuery += " ORDER BY p.created_at DESC LIMIT $" + strconv.Itoa(paramCounter) + " OFFSET $" + strconv.Itoa(paramCounter+1)
+	queryParams = append(queryParams, limit, offset)
+
+	// Execute query
+	rows, err := r.db.Query(searchQuery, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -403,13 +473,6 @@ func (r *ProductRepository) List(offset, limit int) ([]*entity.Product, error) {
 			return nil, err
 		}
 
-		// Load currency-specific prices
-		prices, err := r.getProductPrices(product.ID)
-		if err != nil {
-			return nil, err
-		}
-		product.Prices = prices
-
 		products = append(products, product)
 	}
 
@@ -420,109 +483,67 @@ func (r *ProductRepository) List(offset, limit int) ([]*entity.Product, error) {
 	return products, nil
 }
 
-// Search searches for products based on criteria (prices in cents)
-func (r *ProductRepository) Search(query string, categoryID uint, minPriceCents, maxPriceCents int64, offset, limit int) ([]*entity.Product, error) {
-	// Build dynamic query parts
-	searchQuery := `
-		SELECT id, product_number, name, description, price, currency_code, stock, weight, category_id, images, has_variants, active, created_at, updated_at
-		FROM products
-		WHERE 1=1
+func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint, minPriceCents, maxPriceCents int64, active bool) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
 	`
-	queryParams := []interface{}{}
-	paramCounter := 1
 
-	if query != "" {
-		searchQuery += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", paramCounter, paramCounter)
-		queryParams = append(queryParams, "%"+query+"%")
+	queryParams := []any{}
+	paramCounter := 1
+	var whereAdded bool
+
+	if active {
+		query += " WHERE p.active = true"
+		whereAdded = true
+	}
+
+	if searchQuery != "" {
+		if whereAdded {
+			query += fmt.Sprintf(" AND (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
+		} else {
+			query += fmt.Sprintf(" WHERE (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, "%"+searchQuery+"%")
 		paramCounter++
 	}
 
 	if categoryID > 0 {
-		searchQuery += fmt.Sprintf(" AND category_id = $%d", paramCounter)
+		if whereAdded {
+			query += fmt.Sprintf(" AND p.category_id = $%d", paramCounter)
+		} else {
+			query += fmt.Sprintf(" WHERE p.category_id = $%d", paramCounter)
+			whereAdded = true
+		}
 		queryParams = append(queryParams, categoryID)
 		paramCounter++
 	}
 
 	if minPriceCents > 0 {
-		searchQuery += fmt.Sprintf(" AND price >= $%d", paramCounter)
-		queryParams = append(queryParams, minPriceCents) // Use cents
+		if whereAdded {
+			query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) >= $%d", paramCounter)
+		} else {
+			query += fmt.Sprintf(" WHERE COALESCE(pv.price, p.price) >= $%d", paramCounter)
+			whereAdded = true
+		}
+		queryParams = append(queryParams, minPriceCents)
 		paramCounter++
 	}
 
 	if maxPriceCents > 0 {
-		searchQuery += fmt.Sprintf(" AND price <= $%d", paramCounter)
-		queryParams = append(queryParams, maxPriceCents) // Use cents
+		if whereAdded {
+			query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) <= $%d", paramCounter)
+		} else {
+			query += fmt.Sprintf(" WHERE COALESCE(pv.price, p.price) <= $%d", paramCounter)
+		}
+		queryParams = append(queryParams, maxPriceCents)
 		paramCounter++
 	}
 
-	// Add pagination
-	searchQuery += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(paramCounter) + " OFFSET $" + strconv.Itoa(paramCounter+1)
-	queryParams = append(queryParams, limit, offset)
-
-	// Execute query
-	rows, err := r.db.Query(searchQuery, queryParams...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// Parse results
-	products := []*entity.Product{}
-	for rows.Next() {
-		var imagesJSON []byte
-		product := &entity.Product{}
-		var productNumber sql.NullString
-
-		err := rows.Scan(
-			&product.ID,
-			&productNumber,
-			&product.Name,
-			&product.Description,
-			&product.Price, // Reads int64 directly
-			&product.CurrencyCode,
-			&product.Stock,
-			&product.Weight,
-			&product.CategoryID,
-			&imagesJSON,
-			&product.HasVariants,
-			&product.Active,
-			&product.CreatedAt,
-			&product.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Set product number if valid
-		if productNumber.Valid {
-			product.ProductNumber = productNumber.String
-		}
-
-		// Unmarshal images JSON
-		if err := json.Unmarshal(imagesJSON, &product.Images); err != nil {
-			return nil, err
-		}
-
-		// Load currency-specific prices
-		prices, err := r.getProductPrices(product.ID)
-		if err != nil {
-			return nil, err
-		}
-		product.Prices = prices
-
-		products = append(products, product)
-	}
-
-	return products, nil
-}
-
-func (r *ProductRepository) Count() (int, error) {
-	query := `
-		SELECT COUNT(*) FROM products
-	`
-
 	var count int
-	err := r.db.QueryRow(query).Scan(&count)
+	err := r.db.QueryRow(query, queryParams...).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -531,33 +552,35 @@ func (r *ProductRepository) Count() (int, error) {
 
 func (r *ProductRepository) CountSearch(searchQuery string, categoryID uint, minPriceCents, maxPriceCents int64) (int, error) {
 	query := `
-		SELECT COUNT(*) FROM products
-		WHERE 1=1
+		SELECT COUNT(*) 
+		FROM products p
+		LEFT JOIN product_variants pv ON p.id = pv.product_id AND pv.is_default = true
+		WHERE p.active = true
 	`
 
 	queryParams := []any{}
 	paramCounter := 1
 
 	if searchQuery != "" {
-		query += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", paramCounter, paramCounter)
+		query += fmt.Sprintf(" AND (p.name ILIKE $%d OR p.description ILIKE $%d)", paramCounter, paramCounter)
 		queryParams = append(queryParams, "%"+searchQuery+"%")
 		paramCounter++
 	}
 
 	if categoryID > 0 {
-		query += fmt.Sprintf(" AND category_id = $%d", paramCounter)
+		query += fmt.Sprintf(" AND p.category_id = $%d", paramCounter)
 		queryParams = append(queryParams, categoryID)
 		paramCounter++
 	}
 
 	if minPriceCents > 0 {
-		query += fmt.Sprintf(" AND price >= $%d", paramCounter)
+		query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) >= $%d", paramCounter)
 		queryParams = append(queryParams, minPriceCents)
 		paramCounter++
 	}
 
 	if maxPriceCents > 0 {
-		query += fmt.Sprintf(" AND price <= $%d", paramCounter)
+		query += fmt.Sprintf(" AND COALESCE(pv.price, p.price) <= $%d", paramCounter)
 		queryParams = append(queryParams, maxPriceCents)
 		paramCounter++
 	}

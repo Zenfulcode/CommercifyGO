@@ -272,15 +272,15 @@ export interface CreateCurrencyRequest {
   symbol: string;
   exchange_rate: number /* float64 */;
   is_enabled: boolean;
-  is_default: boolean;
+  is_default?: boolean;
 }
 /**
  * UpdateCurrencyRequest represents a request to update an existing currency
  */
 export interface UpdateCurrencyRequest {
-  name: string;
-  symbol: string;
-  exchange_rate: number /* float64 */;
+  name?: string;
+  symbol?: string;
+  exchange_rate?: number /* float64 */;
   is_enabled?: boolean;
   is_default?: boolean;
 }
@@ -510,7 +510,7 @@ export interface OrderSearchRequest {
   payment_status?: string;
   start_date?: string;
   end_date?: string;
-  PaginationDTO: PaginationDTO;
+  pagination: PaginationDTO;
 }
 /**
  * ProcessPaymentRequest represents the data needed to process a payment
@@ -595,11 +595,10 @@ export interface VariantAttributeDTO {
 export interface CreateProductRequest {
   name: string;
   description: string;
-  price: number /* float64 */;
-  stock: number /* int */;
-  weight: number /* float64 */;
+  currency: string;
   category_id: number /* uint */;
   images: string[];
+  active: boolean;
   variants?: CreateVariantRequest[];
 }
 /**
@@ -607,7 +606,7 @@ export interface CreateProductRequest {
  */
 export interface CreateVariantRequest {
   sku: string;
-  price?: number /* float64 */;
+  price: number /* float64 */;
   stock: number /* int */;
   attributes: VariantAttributeDTO[];
   images?: string[];
@@ -619,9 +618,7 @@ export interface CreateVariantRequest {
 export interface UpdateProductRequest {
   name?: string;
   description?: string;
-  price?: number /* float64 */;
-  stock?: number /* int */;
-  weight?: number /* float64 */;
+  currency?: string;
   category_id?: number /* uint */;
   images?: string[];
   active?: boolean;

@@ -9,6 +9,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/auth"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 )
 
 // UserHandler handles user-related HTTP requests
@@ -183,12 +184,10 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 // GetProfile handles getting the user's profile
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(uint)
-	if !ok {
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Unauthorized",
-		}
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok || userID == 0 {
+		h.logger.Error("Unauthorized access attempt in CreateProduct")
+		response := dto.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -198,10 +197,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userUseCase.GetUserByID(userID)
 	if err != nil {
 		h.logger.Error("Failed to get user profile: %v", err)
-		response := dto.ResponseDTO[any]{
-			Success: false,
-			Error:   "Failed to get user profile",
-		}
+		response := dto.ErrorResponse("Failed to get user profile")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -219,12 +215,10 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: user.UpdatedAt,
 	}
 
-	response := dto.ResponseDTO[dto.UserDTO]{
-		Success: true,
-		Data:    userDTO,
-	}
+	response := dto.SuccessResponse(userDTO)
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
