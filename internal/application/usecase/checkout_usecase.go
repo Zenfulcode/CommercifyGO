@@ -85,14 +85,8 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New("order is already paid")
 	}
 
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default currency: %w", err)
-	}
-
 	// Validate payment provider supports the currency
-	availableProviders := uc.GetAvailablePaymentProvidersForCurrency(defaultCurrency.Code)
+	availableProviders := uc.GetAvailablePaymentProvidersForCurrency(order.Currency)
 	providerValid := false
 	for _, p := range availableProviders {
 		if p.Type == input.PaymentProvider && p.Enabled {
@@ -101,14 +95,14 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		}
 	}
 	if !providerValid {
-		return nil, fmt.Errorf("payment provider %s does not support currency %s", input.PaymentProvider, defaultCurrency.Code)
+		return nil, fmt.Errorf("payment provider %s does not support currency %s", input.PaymentProvider, order.Currency)
 	}
 
 	// Process payment
 	paymentResult, err := uc.paymentSvc.ProcessPayment(service.PaymentRequest{
 		OrderID:         order.ID,
 		Amount:          order.FinalAmount, // Use final amount (after discounts)
-		Currency:        defaultCurrency.Code,
+		Currency:        order.Currency,
 		PaymentMethod:   input.PaymentMethod,
 		PaymentProvider: input.PaymentProvider,
 		CardDetails:     input.CardDetails,
@@ -146,7 +140,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			order.FinalAmount,
-			defaultCurrency.Code,
+			order.Currency,
 			string(paymentResult.Provider),
 		)
 		if err != nil {
@@ -175,12 +169,12 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusFailed,
 			order.FinalAmount,
-			defaultCurrency.Code,
+			order.Currency,
 			string(paymentResult.Provider),
 		)
 		if err == nil {
 			txn.AddMetadata("payment_method", string(order.PaymentMethod))
-			txn.AddMetadata("error_message", paymentResult.ErrorMessage)
+			txn.AddMetadata("error_message", paymentResult.Message)
 
 			if err := uc.paymentTxnRepo.Create(txn); err != nil {
 				// Log error but don't fail the process
@@ -188,7 +182,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 			}
 		}
 
-		return nil, errors.New(paymentResult.ErrorMessage)
+		return nil, errors.New(paymentResult.Message)
 	}
 
 	// Update order with payment ID, provider, and status
@@ -217,7 +211,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		entity.TransactionTypeAuthorize,
 		entity.TransactionStatusSuccessful,
 		order.FinalAmount,
-		defaultCurrency.Code,
+		order.Currency,
 		string(paymentResult.Provider),
 	)
 	if err != nil {

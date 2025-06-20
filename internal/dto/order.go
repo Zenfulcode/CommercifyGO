@@ -175,7 +175,7 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		TotalAmount:      money.FromCents(order.TotalAmount),
 		FinalAmount:      money.FromCents(order.FinalAmount),
 		OrderLinesAmount: len(order.Items),
-		Currency:         order.Currency, // TODO: Assuming USD for simplicity, this should be dynamic
+		Currency:         order.Currency,
 		CreatedAt:        order.CreatedAt,
 		UpdatedAt:        order.UpdatedAt,
 	}

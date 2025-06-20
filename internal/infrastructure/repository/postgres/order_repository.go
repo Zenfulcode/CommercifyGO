@@ -58,9 +58,9 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 				user_id, total_amount, status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-				total_weight
+				total_weight, currency
 			)
-			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 			RETURNING id
 		`
 
@@ -84,6 +84,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingMethodID,
 			order.ShippingCost,
 			order.TotalWeight,
+			order.Currency,
 		).Scan(&order.ID)
 	} else {
 		// Regular user order
@@ -91,9 +92,10 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			INSERT INTO orders (
 				user_id, total_amount, status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
-				customer_email, customer_phone, customer_full_name, shipping_method_id, shipping_cost, total_weight
+				customer_email, customer_phone, customer_full_name, shipping_method_id, shipping_cost, total_weight,
+				currency
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 			RETURNING id
 		`
 
@@ -117,6 +119,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingMethodID,
 			order.ShippingCost,
 			order.TotalWeight,
+			order.Currency,
 		).Scan(&order.ID)
 	}
 
@@ -170,7 +173,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-			total_weight
+			total_weight, currency
 		FROM orders
 		WHERE id = $1
 	`
@@ -217,6 +220,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		&shippingMethodID,
 		&shippingCost,
 		&totalWeight,
+		&order.Currency,
 	)
 
 	if err == sql.ErrNoRows {
@@ -418,8 +422,8 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.Order, error) {
 	query := `
 		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
-			payment_id, payment_provider, created_at, updated_at, completed_at,
-			customer_email, customer_phone, customer_full_name, is_guest_order
+			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
+			customer_email, customer_phone, customer_full_name, is_guest_order, currency
 		FROM orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -461,6 +465,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 			&customerPhone,
 			&customerFullName,
 			&isGuestOrder,
+			&order.Currency,
 		)
 		if err != nil {
 			return nil, err
@@ -548,7 +553,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error) {
 	query := `
 		SELECT id, order_number, user_id, total_amount, status, created_at, updated_at, completed_at,
-			customer_email, customer_full_name, is_guest_order
+			customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
 		WHERE status = $1
 		ORDER BY created_at DESC
@@ -564,12 +569,10 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 	orders := []*entity.Order{}
 	for rows.Next() {
 		order := &entity.Order{}
-		var shippingAddrJSON, billingAddrJSON []byte
 		var completedAt sql.NullTime
-		var paymentProvider sql.NullString
 		var orderNumber sql.NullString
 		var userIDNull sql.NullInt64
-		var customerEmail, customerPhone, customerFullName sql.NullString
+		var customerEmail, customerFullName sql.NullString
 		var isGuestOrder sql.NullBool
 
 		err := rows.Scan(
@@ -578,18 +581,13 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 			&userIDNull,
 			&order.TotalAmount,
 			&order.Status,
-			&shippingAddrJSON,
-			&billingAddrJSON,
-			&order.PaymentID,
-			&paymentProvider,
-			&order.TrackingCode,
 			&order.CreatedAt,
 			&order.UpdatedAt,
 			&completedAt,
 			&customerEmail,
-			&customerPhone,
 			&customerFullName,
 			&isGuestOrder,
+			&order.Currency,
 		)
 		if err != nil {
 			return nil, err
@@ -607,7 +605,6 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 			order.IsGuestOrder = true
 			order.CustomerDetails = &entity.CustomerDetails{
 				Email:    customerEmail.String,
-				Phone:    customerPhone.String,
 				FullName: customerFullName.String,
 			}
 		}
@@ -617,55 +614,13 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 			order.OrderNumber = orderNumber.String
 		}
 
-		// Set payment provider if valid
-		if paymentProvider.Valid {
-			order.PaymentProvider = paymentProvider.String
-		}
-
-		// Unmarshal addresses
-		if err := json.Unmarshal(shippingAddrJSON, &order.ShippingAddr); err != nil {
-			return nil, err
-		}
-
-		if err := json.Unmarshal(billingAddrJSON, &order.BillingAddr); err != nil {
-			return nil, err
-		}
-
 		// Set completed at if valid
 		if completedAt.Valid {
 			order.CompletedAt = &completedAt.Time
 		}
 
-		// Get order items (simplified to avoid N+1 query issue in production)
-		itemsQuery := `
-			SELECT id, order_id, product_id, quantity, price, subtotal
-			FROM order_items
-			WHERE order_id = $1
-		`
-
-		itemRows, err := r.db.Query(itemsQuery, order.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		order.Items = []entity.OrderItem{}
-		for itemRows.Next() {
-			item := entity.OrderItem{}
-			err := itemRows.Scan(
-				&item.ID,
-				&item.OrderID,
-				&item.ProductID,
-				&item.Quantity,
-				&item.Price,
-				&item.Subtotal,
-			)
-			if err != nil {
-				itemRows.Close()
-				return nil, err
-			}
-			order.Items = append(order.Items, item)
-		}
-		itemRows.Close()
+		// Note: This simplified query doesn't load all order details
+		// For full order details, use GetByID method
 
 		orders = append(orders, order)
 	}
@@ -723,7 +678,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-			total_weight
+			total_weight, currency
 		FROM orders
 		WHERE payment_id = $1
 	`
@@ -770,6 +725,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 		&shippingMethodID,
 		&shippingCost,
 		&totalWeight,
+		&order.Currency,
 	)
 
 	if err == sql.ErrNoRows {
@@ -902,7 +858,7 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 	query := `
 		SELECT id, order_number, user_id, total_amount, status,
 			payment_provider, created_at, updated_at, completed_at,
-			final_amount, customer_email, customer_full_name, is_guest_order
+			final_amount, customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -928,7 +884,6 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 			&userID,
 			&order.TotalAmount,
 			&order.Status,
-			&order.PaymentID,
 			&order.PaymentProvider,
 			&order.CreatedAt,
 			&order.UpdatedAt,
@@ -937,6 +892,7 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 			&guestEmail,
 			&guestFullName,
 			&isGuestOrder,
+			&order.Currency,
 		)
 
 		if err != nil {

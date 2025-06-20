@@ -137,9 +137,9 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 	case service.PaymentMethodCreditCard:
 		if request.CardDetails == nil {
 			return &service.PaymentResult{
-				Success:      false,
-				ErrorMessage: "card details are required for credit card payment",
-				Provider:     service.PaymentProviderStripe,
+				Success:  false,
+				Message:  "card details are required for credit card payment",
+				Provider: service.PaymentProviderStripe,
 			}, nil
 		}
 		paymentMethodType = "card"
@@ -149,26 +149,26 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		if err != nil {
 			s.logger.Error("Failed to create payment method: %v", err)
 			return &service.PaymentResult{
-				Success:      false,
-				ErrorMessage: "failed to create payment method: " + err.Error(),
-				Provider:     service.PaymentProviderStripe,
+				Success:  false,
+				Message:  "failed to create payment method: " + err.Error(),
+				Provider: service.PaymentProviderStripe,
 			}, nil
 		}
 
 	default:
 		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "unsupported payment method for Stripe",
-			Provider:     service.PaymentProviderStripe,
+			Success:  false,
+			Message:  "unsupported payment method for Stripe",
+			Provider: service.PaymentProviderStripe,
 		}, nil
 	}
 
 	// If no payment method ID is provided, return an error
 	if paymentMethodID == "" {
 		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "payment method token is required",
-			Provider:     service.PaymentProviderStripe,
+			Success:  false,
+			Message:  "payment method token is required",
+			Provider: service.PaymentProviderStripe,
 		}, nil
 	}
 
@@ -219,9 +219,9 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 	if err != nil {
 		s.logger.Error("Failed to create Stripe payment intent: %v", err)
 		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "failed to process payment: " + err.Error(),
-			Provider:     service.PaymentProviderStripe,
+			Success:  false,
+			Message:  "failed to process payment: " + err.Error(),
+			Provider: service.PaymentProviderStripe,
 		}, nil
 	}
 
@@ -241,7 +241,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:        false,
 			TransactionID:  paymentIntent.ID,
-			ErrorMessage:   "payment requires additional action",
+			Message:        "payment requires additional action",
 			RequiresAction: true,
 			ActionURL:      paymentIntent.NextAction.RedirectToURL.URL,
 			Provider:       service.PaymentProviderStripe,
@@ -252,7 +252,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:       false,
 			TransactionID: paymentIntent.ID,
-			ErrorMessage:  fmt.Sprintf("payment status: %s", paymentIntent.Status),
+			Message:       fmt.Sprintf("payment status: %s", paymentIntent.Status),
 			Provider:      service.PaymentProviderStripe,
 		}, nil
 	}
@@ -283,41 +283,47 @@ func (s *StripePaymentService) VerifyPayment(transactionID string, provider serv
 }
 
 // RefundPayment refunds a payment
-func (s *StripePaymentService) RefundPayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *StripePaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 	if amount <= 0 {
-		return errors.New("refund amount must be greater than zero")
+		return nil, errors.New("refund amount must be greater than zero")
 	}
 
 	// Create refund params
 	params := &stripe.RefundParams{
 		PaymentIntent: stripe.String(transactionID),
 		Amount:        stripe.Int64(amount),
+		Currency:      stripe.String(currency),
 	}
 
 	// Process the refund
 	refundResult, err := refund.New(params)
 	if err != nil {
 		s.logger.Error("Failed to process Stripe refund: %v", err)
-		return fmt.Errorf("failed to process refund: %w", err)
+		return nil, fmt.Errorf("failed to process refund: %w", err)
 	}
 
 	if refundResult.Status != stripe.RefundStatusSucceeded {
 		s.logger.Warn("Refund created with status %s", refundResult.Status)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:       refundResult.Status == stripe.RefundStatusSucceeded,
+		TransactionID: refundResult.ID,
+		Message:       fmt.Sprintf("refund status: %s", refundResult.Status),
+		Provider:      service.PaymentProviderStripe,
+	}, nil
 }
 
 // CapturePayment captures a payment
-func (s *StripePaymentService) CapturePayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *StripePaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 	if amount <= 0 {
-		return errors.New("capture amount must be greater than zero")
+		return nil, errors.New("capture amount must be greater than zero")
 	}
 
 	// Create capture params
@@ -329,20 +335,25 @@ func (s *StripePaymentService) CapturePayment(transactionID string, amount int64
 	captureResult, err := paymentintent.Capture(transactionID, params)
 	if err != nil {
 		s.logger.Error("Failed to capture Stripe payment: %v", err)
-		return fmt.Errorf("failed to capture payment: %w", err)
+		return nil, fmt.Errorf("failed to capture payment: %w", err)
 	}
 
 	if captureResult.Status != stripe.PaymentIntentStatusSucceeded {
-		return fmt.Errorf("capture resulted in unexpected status: %s", captureResult.Status)
+		return nil, fmt.Errorf("capture resulted in unexpected status: %s", captureResult.Status)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:       true,
+		TransactionID: captureResult.ID,
+		Message:       "payment captured successfully",
+		Provider:      service.PaymentProviderStripe,
+	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *StripePaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) error {
+func (s *StripePaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 
 	// Create cancel params
@@ -352,14 +363,19 @@ func (s *StripePaymentService) CancelPayment(transactionID string, provider serv
 	cancelResult, err := paymentintent.Cancel(transactionID, params)
 	if err != nil {
 		s.logger.Error("Failed to cancel Stripe payment: %v", err)
-		return fmt.Errorf("failed to cancel payment: %w", err)
+		return nil, fmt.Errorf("failed to cancel payment: %w", err)
 	}
 
 	if cancelResult.Status != stripe.PaymentIntentStatusCanceled {
-		return fmt.Errorf("cancel resulted in unexpected status: %s", cancelResult.Status)
+		return nil, fmt.Errorf("cancel resulted in unexpected status: %s", cancelResult.Status)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:       true,
+		TransactionID: cancelResult.ID,
+		Message:       "payment canceled successfully",
+		Provider:      service.PaymentProviderStripe,
+	}, nil
 }
 
 func (s *StripePaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {

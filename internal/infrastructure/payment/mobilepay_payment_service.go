@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/client"
 	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
@@ -64,11 +65,8 @@ func (s *MobilePayPaymentService) GetAvailableProvidersForCurrency(currency stri
 	var supportedProviders []service.PaymentProvider
 
 	for _, provider := range providers {
-		for _, supportedCurrency := range provider.SupportedCurrencies {
-			if supportedCurrency == currency {
-				supportedProviders = append(supportedProviders, provider)
-				break
-			}
+		if slices.Contains(provider.SupportedCurrencies, currency) {
+			supportedProviders = append(supportedProviders, provider)
 		}
 	}
 
@@ -77,21 +75,12 @@ func (s *MobilePayPaymentService) GetAvailableProvidersForCurrency(currency stri
 
 // ProcessPayment processes a payment request using MobilePay
 func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest) (*service.PaymentResult, error) {
-	// Only wallet payment method is supported for MobilePay
-	if request.PaymentMethod != service.PaymentMethodWallet {
-		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "unsupported payment method for MobilePay, only wallet is supported",
-			Provider:     service.PaymentProviderMobilePay,
-		}, nil
+	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, request.Currency) {
+		return nil, fmt.Errorf("currency %s is not supported by MobilePay", request.Currency)
 	}
 
 	if request.PhoneNumber == "" {
-		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "phone number is required for MobilePay payments",
-			Provider:     service.PaymentProviderMobilePay,
-		}, nil
+		return nil, errors.New("phone number is required for MobilePay payments")
 	}
 
 	phoneNumber := request.PhoneNumber
@@ -99,27 +88,16 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 	r := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
 
 	if !r.MatchString(phoneNumber) {
-		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "invalid phone number format, must be in international format",
-			Provider:     service.PaymentProviderMobilePay,
-		}, nil
+		return nil, fmt.Errorf("invalid phone number format: %s", phoneNumber)
 	}
 
 	// Generate a unique reference for this payment
 	reference := fmt.Sprintf("order-%d-%s", request.OrderID, uuid.New().String())
 
-	// MobilePay only supports specific currencies (NOK, DKK, EUR)
-	// Use the configured market currency instead of the request currency
-	mobilePayCurrency := s.config.Market
-	if mobilePayCurrency == "" {
-		mobilePayCurrency = "NOK" // Default to NOK if not configured
-	}
-
 	// Construct the payment request
 	paymentRequest := models.CreatePaymentRequest{
 		Amount: models.Amount{
-			Currency: mobilePayCurrency,
+			Currency: request.Currency,
 			Value:    int(request.Amount),
 		},
 		Customer: &models.Customer{
@@ -136,11 +114,7 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 
 	res, err := s.epayment.Create(paymentRequest)
 	if err != nil {
-		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: fmt.Sprintf("failed to create payment: %v", err),
-			Provider:     service.PaymentProviderMobilePay,
-		}, nil
+		return nil, fmt.Errorf("failed to create MobilePay payment: %v", err)
 	}
 
 	// MobilePay requires a redirect to complete the payment
@@ -148,7 +122,7 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 	return &service.PaymentResult{
 		Success:        false,
 		TransactionID:  res.Reference,
-		ErrorMessage:   "payment requires user action",
+		Message:        "payment requires user action",
 		RequiresAction: true,
 		ActionURL:      res.RedirectURL,
 		Provider:       service.PaymentProviderMobilePay,
@@ -175,87 +149,102 @@ func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider s
 }
 
 // RefundPayment refunds a payment
-func (s *MobilePayPaymentService) RefundPayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if provider != service.PaymentProviderMobilePay {
-		return errors.New("invalid payment provider")
+		return nil, errors.New("invalid payment provider")
 	}
 
-	// MobilePay only supports specific currencies (NOK, DKK, EUR)
-	// Use the configured market currency
-	mobilePayCurrency := s.config.Market
-	if mobilePayCurrency == "" {
-		mobilePayCurrency = "NOK" // Default to NOK if not configured
+	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, currency) {
+		return nil, fmt.Errorf("currency %s is not supported by MobilePay", currency)
 	}
 
 	// Prepare refund request
 	refundRequest := models.ModificationRequest{
 		ModificationAmount: models.Amount{
-			Currency: mobilePayCurrency,
+			Currency: currency,
 			Value:    int(amount),
 		},
 	}
 
-	_, err := s.epayment.Refund(transactionID, refundRequest)
+	result, err := s.epayment.Refund(transactionID, refundRequest)
 
 	if err != nil {
-		return fmt.Errorf("failed to refund payment: %v", err)
+		return nil, fmt.Errorf("failed to refund payment: %v", err)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:        true,
+		TransactionID:  result.Reference,
+		Message:        "payment refunded successfully",
+		RequiresAction: false,
+		ActionURL:      "", // No action URL needed for refunds
+		Provider:       service.PaymentProviderMobilePay,
+	}, nil
 }
 
 // CapturePayment captures an authorized payment
-func (s *MobilePayPaymentService) CapturePayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if provider != service.PaymentProviderMobilePay {
-		return errors.New("invalid payment provider")
+		return nil, errors.New("invalid payment provider")
 	}
 
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 
-	// MobilePay only supports specific currencies (NOK, DKK, EUR)
-	// Use the configured market currency
-	mobilePayCurrency := s.config.Market
-	if mobilePayCurrency == "" {
-		mobilePayCurrency = "NOK" // Default to NOK if not configured
+	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, currency) {
+		return nil, fmt.Errorf("currency %s is not supported by MobilePay", currency)
 	}
 
 	// Prepare capture request
 	captureRequest := models.ModificationRequest{
 		ModificationAmount: models.Amount{
-			Currency: mobilePayCurrency,
+			Currency: currency,
 			Value:    int(amount),
 		},
 	}
 
-	_, err := s.epayment.Capture(transactionID, captureRequest)
+	result, err := s.epayment.Capture(transactionID, captureRequest)
 	if err != nil {
-		return fmt.Errorf("failed to capture payment: %v", err)
+		return nil, fmt.Errorf("failed to capture payment: %v", err)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:        true,
+		TransactionID:  result.Reference,
+		Message:        "payment captured successfully",
+		RequiresAction: false,
+		ActionURL:      "", // No action URL needed for captures
+		Provider:       service.PaymentProviderMobilePay,
+	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) error {
+func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if provider != service.PaymentProviderMobilePay {
-		return errors.New("invalid payment provider")
+		return nil, errors.New("invalid payment provider")
 	}
 
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 
-	_, err := s.epayment.Cancel(transactionID, &models.CancelModificationRequest{
+	result, err := s.epayment.Cancel(transactionID, &models.CancelModificationRequest{
 		CancelTransactionOnly: false,
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to cancel payment: %v", err)
+		return nil, fmt.Errorf("failed to cancel payment: %v", err)
 	}
 
-	return nil
+	return &service.PaymentResult{
+		Success:        true,
+		TransactionID:  result.Reference,
+		Message:        "payment cancelled successfully",
+		RequiresAction: false,
+		ActionURL:      "", // No action URL needed for cancellations
+		Provider:       service.PaymentProviderMobilePay,
+	}, nil
 }
 
 func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {

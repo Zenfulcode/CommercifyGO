@@ -124,30 +124,30 @@ func (s *MultiProviderPaymentService) VerifyPayment(transactionID string, provid
 }
 
 // RefundPayment refunds a payment
-func (s *MultiProviderPaymentService) RefundPayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MultiProviderPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	paymentProvider, exists := s.providers[provider]
 	if !exists {
-		return fmt.Errorf("payment provider %s not available", provider)
+		return nil, fmt.Errorf("payment provider %s not available", provider)
 	}
 
-	return paymentProvider.RefundPayment(transactionID, amount, provider)
+	return paymentProvider.RefundPayment(transactionID, currency, amount, provider)
 }
 
 // CapturePayment captures a payment
-func (s *MultiProviderPaymentService) CapturePayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MultiProviderPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	paymentProvider, exists := s.providers[provider]
 	if !exists {
-		return fmt.Errorf("payment provider %s not available", provider)
+		return nil, fmt.Errorf("payment provider %s not available", provider)
 	}
 
-	return paymentProvider.CapturePayment(transactionID, amount, provider)
+	return paymentProvider.CapturePayment(transactionID, currency, amount, provider)
 }
 
 // CancelPayment cancels a payment
-func (s *MultiProviderPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) error {
+func (s *MultiProviderPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	paymentProvider, exists := s.providers[provider]
 	if !exists {
-		return fmt.Errorf("payment provider %s not available", provider)
+		return nil, fmt.Errorf("payment provider %s not available", provider)
 	}
 
 	return paymentProvider.CancelPayment(transactionID, provider)

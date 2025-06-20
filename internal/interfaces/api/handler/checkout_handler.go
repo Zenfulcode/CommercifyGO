@@ -621,9 +621,6 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 
 	h.logger.Info("Converting checkout to order. CheckoutSessionID: %s", checkoutSessionID)
 
-	var order *entity.Order
-	var err error
-
 	// Try to find checkout by checkout session ID first
 	checkout, err := h.checkoutUseCase.GetCheckoutBySessionID(checkoutSessionID)
 	if err != nil {
@@ -650,7 +647,7 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// If checkout exists for this session, convert it to order
-	order, err = h.checkoutUseCase.CreateOrderFromCheckout(checkout.ID)
+	order, err := h.checkoutUseCase.CreateOrderFromCheckout(checkout.ID)
 	if err != nil {
 		h.logger.Error("Failed to convert checkout to order: %v", err)
 		response := dto.ErrorResponse(err.Error())

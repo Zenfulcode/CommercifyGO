@@ -404,6 +404,7 @@ func (c *Checkout) ToOrder() *Order {
 	order := &Order{
 		UserID:            c.UserID, // This will be 0 for guest orders
 		Items:             items,
+		Currency:          c.Currency,
 		TotalAmount:       c.TotalAmount,
 		TotalWeight:       c.TotalWeight,
 		ShippingCost:      c.ShippingCost,
