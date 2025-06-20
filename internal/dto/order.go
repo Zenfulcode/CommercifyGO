@@ -15,8 +15,9 @@ type OrderDTO struct {
 	OrderNumber     string             `json:"order_number"`
 	Items           []OrderItemDTO     `json:"items"`
 	Status          OrderStatus        `json:"status"`
-	TotalAmount     float64            `json:"total_amount"`
-	FinalAmount     float64            `json:"final_amount"`
+	TotalAmount     float64            `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost    float64            `json:"shipping_cost"` // Shipping cost
+	FinalAmount     float64            `json:"final_amount"`  // Total including shipping and discounts
 	Currency        string             `json:"currency"`
 	ShippingAddress AddressDTO         `json:"shipping_address"`
 	BillingAddress  AddressDTO         `json:"billing_address"`
@@ -34,8 +35,9 @@ type OrderSummaryDTO struct {
 	OrderNumber      string      `json:"order_number"`
 	UserID           uint        `json:"user_id"`
 	Status           OrderStatus `json:"status"`
-	TotalAmount      float64     `json:"total_amount"`
-	FinalAmount      float64     `json:"final_amount"`
+	TotalAmount      float64     `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64     `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64     `json:"final_amount"`  // Total including shipping and discounts
 	OrderLinesAmount int         `json:"order_lines_amount"`
 	Currency         string      `json:"currency"`
 	CreatedAt        time.Time   `json:"created_at"`
@@ -173,6 +175,7 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		UserID:           order.UserID,
 		Status:           OrderStatus(order.Status),
 		TotalAmount:      money.FromCents(order.TotalAmount),
+		ShippingCost:     money.FromCents(order.ShippingCost),
 		FinalAmount:      money.FromCents(order.FinalAmount),
 		OrderLinesAmount: len(order.Items),
 		Currency:         order.Currency,
@@ -260,6 +263,7 @@ func toOrderDTO(order *entity.Order) OrderDTO {
 		UserID:          order.UserID,
 		Status:          OrderStatus(order.Status),
 		TotalAmount:     money.FromCents(order.TotalAmount),
+		ShippingCost:    money.FromCents(order.ShippingCost),
 		FinalAmount:     money.FromCents(order.FinalAmount),
 		Currency:        order.Currency,
 		Items:           items,
