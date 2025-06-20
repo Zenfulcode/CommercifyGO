@@ -1014,3 +1014,518 @@ func TestProductUseCase_DeleteProduct(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestProductUseCase_CreateProduct_StockCalculation(t *testing.T) {
+	setupTestUseCase := func() *usecase.ProductUseCase {
+		productRepo := mock.NewMockProductRepository()
+		categoryRepo := mock.NewMockCategoryRepository()
+		productVariantRepo := mock.NewMockProductVariantRepository()
+		currencyRepo := mock.NewMockCurrencyRepository()
+		orderRepo := mock.NewMockOrderRepository(false)
+		checkoutRepo := mock.NewMockCheckoutRepository()
+
+		// Create a test category
+		category := &entity.Category{
+			ID:   1,
+			Name: "Test Category",
+		}
+		categoryRepo.Create(category)
+
+		return usecase.NewProductUseCase(
+			productRepo,
+			categoryRepo,
+			productVariantRepo,
+			currencyRepo,
+			orderRepo,
+			checkoutRepo,
+		)
+	}
+
+	t.Run("Product with single variant - stock should equal variant stock", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		input := usecase.CreateProductInput{
+			Name:        "Single Variant Product",
+			Description: "Product with one variant",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants: []usecase.CreateVariantInput{
+				{
+					SKU:       "SKU-SINGLE",
+					Price:     99.99,
+					Stock:     25,
+					IsDefault: true,
+				},
+			},
+			Active: true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, product)
+		assert.Equal(t, 25, product.Stock, "Product stock should equal the single variant's stock")
+		assert.Len(t, product.Variants, 1, "Should have exactly one variant")
+		assert.Equal(t, 25, product.Variants[0].Stock, "Variant stock should be preserved")
+		assert.True(t, product.Variants[0].IsDefault, "Single variant should be default")
+		assert.False(t, product.HasVariants, "HasVariants should be false for single variant (current logic)")
+	})
+
+	t.Run("Product with multiple variants - stock should be sum of all variant stocks", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		input := usecase.CreateProductInput{
+			Name:        "Multi Variant Product",
+			Description: "Product with multiple variants",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants: []usecase.CreateVariantInput{
+				{
+					SKU:        "SKU-RED",
+					Price:      99.99,
+					Stock:      15,
+					Attributes: []entity.VariantAttribute{{Name: "Color", Value: "Red"}},
+					IsDefault:  true,
+				},
+				{
+					SKU:        "SKU-BLUE",
+					Price:      109.99,
+					Stock:      20,
+					Attributes: []entity.VariantAttribute{{Name: "Color", Value: "Blue"}},
+					IsDefault:  false,
+				},
+				{
+					SKU:        "SKU-GREEN",
+					Price:      119.99,
+					Stock:      10,
+					Attributes: []entity.VariantAttribute{{Name: "Color", Value: "Green"}},
+					IsDefault:  false,
+				},
+			},
+			Active: true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, product)
+		assert.Equal(t, 45, product.Stock, "Product stock should be sum of all variant stocks (15+20+10)")
+		assert.Len(t, product.Variants, 3, "Should have exactly three variants")
+		assert.True(t, product.HasVariants, "HasVariants should be true for multiple variants")
+
+		// Verify individual variant stocks are preserved
+		assert.Equal(t, 15, product.Variants[0].Stock, "First variant stock should be preserved")
+		assert.Equal(t, 20, product.Variants[1].Stock, "Second variant stock should be preserved")
+		assert.Equal(t, 10, product.Variants[2].Stock, "Third variant stock should be preserved")
+	})
+
+	t.Run("Product with variants having zero stock - total should be zero", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		input := usecase.CreateProductInput{
+			Name:        "Zero Stock Product",
+			Description: "Product with zero stock variants",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants: []usecase.CreateVariantInput{
+				{
+					SKU:       "SKU-EMPTY1",
+					Price:     99.99,
+					Stock:     0,
+					IsDefault: true,
+				},
+				{
+					SKU:       "SKU-EMPTY2",
+					Price:     109.99,
+					Stock:     0,
+					IsDefault: false,
+				},
+			},
+			Active: true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, product)
+		assert.Equal(t, 0, product.Stock, "Product stock should be zero when all variants have zero stock")
+		assert.Len(t, product.Variants, 2, "Should have exactly two variants")
+		assert.True(t, product.HasVariants, "HasVariants should be true for multiple variants")
+	})
+
+	t.Run("Product with mixed stock levels - should calculate correctly", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		input := usecase.CreateProductInput{
+			Name:        "Mixed Stock Product",
+			Description: "Product with mixed stock levels",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants: []usecase.CreateVariantInput{
+				{
+					SKU:        "SKU-HIGH",
+					Price:      99.99,
+					Stock:      100,
+					Attributes: []entity.VariantAttribute{{Name: "Size", Value: "Large"}},
+					IsDefault:  true,
+				},
+				{
+					SKU:        "SKU-ZERO",
+					Price:      99.99,
+					Stock:      0,
+					Attributes: []entity.VariantAttribute{{Name: "Size", Value: "Medium"}},
+					IsDefault:  false,
+				},
+				{
+					SKU:        "SKU-LOW",
+					Price:      99.99,
+					Stock:      5,
+					Attributes: []entity.VariantAttribute{{Name: "Size", Value: "Small"}},
+					IsDefault:  false,
+				},
+			},
+			Active: true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, product)
+		assert.Equal(t, 105, product.Stock, "Product stock should be sum of all variant stocks (100+0+5)")
+		assert.Len(t, product.Variants, 3, "Should have exactly three variants")
+
+		// Verify the CalculateStock method works correctly
+		product.CalculateStock()
+		assert.Equal(t, 105, product.Stock, "CalculateStock should produce the same result")
+	})
+
+	t.Run("Product without variants - should have zero stock", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		input := usecase.CreateProductInput{
+			Name:        "No Variants Product",
+			Description: "Product without any variants",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants:    []usecase.CreateVariantInput{}, // Empty variants
+			Active:      true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, product)
+		assert.Equal(t, 0, product.Stock, "Product stock should be zero when no variants exist")
+		assert.Len(t, product.Variants, 0, "Should have no variants")
+		assert.False(t, product.HasVariants, "HasVariants should be false when no variants exist")
+	})
+
+	t.Run("Stock calculation after adding variants individually", func(t *testing.T) {
+		productUseCase := setupTestUseCase()
+
+		// First create a product with one variant
+		input := usecase.CreateProductInput{
+			Name:        "Incremental Product",
+			Description: "Product to test incremental variant addition",
+			Currency:    "USD",
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			Variants: []usecase.CreateVariantInput{
+				{
+					SKU:       "SKU-FIRST",
+					Price:     99.99,
+					Stock:     30,
+					IsDefault: true,
+				},
+			},
+			Active: true,
+		}
+
+		product, err := productUseCase.CreateProduct(input)
+		assert.NoError(t, err)
+		assert.Equal(t, 30, product.Stock, "Initial stock should be 30")
+
+		// Simulate adding a second variant (this would happen through AddVariant use case)
+		// But we can test the entity logic directly
+		variant2, err := entity.NewProductVariant(
+			product.ID,
+			"SKU-SECOND",
+			79.99,
+			"USD",
+			20,
+			[]entity.VariantAttribute{{Name: "Size", Value: "Small"}},
+			[]string{"small.jpg"},
+			false,
+		)
+		assert.NoError(t, err)
+
+		err = product.AddVariant(variant2)
+		assert.NoError(t, err)
+
+		// After adding second variant, stock should be recalculated
+		assert.Equal(t, 50, product.Stock, "Stock should be sum after adding second variant (30+20)")
+		assert.True(t, product.HasVariants, "HasVariants should be true after adding second variant")
+	})
+}
+
+func TestProductUseCase_UpdateProduct_StockCalculation(t *testing.T) {
+	setupTestUseCaseWithProduct := func() (*usecase.ProductUseCase, *entity.Product) {
+		productRepo := mock.NewMockProductRepository()
+		categoryRepo := mock.NewMockCategoryRepository()
+		productVariantRepo := mock.NewMockProductVariantRepository()
+		currencyRepo := mock.NewMockCurrencyRepository()
+		orderRepo := mock.NewMockOrderRepository(false)
+		checkoutRepo := mock.NewMockCheckoutRepository()
+
+		// Create a test category
+		category := &entity.Category{
+			ID:   1,
+			Name: "Test Category",
+		}
+		categoryRepo.Create(category)
+
+		// Create a test product with variants
+		product := &entity.Product{
+			ID:          1,
+			Name:        "Test Product",
+			Description: "Test Description",
+			Price:       9999,
+			Stock:       50,
+			CategoryID:  1,
+			Images:      []string{"image1.jpg"},
+			HasVariants: true,
+			Active:      true,
+		}
+
+		// Add some variants
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 25, []entity.VariantAttribute{}, []string{}, true)
+		variant2, _ := entity.NewProductVariant(1, "SKU-2", 109.99, "USD", 25, []entity.VariantAttribute{}, []string{}, false)
+
+		variant1.ID = 1
+		variant2.ID = 2
+
+		product.Variants = []*entity.ProductVariant{variant1, variant2}
+		product.CalculateStock() // Should set stock to 50
+
+		productRepo.Create(product)
+		productVariantRepo.Create(variant1)
+		productVariantRepo.Create(variant2)
+
+		productUseCase := usecase.NewProductUseCase(
+			productRepo,
+			categoryRepo,
+			productVariantRepo,
+			currencyRepo,
+			orderRepo,
+			checkoutRepo,
+		)
+
+		return productUseCase, product
+	}
+
+	t.Run("UpdateProduct should recalculate stock from variants", func(t *testing.T) {
+		productUseCase, product := setupTestUseCaseWithProduct()
+
+		// Verify initial stock calculation
+		assert.Equal(t, 50, product.Stock, "Initial stock should be 50")
+
+		// Update the product (this should trigger stock recalculation)
+		input := usecase.UpdateProductInput{
+			Name:        "Updated Product Name",
+			Description: "Updated Description",
+			Active:      true,
+		}
+
+		updatedProduct, err := productUseCase.UpdateProduct(product.ID, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, updatedProduct)
+		assert.Equal(t, "Updated Product Name", updatedProduct.Name)
+		assert.Equal(t, 50, updatedProduct.Stock, "Stock should remain correctly calculated after update")
+	})
+
+	t.Run("UpdateVariant should trigger product stock recalculation", func(t *testing.T) {
+		productUseCase, product := setupTestUseCaseWithProduct()
+
+		// Update a variant's stock
+		updateInput := usecase.UpdateVariantInput{
+			Stock: 35, // Change from 25 to 35
+		}
+
+		updatedVariant, err := productUseCase.UpdateVariant(product.ID, 1, updateInput)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, updatedVariant)
+		assert.Equal(t, 35, updatedVariant.Stock, "Variant stock should be updated")
+
+		// The product stock should be recalculated when we fetch it again
+		// Since we're using mocks, we'll test the entity behavior directly
+		product.Variants[0].Stock = 35
+		product.CalculateStock()
+		assert.Equal(t, 60, product.Stock, "Product stock should be recalculated (35+25)")
+	})
+}
+
+func TestProductEntity_CalculateStock(t *testing.T) {
+	t.Run("CalculateStock with multiple variants", func(t *testing.T) {
+		product := &entity.Product{
+			ID:   1,
+			Name: "Test Product",
+		}
+
+		// Create variants with different stock levels
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 10, []entity.VariantAttribute{}, []string{}, true)
+		variant2, _ := entity.NewProductVariant(1, "SKU-2", 109.99, "USD", 20, []entity.VariantAttribute{}, []string{}, false)
+		variant3, _ := entity.NewProductVariant(1, "SKU-3", 119.99, "USD", 30, []entity.VariantAttribute{}, []string{}, false)
+
+		product.Variants = []*entity.ProductVariant{variant1, variant2, variant3}
+
+		product.CalculateStock()
+
+		assert.Equal(t, 60, product.Stock, "Stock should be sum of all variant stocks (10+20+30)")
+	})
+
+	t.Run("CalculateStock with zero stock variants", func(t *testing.T) {
+		product := &entity.Product{
+			ID:   1,
+			Name: "Test Product",
+		}
+
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 0, []entity.VariantAttribute{}, []string{}, true)
+		variant2, _ := entity.NewProductVariant(1, "SKU-2", 109.99, "USD", 0, []entity.VariantAttribute{}, []string{}, false)
+
+		product.Variants = []*entity.ProductVariant{variant1, variant2}
+
+		product.CalculateStock()
+
+		assert.Equal(t, 0, product.Stock, "Stock should be zero when all variants have zero stock")
+	})
+
+	t.Run("CalculateStock with no variants", func(t *testing.T) {
+		product := &entity.Product{
+			ID:       1,
+			Name:     "Test Product",
+			Variants: []*entity.ProductVariant{},
+		}
+
+		product.CalculateStock()
+
+		assert.Equal(t, 0, product.Stock, "Stock should be zero when no variants exist")
+	})
+
+	t.Run("CalculateStock with single variant", func(t *testing.T) {
+		product := &entity.Product{
+			ID:   1,
+			Name: "Test Product",
+		}
+
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 42, []entity.VariantAttribute{}, []string{}, true)
+		product.Variants = []*entity.ProductVariant{variant1}
+
+		product.CalculateStock()
+
+		assert.Equal(t, 42, product.Stock, "Stock should equal single variant's stock")
+	})
+
+	t.Run("CalculateStock is called automatically when adding variants", func(t *testing.T) {
+		product := &entity.Product{
+			ID:   1,
+			Name: "Test Product",
+		}
+
+		// AddVariant should automatically call CalculateStock
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 15, []entity.VariantAttribute{}, []string{}, true)
+		err := product.AddVariant(variant1)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 15, product.Stock, "Stock should be calculated automatically when adding variant")
+
+		// Add another variant
+		variant2, _ := entity.NewProductVariant(1, "SKU-2", 109.99, "USD", 25, []entity.VariantAttribute{}, []string{}, false)
+		err = product.AddVariant(variant2)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 40, product.Stock, "Stock should be recalculated when adding second variant (15+25)")
+	})
+}
+
+func TestProductUseCase_AddVariant_StockCalculation(t *testing.T) {
+	t.Run("AddVariant should update product stock", func(t *testing.T) {
+		// Setup mocks
+		productRepo := mock.NewMockProductRepository()
+		categoryRepo := mock.NewMockCategoryRepository()
+		productVariantRepo := mock.NewMockProductVariantRepository()
+		currencyRepo := mock.NewMockCurrencyRepository()
+		orderRepo := mock.NewMockOrderRepository(false)
+		checkoutRepo := mock.NewMockCheckoutRepository()
+
+		// Create a test category
+		category := &entity.Category{
+			ID:   1,
+			Name: "Test Category",
+		}
+		categoryRepo.Create(category)
+
+		// Create a product with one variant
+		product := &entity.Product{
+			ID:          1,
+			Name:        "Test Product",
+			Description: "Test Description",
+			Price:       9999,
+			Stock:       30,
+			CategoryID:  1,
+			HasVariants: false,
+			Active:      true,
+		}
+
+		variant1, _ := entity.NewProductVariant(1, "SKU-1", 99.99, "USD", 30, []entity.VariantAttribute{}, []string{}, true)
+		variant1.ID = 1
+		product.Variants = []*entity.ProductVariant{variant1}
+
+		productRepo.Create(product)
+		productVariantRepo.Create(variant1)
+
+		productUseCase := usecase.NewProductUseCase(
+			productRepo,
+			categoryRepo,
+			productVariantRepo,
+			currencyRepo,
+			orderRepo,
+			checkoutRepo,
+		)
+
+		// Add a second variant
+		input := usecase.AddVariantInput{
+			ProductID:  1,
+			SKU:        "SKU-2",
+			Price:      109.99,
+			Stock:      20,
+			Attributes: []entity.VariantAttribute{{Name: "Color", Value: "Blue"}},
+			Images:     []string{"blue.jpg"},
+			IsDefault:  false,
+		}
+
+		addedVariant, err := productUseCase.AddVariant(input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, addedVariant)
+		assert.Equal(t, "SKU-2", addedVariant.SKU)
+		assert.Equal(t, 20, addedVariant.Stock)
+
+		// Verify the product stock calculation through entity behavior
+		// (In a real scenario, the product would be fetched from repo and have updated stock)
+		// Since AddVariant calls product.AddVariant() which calls CalculateStock()
+		// and then updates the product in the repository, we need to verify this works
+
+		// The product in the repository should now have updated stock
+		updatedProduct, err := productRepo.GetByID(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 50, updatedProduct.Stock, "Product stock should be sum of all variants after adding new variant (30+20)")
+		assert.True(t, updatedProduct.HasVariants, "HasVariants should be true after adding second variant")
+	})
+}

@@ -117,6 +117,7 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 			}
 
 			variants = append(variants, variant)
+			product.AddVariant(variant)
 		}
 
 		// Save each variant individually to process their currency prices too
@@ -126,12 +127,15 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 			}
 		}
 
-		// Add variants to product
-		product.Variants = variants
-		// Only set has_variants=true if there are multiple variants
 		product.HasVariants = len(variants) > 1
 		product.Active = input.Active
+
+		if err := uc.productRepo.Update(product); err != nil {
+			return nil, err
+		}
 	}
+
+	product.CalculateStock()
 
 	return product, nil
 }
@@ -167,6 +171,7 @@ func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.
 	}
 
 	product.CurrencyCode = currency.Code
+	product.CalculateStock()
 
 	return product, nil
 }
@@ -211,6 +216,8 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 	if input.Active != product.Active {
 		product.Active = input.Active
 	}
+
+	product.CalculateStock()
 
 	// Update product in repository
 	if err := uc.productRepo.Update(product); err != nil {
@@ -287,6 +294,16 @@ func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input Up
 		return nil, err
 	}
 
+	// If stock was updated, recalculate product stock
+	if input.Stock >= 0 {
+		product, err := uc.productRepo.GetByIDWithVariants(productID)
+		if err != nil {
+			return variant, nil // Return the variant even if product update fails
+		}
+		product.CalculateStock()
+		uc.productRepo.Update(product) // Ignore error to not fail the variant update
+	}
+
 	return variant, nil
 }
 
@@ -346,6 +363,11 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		return nil, err
 	}
 
+	// Update the product to persist the recalculated stock
+	if err := uc.productRepo.Update(product); err != nil {
+		return nil, err
+	}
+
 	return variant, nil
 }
 
@@ -362,7 +384,20 @@ func (uc *ProductUseCase) DeleteVariant(productID uint, variantID uint) error {
 	}
 
 	// Delete variant
-	return uc.productVariantRepo.Delete(variantID)
+	err = uc.productVariantRepo.Delete(variantID)
+	if err != nil {
+		return err
+	}
+
+	// Recalculate product stock after variant deletion
+	product, err := uc.productRepo.GetByIDWithVariants(productID)
+	if err != nil {
+		return nil // Variant was deleted successfully, product update failure shouldn't fail the operation
+	}
+	product.CalculateStock()
+	uc.productRepo.Update(product) // Ignore error to not fail the variant deletion
+
+	return nil
 }
 
 // DeleteProduct deletes a product after checking it has no associated orders or active checkouts
