@@ -162,14 +162,8 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 
 	providerType := service.PaymentProviderType(order.PaymentProvider)
 
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return fmt.Errorf("failed to get default currency: %w", err)
-	}
-
 	// Call payment service to capture payment
-	err = uc.paymentSvc.CapturePayment(transactionID, amount, providerType)
+	_, err = uc.paymentSvc.CapturePayment(transactionID, order.Currency, amount, providerType)
 	if err != nil {
 		// Record failed capture attempt
 		txn, txErr := entity.NewPaymentTransaction(
@@ -178,7 +172,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusFailed,
 			amount,
-			defaultCurrency.Code,
+			order.Currency,
 			string(providerType),
 		)
 
@@ -211,7 +205,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		entity.TransactionTypeCapture,
 		entity.TransactionStatusSuccessful,
 		amount,
-		defaultCurrency.Code,
+		order.Currency,
 		string(providerType),
 	)
 	if err == nil {
@@ -256,13 +250,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 
 	providerType := service.PaymentProviderType(order.PaymentProvider)
 
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return fmt.Errorf("failed to get default currency: %w", err)
-	}
-
-	err = uc.paymentSvc.CancelPayment(transactionID, providerType)
+	_, err = uc.paymentSvc.CancelPayment(transactionID, providerType)
 	if err != nil {
 		// Record failed cancellation attempt
 		txn, txErr := entity.NewPaymentTransaction(
@@ -271,7 +259,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 			entity.TransactionTypeCancel,
 			entity.TransactionStatusFailed,
 			0, // No amount for cancellation
-			defaultCurrency.Code,
+			order.Currency,
 			string(providerType),
 		)
 		if txErr == nil {
@@ -301,7 +289,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		entity.TransactionTypeCancel,
 		entity.TransactionStatusSuccessful,
 		0, // No amount for cancellation
-		defaultCurrency.Code,
+		order.Currency,
 		string(providerType),
 	)
 	if err == nil {
@@ -343,12 +331,6 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 
 	providerType := service.PaymentProviderType(order.PaymentProvider)
 
-	// Get default currency
-	defaultCurrency, err := uc.currencyRepo.GetDefault()
-	if err != nil {
-		return fmt.Errorf("failed to get default currency: %w", err)
-	}
-
 	// Get total refunded amount so far (if any)
 	var totalRefundedSoFar int64 = 0
 	totalRefundedSoFar, _ = uc.paymentTxnRepo.SumAmountByOrderIDAndType(order.ID, entity.TransactionTypeRefund)
@@ -358,7 +340,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return errors.New("total refund amount would exceed the original payment amount")
 	}
 
-	err = uc.paymentSvc.RefundPayment(transactionID, amount, providerType)
+	_, err = uc.paymentSvc.RefundPayment(transactionID, order.Currency, amount, providerType)
 	if err != nil {
 		// Record failed refund attempt
 		txn, txErr := entity.NewPaymentTransaction(
@@ -367,7 +349,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 			entity.TransactionTypeRefund,
 			entity.TransactionStatusFailed,
 			amount,
-			defaultCurrency.Code,
+			order.Currency,
 			string(providerType),
 		)
 		if txErr == nil {
@@ -405,7 +387,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		entity.TransactionTypeRefund,
 		entity.TransactionStatusSuccessful,
 		amount,
-		defaultCurrency.Code,
+		order.Currency,
 		string(providerType),
 	)
 	if err == nil {

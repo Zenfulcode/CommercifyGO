@@ -7,34 +7,34 @@ help: ## Show this help message
 
 # Database commands
 db-start: ## Start PostgreSQL database container
-	docker-compose up -d postgres
+	docker compose up -d postgres
 
 db-stop: ## Stop PostgreSQL database container
-	docker-compose stop postgres
+	docker compose stop postgres
 
 db-restart: ## Restart PostgreSQL database container
-	docker-compose restart postgres
+	docker compose restart postgres
 
 db-logs: ## Show PostgreSQL database logs
-	docker-compose logs -f postgres
+	docker compose logs -f postgres
 
 db-clean: ## Stop and remove PostgreSQL container and volumes
-	docker-compose down postgres
+	docker compose down postgres
 	docker volume rm commercify_postgres_data 2>/dev/null || true
 
 # Migration commands
 migrate-up: ## Run database migrations up
-	docker-compose run --rm migrate -up
+	docker compose run --rm migrate -up
 
 migrate-down: ## Run database migrations down
-	docker-compose run --rm migrate -down
+	docker compose run --rm migrate -down
 
 migrate-status: ## Show migration status
-	docker-compose run --rm migrate -status
+	docker compose run --rm migrate -status
 
 # Seed data
 seed-data: ## Seed database with sample data
-	docker-compose run --rm seed -all
+	docker compose run --rm seed -all
 
 # Application commands
 build: ## Build the application
@@ -48,13 +48,13 @@ run: db-start ## Run the application locally with database
 	go run ./cmd/api
 
 run-docker: ## Run the entire application stack with Docker
-	docker-compose up -d
+	docker compose up -d
 
 stop-docker: ## Stop the entire application stack
-	docker-compose down
+	docker compose down
 
 logs: ## Show application logs
-	docker-compose logs -f api
+	docker compose logs -f api
 
 # Development commands
 test: ## Run tests

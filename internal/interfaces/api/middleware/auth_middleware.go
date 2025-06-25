@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/infrastructure/auth"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -20,7 +21,7 @@ type contextKey string
 const (
 	UserIDKey contextKey = "user_id"
 	emailKey  contextKey = "email"
-	roleKey   contextKey = "role"
+	RoleKey   contextKey = "role"
 )
 
 // NewAuthMiddleware creates a new AuthMiddleware
@@ -61,7 +62,7 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		// Add user info to request context
 		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 		ctx = context.WithValue(ctx, emailKey, claims.Email)
-		ctx = context.WithValue(ctx, roleKey, claims.Role)
+		ctx = context.WithValue(ctx, RoleKey, claims.Role)
 
 		// Call the next handler with the updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -72,8 +73,8 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get role from context
-		role, ok := r.Context().Value(roleKey).(string)
-		if !ok || role != "admin" {
+		role, ok := r.Context().Value(RoleKey).(string)
+		if !ok || role != string(entity.RoleAdmin) {
 			http.Error(w, "Admin access required", http.StatusForbidden)
 			return
 		}

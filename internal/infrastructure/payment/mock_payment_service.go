@@ -60,24 +60,24 @@ func (s *MockPaymentService) ProcessPayment(request service.PaymentRequest) (*se
 	case service.PaymentMethodCreditCard:
 		if request.CardDetails == nil {
 			return &service.PaymentResult{
-				Success:      false,
-				ErrorMessage: "card details are required for credit card payment",
-				Provider:     service.PaymentProviderMock,
+				Success:  false,
+				Message:  "card details are required for credit card payment",
+				Provider: service.PaymentProviderMock,
 			}, nil
 		}
 		// Validate card details
 		if request.CardDetails.CardNumber == "" || request.CardDetails.CVV == "" {
 			return &service.PaymentResult{
-				Success:      false,
-				ErrorMessage: "invalid card details",
-				Provider:     service.PaymentProviderMock,
+				Success:  false,
+				Message:  "invalid card details",
+				Provider: service.PaymentProviderMock,
 			}, nil
 		}
 	default:
 		return &service.PaymentResult{
-			Success:      false,
-			ErrorMessage: "unsupported payment method",
-			Provider:     service.PaymentProviderMock,
+			Success:  false,
+			Message:  "unsupported payment method",
+			Provider: service.PaymentProviderMock,
 		}, nil
 	}
 
@@ -103,48 +103,65 @@ func (s *MockPaymentService) VerifyPayment(transactionID string, provider servic
 }
 
 // RefundPayment refunds a payment
-func (s *MockPaymentService) RefundPayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MockPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 	if amount <= 0 {
-		return errors.New("refund amount must be greater than zero")
+		return nil, errors.New("refund amount must be greater than zero")
 	}
 
 	// Simulate refund processing
 	time.Sleep(500 * time.Millisecond)
 
 	// Always succeed for mock service
-	return nil
+	return &service.PaymentResult{
+		Success:       true,
+		TransactionID: transactionID,
+		Provider:      provider,
+		Message:       "refund successful",
+	}, nil
 }
 
 // CapturePayment captures a payment
-func (s *MockPaymentService) CapturePayment(transactionID string, amount int64, provider service.PaymentProviderType) error {
+func (s *MockPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 	if amount <= 0 {
-		return errors.New("capture amount must be greater than zero")
+		return nil, errors.New("capture amount must be greater than zero")
 	}
 
 	// Simulate capture processing
 	time.Sleep(500 * time.Millisecond)
 
 	// Always succeed for mock service
-	return nil
+	return &service.PaymentResult{
+		Success:        true,
+		TransactionID:  transactionID,
+		Provider:       provider,
+		Message:        "capture successful",
+		RequiresAction: false,
+		ActionURL:      "",
+	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *MockPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) error {
+func (s *MockPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
-		return errors.New("transaction ID is required")
+		return nil, errors.New("transaction ID is required")
 	}
 
 	// Simulate cancellation processing
 	time.Sleep(500 * time.Millisecond)
 
 	// Always succeed for mock service
-	return nil
+	return &service.PaymentResult{
+		Success:       true,
+		TransactionID: transactionID,
+		Provider:      provider,
+		Message:       "payment cancelled successfully",
+	}, nil
 }
 
 func (s *MockPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {

@@ -10,6 +10,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 )
 
 // OrderHandler handles order-related HTTP requests
@@ -29,10 +30,13 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 // GetOrder handles getting an order by ID
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(uint)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -58,8 +62,8 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the user is authorized to view this order
 	if order.UserID != userID {
-		role, ok := r.Context().Value("role").(string)
-		if !ok || role != "admin" {
+		role, ok := r.Context().Value(middleware.RoleKey).(string)
+		if !ok || role != string(entity.RoleAdmin) {
 			h.logger.Error("Unauthorized access to order %d by user %d", order.ID, userID)
 			response := dto.ErrorResponse("You are not authorized to view this order")
 			w.Header().Set("Content-Type", "application/json")
@@ -79,10 +83,13 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 // ListOrders handles listing orders for a user
 func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(uint)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -120,6 +127,17 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 
 // ListAllOrders handles listing all orders (admin only)
 func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
+	// Get user ID from context
+	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok {
+		h.logger.Error("Unauthorized access attempt")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	// Parse pagination parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
@@ -163,6 +181,16 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 
 // UpdateOrderStatus handles updating an order's status (admin only)
 func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok {
+		h.logger.Error("Unauthorized access attempt")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	// Get order ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)

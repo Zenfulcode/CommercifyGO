@@ -19,8 +19,8 @@ type ResponseDTO[T any] struct {
 type ListResponseDTO[T any] struct {
 	Success    bool          `json:"success"`
 	Message    string        `json:"message,omitempty"`
-	Data       []T           `json:"data,omitempty"`
-	Pagination PaginationDTO `json:"pagination,omitempty"`
+	Data       []T           `json:"data"`
+	Pagination PaginationDTO `json:"pagination"`
 	Error      string        `json:"error,omitempty"`
 }
 

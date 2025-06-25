@@ -215,6 +215,12 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants", productHandler.AddVariant).Methods(http.MethodPost)
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants/{variantId:[0-9]+}", productHandler.UpdateVariant).Methods(http.MethodPut)
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants/{variantId:[0-9]+}", productHandler.DeleteVariant).Methods(http.MethodDelete)
+
+	// Variant price management routes
+	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.SetVariantPrice).Methods(http.MethodPost)
+	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.SetMultipleVariantPrices).Methods(http.MethodPut)
+	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.GetVariantPrices).Methods(http.MethodGet)
+	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices/{currency}", productHandler.RemoveVariantPrice).Methods(http.MethodDelete)
 }
 
 // setupStripeWebhooks configures Stripe webhooks

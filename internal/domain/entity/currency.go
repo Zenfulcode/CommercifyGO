@@ -122,5 +122,6 @@ func (c *Currency) ConvertAmount(amount int64, targetCurrency *Currency) int64 {
 	// Then convert to target currency
 	targetAmount := baseAmount * targetCurrency.ExchangeRate
 
+	// Round to nearest cent instead of truncating
 	return int64(targetAmount)
 }

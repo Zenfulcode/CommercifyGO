@@ -67,7 +67,7 @@ type BankDetails struct {
 type PaymentResult struct {
 	Success        bool
 	TransactionID  string
-	ErrorMessage   string
+	Message        string
 	RequiresAction bool
 	ActionURL      string
 	Provider       PaymentProviderType
@@ -88,13 +88,13 @@ type PaymentService interface {
 	VerifyPayment(transactionID string, provider PaymentProviderType) (bool, error)
 
 	// RefundPayment refunds a payment
-	RefundPayment(transactionID string, amount int64, provider PaymentProviderType) error
+	RefundPayment(transactionID, currency string, amount int64, provider PaymentProviderType) (*PaymentResult, error)
 
 	// CapturePayment captures a payment
-	CapturePayment(transactionID string, amount int64, provider PaymentProviderType) error
+	CapturePayment(transactionID, currency string, amount int64, provider PaymentProviderType) (*PaymentResult, error)
 
 	// CancelPayment cancels a payment
-	CancelPayment(transactionID string, provider PaymentProviderType) error
+	CancelPayment(transactionID string, provider PaymentProviderType) (*PaymentResult, error)
 
 	// ForceApprovePayment force approves a payment
 	ForceApprovePayment(transactionID string, phoneNumber string, provider PaymentProviderType) error

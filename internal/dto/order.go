@@ -15,8 +15,9 @@ type OrderDTO struct {
 	OrderNumber     string             `json:"order_number"`
 	Items           []OrderItemDTO     `json:"items"`
 	Status          OrderStatus        `json:"status"`
-	TotalAmount     float64            `json:"total_amount"`
-	FinalAmount     float64            `json:"final_amount"`
+	TotalAmount     float64            `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost    float64            `json:"shipping_cost"` // Shipping cost
+	FinalAmount     float64            `json:"final_amount"`  // Total including shipping and discounts
 	Currency        string             `json:"currency"`
 	ShippingAddress AddressDTO         `json:"shipping_address"`
 	BillingAddress  AddressDTO         `json:"billing_address"`
@@ -34,8 +35,9 @@ type OrderSummaryDTO struct {
 	OrderNumber      string      `json:"order_number"`
 	UserID           uint        `json:"user_id"`
 	Status           OrderStatus `json:"status"`
-	TotalAmount      float64     `json:"total_amount"`
-	FinalAmount      float64     `json:"final_amount"`
+	TotalAmount      float64     `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64     `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64     `json:"final_amount"`  // Total including shipping and discounts
 	OrderLinesAmount int         `json:"order_lines_amount"`
 	Currency         string      `json:"currency"`
 	CreatedAt        time.Time   `json:"created_at"`
@@ -145,20 +147,22 @@ func OrderUpdateStatusResponse(order *entity.Order) ResponseDTO[OrderSummaryDTO]
 	return SuccessResponseWithMessage(ToOrderSummaryDTO(order), "Order status updated successfully")
 }
 
-func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ResponseDTO[ListResponseDTO[OrderSummaryDTO]] {
+func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ListResponseDTO[OrderSummaryDTO] {
 	var orderSummaries []OrderSummaryDTO
 	for _, order := range orders {
 		orderSummaries = append(orderSummaries, ToOrderSummaryDTO(order))
 	}
 
-	return SuccessResponseWithMessage(ListResponseDTO[OrderSummaryDTO]{
-		Data: orderSummaries,
+	return ListResponseDTO[OrderSummaryDTO]{
+		Success: true,
+		Message: "Order summaries retrieved successfully",
+		Data:    orderSummaries,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    total,
 		},
-	}, "Orders retrieved successfully")
+	}
 }
 
 func OrderDetailResponse(order *entity.Order) ResponseDTO[OrderDTO] {
@@ -173,9 +177,10 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		UserID:           order.UserID,
 		Status:           OrderStatus(order.Status),
 		TotalAmount:      money.FromCents(order.TotalAmount),
+		ShippingCost:     money.FromCents(order.ShippingCost),
 		FinalAmount:      money.FromCents(order.FinalAmount),
 		OrderLinesAmount: len(order.Items),
-		Currency:         "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Currency:         order.Currency,
 		CreatedAt:        order.CreatedAt,
 		UpdatedAt:        order.UpdatedAt,
 	}
@@ -260,8 +265,9 @@ func toOrderDTO(order *entity.Order) OrderDTO {
 		UserID:          order.UserID,
 		Status:          OrderStatus(order.Status),
 		TotalAmount:     money.FromCents(order.TotalAmount),
+		ShippingCost:    money.FromCents(order.ShippingCost),
 		FinalAmount:     money.FromCents(order.FinalAmount),
-		Currency:        "USD", // TODO: Assuming USD for simplicity, this should be dynamic
+		Currency:        order.Currency,
 		Items:           items,
 		ShippingAddress: *shippingAddr,
 		BillingAddress:  *billingAddr,

@@ -40,6 +40,7 @@ type VariantDTO struct {
 	IsDefault  bool                  `json:"is_default"`
 	CreatedAt  time.Time             `json:"created_at"`
 	UpdatedAt  time.Time             `json:"updated_at"`
+	Prices     map[string]float64    `json:"prices,omitempty"` // All prices in different currencies
 }
 
 type VariantAttributeDTO struct {
@@ -156,6 +157,13 @@ func ToVariantDTO(variant *entity.ProductVariant) VariantDTO {
 		}
 	}
 
+	// Get all prices and convert from cents to float
+	allPricesInCents := variant.GetAllPrices()
+	allPrices := make(map[string]float64)
+	for currency, priceInCents := range allPricesInCents {
+		allPrices[currency] = money.FromCents(priceInCents)
+	}
+
 	return VariantDTO{
 		ID:         variant.ID,
 		ProductID:  variant.ProductID,
@@ -168,6 +176,7 @@ func ToVariantDTO(variant *entity.ProductVariant) VariantDTO {
 		IsDefault:  variant.IsDefault,
 		CreatedAt:  variant.CreatedAt,
 		UpdatedAt:  variant.UpdatedAt,
+		Prices:     allPrices,
 	}
 }
 
@@ -196,5 +205,34 @@ func ToProductDTO(product *entity.Product) ProductDTO {
 		CreatedAt:   product.CreatedAt,
 		UpdatedAt:   product.UpdatedAt,
 		Active:      product.Active,
+	}
+}
+
+// SetVariantPriceRequest represents the request to set a price for a variant in a specific currency
+type SetVariantPriceRequest struct {
+	CurrencyCode string  `json:"currency_code"`
+	Price        float64 `json:"price"`
+}
+
+// SetMultipleVariantPricesRequest represents the request to set multiple prices for a variant
+type SetMultipleVariantPricesRequest struct {
+	Prices map[string]float64 `json:"prices"` // currency_code -> price
+}
+
+// VariantPricesResponse represents the response containing all prices for a variant
+type VariantPricesResponse struct {
+	VariantID uint               `json:"variant_id"`
+	Prices    map[string]float64 `json:"prices"` // currency_code -> price
+}
+
+// CreateProductVariantResponse creates a response from a ProductVariant entity
+func CreateProductVariantResponse(variant *entity.ProductVariant) VariantDTO {
+	return ToVariantDTO(variant)
+}
+
+// CreateVariantPricesResponse creates a response containing all prices for a variant
+func CreateVariantPricesResponse(prices map[string]float64) VariantPricesResponse {
+	return VariantPricesResponse{
+		Prices: prices,
 	}
 }

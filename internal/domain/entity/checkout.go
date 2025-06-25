@@ -77,9 +77,13 @@ type AppliedDiscount struct {
 }
 
 // NewCheckout creates a new checkout for a guest user
-func NewCheckout(sessionID string) (*Checkout, error) {
+func NewCheckout(sessionID string, currency string) (*Checkout, error) {
 	if sessionID == "" {
 		return nil, errors.New("session ID cannot be empty")
+	}
+
+	if currency == "" {
+		return nil, errors.New("currency cannot be empty")
 	}
 
 	now := time.Now()
@@ -89,7 +93,7 @@ func NewCheckout(sessionID string) (*Checkout, error) {
 		SessionID:      sessionID,
 		Items:          []CheckoutItem{},
 		Status:         CheckoutStatusActive,
-		Currency:       "USD", // Default currency
+		Currency:       currency,
 		TotalAmount:    0,
 		ShippingCost:   0,
 		DiscountAmount: 0,
@@ -250,7 +254,6 @@ func (c *Checkout) SetPaymentProvider(provider string) {
 // SetCurrency changes the currency of the checkout and converts all prices
 func (c *Checkout) SetCurrency(newCurrency string, fromCurrency *Currency, toCurrency *Currency) {
 	if c.Currency == newCurrency {
-		// No change needed
 		return
 	}
 
@@ -401,6 +404,7 @@ func (c *Checkout) ToOrder() *Order {
 	order := &Order{
 		UserID:            c.UserID, // This will be 0 for guest orders
 		Items:             items,
+		Currency:          c.Currency,
 		TotalAmount:       c.TotalAmount,
 		TotalWeight:       c.TotalWeight,
 		ShippingCost:      c.ShippingCost,

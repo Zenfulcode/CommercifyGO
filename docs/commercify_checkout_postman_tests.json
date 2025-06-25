@@ -257,7 +257,7 @@
 							"pm.test(\"Customer details were updated\", function () {",
 							"    pm.expect(response.customer_details).to.not.be.undefined;",
 							"    pm.expect(response.customer_details.email).to.equal(\"customer@example.com\");",
-							"    pm.expect(response.customer_details.phone).to.equal(\"+1234567890\");",
+							"    pm.expect(response.customer_details.phone).to.equal(\"1234567890\");",
 							"    pm.expect(response.customer_details.full_name).to.equal(\"John Doe\");",
 							"});"
 						],
@@ -275,7 +275,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+1234567890\",\n    \"full_name\": \"John Doe\"\n}"
+					"raw": "{\n    \"email\": \"customer@example.com\",\n    \"phone\": \"1234567890\",\n    \"full_name\": \"John Doe\"\n}"
 				},
 				"url": {
 					"raw": "{{baseUrl}}/api/checkout/customer-details",
