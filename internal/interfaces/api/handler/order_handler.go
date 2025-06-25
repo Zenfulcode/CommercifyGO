@@ -31,12 +31,12 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
-
-	h.logger.Debug("User ID from context: %d", userID)
-
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -83,10 +83,13 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 // ListOrders handles listing orders for a user
 func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(uint)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
 		return
 	}
 
@@ -124,6 +127,17 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 
 // ListAllOrders handles listing all orders (admin only)
 func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
+	// Get user ID from context
+	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok {
+		h.logger.Error("Unauthorized access attempt")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	// Parse pagination parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
@@ -167,6 +181,16 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 
 // UpdateOrderStatus handles updating an order's status (admin only)
 func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok {
+		h.logger.Error("Unauthorized access attempt")
+		response := dto.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	// Get order ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)

@@ -147,20 +147,22 @@ func OrderUpdateStatusResponse(order *entity.Order) ResponseDTO[OrderSummaryDTO]
 	return SuccessResponseWithMessage(ToOrderSummaryDTO(order), "Order status updated successfully")
 }
 
-func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ResponseDTO[ListResponseDTO[OrderSummaryDTO]] {
+func OrderSummaryListResponse(orders []*entity.Order, page, pageSize, total int) ListResponseDTO[OrderSummaryDTO] {
 	var orderSummaries []OrderSummaryDTO
 	for _, order := range orders {
 		orderSummaries = append(orderSummaries, ToOrderSummaryDTO(order))
 	}
 
-	return SuccessResponseWithMessage(ListResponseDTO[OrderSummaryDTO]{
-		Data: orderSummaries,
+	return ListResponseDTO[OrderSummaryDTO]{
+		Success: true,
+		Message: "Order summaries retrieved successfully",
+		Data:    orderSummaries,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    total,
 		},
-	}, "Orders retrieved successfully")
+	}
 }
 
 func OrderDetailResponse(order *entity.Order) ResponseDTO[OrderDTO] {

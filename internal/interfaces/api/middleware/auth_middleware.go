@@ -64,9 +64,6 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, emailKey, claims.Email)
 		ctx = context.WithValue(ctx, RoleKey, claims.Role)
 
-		// print user ID and role for debugging
-		m.logger.Debug("Authenticated user ID: %d, Role: %s", claims.UserID, claims.Role)
-
 		// Call the next handler with the updated context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
