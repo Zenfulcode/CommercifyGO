@@ -411,6 +411,7 @@ func (c *Checkout) ToOrder() *Order {
 		DiscountAmount:    c.DiscountAmount,
 		FinalAmount:       c.FinalAmount,
 		Status:            OrderStatusPending,
+		PaymentStatus:     PaymentStatusPending, // Initialize payment status
 		ShippingAddr:      c.ShippingAddr,
 		BillingAddr:       c.BillingAddr,
 		CustomerDetails:   &c.CustomerDetails,

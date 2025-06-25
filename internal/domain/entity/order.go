@@ -11,15 +11,23 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusPending       OrderStatus = "pending"
-	OrderStatusPendingAction OrderStatus = "pending_action" // Requires user action (e.g., redirect to payment provider)
-	OrderStatusPaid          OrderStatus = "paid"
-	OrderStatusCaptured      OrderStatus = "captured" // Payment captured
-	OrderStatusShipped       OrderStatus = "shipped"
-	OrderStatusDelivered     OrderStatus = "delivered"
-	OrderStatusCancelled     OrderStatus = "cancelled"
-	OrderStatusRefunded      OrderStatus = "refunded"
-	OrderStatusFailed        OrderStatus = "failed"
+	OrderStatusPending   OrderStatus = "pending"
+	OrderStatusPaid      OrderStatus = "paid"
+	OrderStatusShipped   OrderStatus = "shipped"
+	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusCompleted OrderStatus = "completed" // Set automatically when payment is captured
+)
+
+// PaymentStatus represents the status of a payment
+type PaymentStatus string
+
+const (
+	PaymentStatusPending    PaymentStatus = "pending"
+	PaymentStatusAuthorized PaymentStatus = "authorized"
+	PaymentStatusCaptured   PaymentStatus = "captured"
+	PaymentStatusRefunded   PaymentStatus = "refunded"
+	PaymentStatusCancelled  PaymentStatus = "cancelled"
+	PaymentStatusFailed     PaymentStatus = "failed"
 )
 
 // Order represents an order entity
@@ -31,6 +39,7 @@ type Order struct {
 	Items             []OrderItem
 	TotalAmount       int64 // stored in cents
 	Status            OrderStatus
+	PaymentStatus     PaymentStatus // New field for payment status
 	ShippingAddr      Address
 	BillingAddr       Address
 	PaymentID         string
@@ -131,6 +140,7 @@ func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, bil
 		DiscountAmount:  0,
 		FinalAmount:     totalAmount, // Initially same as total amount
 		Status:          OrderStatusPending,
+		PaymentStatus:   PaymentStatusPending, // Initialize payment status
 		ShippingAddr:    shippingAddr,
 		BillingAddr:     billingAddr,
 		CreatedAt:       now,
@@ -175,6 +185,7 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 		DiscountAmount: 0,
 		FinalAmount:    totalAmount, // Initially same as total amount
 		Status:         OrderStatusPending,
+		PaymentStatus:  PaymentStatusPending, // Initialize payment status
 		ShippingAddr:   shippingAddr,
 		BillingAddr:    billingAddr,
 		CreatedAt:      now,
@@ -195,8 +206,8 @@ func (o *Order) UpdateStatus(status OrderStatus) error {
 	o.Status = status
 	o.UpdatedAt = time.Now()
 
-	// If the status is delivered or cancelled, set the completed_at timestamp
-	if status == OrderStatusDelivered || status == OrderStatusCancelled || status == OrderStatusRefunded {
+	// If the status is cancelled or completed, set the completed_at timestamp
+	if status == OrderStatusCancelled || status == OrderStatusCompleted {
 		now := time.Now()
 		o.CompletedAt = &now
 	}
@@ -207,14 +218,11 @@ func (o *Order) UpdateStatus(status OrderStatus) error {
 // isValidStatusTransition checks if a status transition is valid
 func isValidStatusTransition(from, to OrderStatus) bool {
 	validTransitions := map[OrderStatus][]OrderStatus{
-		OrderStatusPending:       {OrderStatusPendingAction, OrderStatusPaid, OrderStatusCancelled},
-		OrderStatusPendingAction: {OrderStatusPaid, OrderStatusCancelled},
-		OrderStatusPaid:          {OrderStatusShipped, OrderStatusCancelled, OrderStatusRefunded, OrderStatusCaptured},
-		OrderStatusCaptured:      {OrderStatusShipped, OrderStatusCancelled, OrderStatusRefunded},
-		OrderStatusShipped:       {OrderStatusDelivered, OrderStatusCancelled},
-		OrderStatusDelivered:     {OrderStatusRefunded},
-		OrderStatusCancelled:     {OrderStatusRefunded},
-		OrderStatusRefunded:      {},
+		OrderStatusPending:   {OrderStatusPaid, OrderStatusCancelled},
+		OrderStatusPaid:      {OrderStatusShipped, OrderStatusCancelled},
+		OrderStatusShipped:   {OrderStatusCompleted, OrderStatusCancelled},
+		OrderStatusCancelled: {},
+		OrderStatusCompleted: {},
 	}
 
 	return slices.Contains(validTransitions[from], to)
@@ -348,12 +356,68 @@ func (o *Order) CalculateTotalWeight() float64 {
 	return totalWeight
 }
 
-// IsCaptured returns true if the order is captured
+// IsCaptured returns true if the payment is captured
 func (o *Order) IsCaptured() bool {
-	return o.Status == OrderStatusCaptured
+	return o.PaymentStatus == PaymentStatusCaptured
 }
 
-// IsRefunded returns true if the order is refunded
+// IsRefunded returns true if the payment is refunded
 func (o *Order) IsRefunded() bool {
-	return o.Status == OrderStatusRefunded
+	return o.PaymentStatus == PaymentStatusRefunded
+}
+
+// UpdatePaymentStatus updates the payment status and handles order status transitions
+func (o *Order) UpdatePaymentStatus(status PaymentStatus) error {
+	if !isValidPaymentStatusTransition(o.PaymentStatus, status) {
+		return errors.New("invalid payment status transition: " + string(o.PaymentStatus) + " -> " + string(status))
+	}
+
+	o.PaymentStatus = status
+	o.UpdatedAt = time.Now()
+
+	// Handle automatic order status transitions based on payment status
+	switch status {
+	case PaymentStatusAuthorized:
+		// When payment is authorized, order becomes "paid"
+		if o.Status == OrderStatusPending {
+			o.Status = OrderStatusPaid
+		}
+	case PaymentStatusFailed:
+		// When payment fails, order is cancelled
+		if o.Status == OrderStatusPending {
+			o.Status = OrderStatusCancelled
+			now := time.Now()
+			o.CompletedAt = &now
+		}
+	case PaymentStatusCaptured:
+		// When payment is captured and order is shipped, order is completed
+		if o.Status == OrderStatusShipped {
+			o.Status = OrderStatusCompleted
+			now := time.Now()
+			o.CompletedAt = &now
+		}
+	case PaymentStatusCancelled:
+		// When payment is cancelled, order is cancelled
+		if o.Status == OrderStatusPending || o.Status == OrderStatusPaid {
+			o.Status = OrderStatusCancelled
+			now := time.Now()
+			o.CompletedAt = &now
+		}
+	}
+
+	return nil
+}
+
+// isValidPaymentStatusTransition checks if a payment status transition is valid
+func isValidPaymentStatusTransition(from, to PaymentStatus) bool {
+	validTransitions := map[PaymentStatus][]PaymentStatus{
+		PaymentStatusPending:    {PaymentStatusAuthorized, PaymentStatusFailed},
+		PaymentStatusAuthorized: {PaymentStatusCaptured, PaymentStatusRefunded, PaymentStatusCancelled},
+		PaymentStatusCaptured:   {PaymentStatusRefunded},
+		PaymentStatusRefunded:   {},
+		PaymentStatusCancelled:  {},
+		PaymentStatusFailed:     {},
+	}
+
+	return slices.Contains(validTransitions[from], to)
 }

@@ -120,9 +120,9 @@ func (uc *OrderUseCase) ListOrdersByStatus(status entity.OrderStatus, offset, li
 }
 
 func (uc *OrderUseCase) FailOrder(order *entity.Order) error {
-	// Update the order status to failed
-	if err := order.UpdateStatus(entity.OrderStatusFailed); err != nil {
-		return fmt.Errorf("failed to update order status: %w", err)
+	// Update the payment status to failed, which will also update order status to cancelled
+	if err := order.UpdatePaymentStatus(entity.PaymentStatusFailed); err != nil {
+		return fmt.Errorf("failed to update payment status: %w", err)
 	}
 
 	// Save the updated order in the repository
@@ -141,13 +141,18 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		return errors.New("order not found for payment ID")
 	}
 
-	// Check if the order is already captured
-	if order.Status == entity.OrderStatusCaptured {
-		return errors.New("payment already captured")
+	// Check if the payment is already captured
+	if order.PaymentStatus == entity.PaymentStatusCaptured {
+		return errors.New("payment already captured for this order")
 	}
-	// Check if the order is in a state that allows capture
-	if order.Status != entity.OrderStatusPaid {
-		return errors.New("payment capture not allowed in current order status")
+
+	// Check if the payment is in authorized state and order is shipped (new rule)
+	if order.PaymentStatus != entity.PaymentStatusAuthorized {
+		return errors.New("payment must be authorized before capture")
+	}
+
+	if order.Status != entity.OrderStatusShipped {
+		return errors.New("order must be shipped before payment can be captured")
 	}
 
 	// Check if the amount is valid
@@ -186,8 +191,9 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		return fmt.Errorf("failed to capture payment: %v", err)
 	}
 
-	if err := order.UpdateStatus(entity.OrderStatusCaptured); err != nil {
-		return fmt.Errorf("failed to update order status: %v", err)
+	// Update payment status to captured, which will also update order status to completed
+	if err := order.UpdatePaymentStatus(entity.PaymentStatusCaptured); err != nil {
+		return fmt.Errorf("failed to update payment status: %v", err)
 	}
 
 	// Save the updated order in repository
@@ -235,14 +241,16 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		return errors.New("order not found for payment ID")
 	}
 
-	// Check if the order is already canceled
-	if order.Status == entity.OrderStatusCancelled {
+	// Check if the payment is already cancelled
+	if order.PaymentStatus == entity.PaymentStatusCancelled {
 		return errors.New("payment already canceled")
 	}
-	// Check if the order is in a state that allows cancellation
-	if order.Status != entity.OrderStatusPendingAction {
-		return errors.New("payment cancellation not allowed in current order status")
+
+	// Check if the payment is in authorized state (can only cancel authorized payments that aren't captured)
+	if order.PaymentStatus != entity.PaymentStatusAuthorized {
+		return errors.New("payment cancellation only allowed for authorized payments")
 	}
+
 	// Check if the transaction ID is valid
 	if transactionID == "" {
 		return errors.New("transaction ID is required")
@@ -272,9 +280,9 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		return fmt.Errorf("failed to cancel payment: %v", err)
 	}
 
-	// Update the order status to cancelled after successful payment cancellation
-	if err := order.UpdateStatus(entity.OrderStatusCancelled); err != nil {
-		return fmt.Errorf("failed to update order status: %v", err)
+	// Update payment status to cancelled, which will also update order status to cancelled
+	if err := order.UpdatePaymentStatus(entity.PaymentStatusCancelled); err != nil {
+		return fmt.Errorf("failed to update payment status: %v", err)
 	}
 
 	// Save the updated order in the repository
@@ -293,7 +301,8 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		string(providerType),
 	)
 	if err == nil {
-		txn.AddMetadata("previous_status", string(entity.OrderStatusPendingAction))
+		txn.AddMetadata("previous_order_status", string(order.Status))
+		txn.AddMetadata("previous_payment_status", string(entity.PaymentStatusAuthorized))
 
 		if err := uc.paymentTxnRepo.Create(txn); err != nil {
 			log.Printf("Failed to save cancel transaction: %v\n", err)
@@ -311,14 +320,16 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return errors.New("order not found for payment ID")
 	}
 
-	// Check if the order is already refunded
-	if order.Status == entity.OrderStatusRefunded {
+	// Check if the payment is already refunded
+	if order.PaymentStatus == entity.PaymentStatusRefunded {
 		return errors.New("payment already refunded")
 	}
-	// Check if the order is in a state that allows refund
-	if order.Status != entity.OrderStatusPaid && order.Status != entity.OrderStatusCaptured {
-		return errors.New("payment refund not allowed in current order status")
+
+	// Check if the payment is in a state that allows refund (authorized or captured)
+	if order.PaymentStatus != entity.PaymentStatusAuthorized && order.PaymentStatus != entity.PaymentStatusCaptured {
+		return errors.New("payment refund only allowed for authorized or captured payments")
 	}
+
 	// Check if the amount is valid
 	if amount <= 0 {
 		return errors.New("refund amount must be greater than zero")
@@ -368,10 +379,10 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		isFullRefund = true
 	}
 
-	// Only update the order status to refunded if it's a full refund
+	// Only update the payment status to refunded if it's a full refund
 	if isFullRefund {
-		if err := order.UpdateStatus(entity.OrderStatusRefunded); err != nil {
-			return fmt.Errorf("failed to update order status: %v", err)
+		if err := order.UpdatePaymentStatus(entity.PaymentStatusRefunded); err != nil {
+			return fmt.Errorf("failed to update payment status: %v", err)
 		}
 
 		// Save the updated order in the repository
@@ -392,7 +403,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 	)
 	if err == nil {
 		txn.AddMetadata("full_refund", fmt.Sprintf("%t", isFullRefund))
-		txn.AddMetadata("previous_status", string(order.Status))
+		txn.AddMetadata("previous_payment_status", string(order.PaymentStatus))
 
 		// Record total refunded amount including this transaction
 		totalRefunded := totalRefundedSoFar + amount
@@ -461,4 +472,31 @@ func (uc *OrderUseCase) RecordPaymentTransaction(transaction *entity.PaymentTran
 
 	// Create transaction record
 	return uc.paymentTxnRepo.Create(transaction)
+}
+
+// UpdatePaymentStatusInput contains the data needed to update payment status
+type UpdatePaymentStatusInput struct {
+	OrderID       uint
+	PaymentStatus entity.PaymentStatus
+}
+
+// UpdatePaymentStatus updates the payment status of an order
+func (uc *OrderUseCase) UpdatePaymentStatus(input UpdatePaymentStatusInput) (*entity.Order, error) {
+	// Get order
+	order, err := uc.orderRepo.GetByID(input.OrderID)
+	if err != nil {
+		return nil, fmt.Errorf("order not found: %w", err)
+	}
+
+	// Update payment status
+	if err := order.UpdatePaymentStatus(input.PaymentStatus); err != nil {
+		return nil, fmt.Errorf("failed to update payment status: %w", err)
+	}
+
+	// Update order in repository
+	if err := uc.orderRepo.Update(order); err != nil {
+		return nil, fmt.Errorf("failed to save order: %w", err)
+	}
+
+	return order, nil
 }

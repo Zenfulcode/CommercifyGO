@@ -81,7 +81,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Check if order is already paid
 	if order.Status == entity.OrderStatusPaid ||
 		order.Status == entity.OrderStatusShipped ||
-		order.Status == entity.OrderStatusDelivered {
+		order.Status == entity.OrderStatusCompleted {
 		return nil, errors.New("order is already paid")
 	}
 
@@ -124,9 +124,8 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		if err := order.SetActionURL(paymentResult.ActionURL); err != nil {
 			return nil, err
 		}
-		if err := order.UpdateStatus(entity.OrderStatusPendingAction); err != nil {
-			return nil, err
-		}
+		// Payment requires action - keep order status as pending
+		// Payment status remains pending until action is completed
 
 		// Update order in repository
 		if err := uc.orderRepo.Update(order); err != nil {
@@ -185,7 +184,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New(paymentResult.Message)
 	}
 
-	// Update order with payment ID, provider, and status
+	// Update order with payment ID, provider, and payment status
 	if err := order.SetPaymentID(paymentResult.TransactionID); err != nil {
 		return nil, err
 	}
@@ -195,7 +194,8 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	if err := order.SetPaymentMethod(string(order.PaymentMethod)); err != nil {
 		return nil, err
 	}
-	if err := order.UpdateStatus(entity.OrderStatusPaid); err != nil {
+	// Update payment status to authorized, which will also update order status to paid
+	if err := order.UpdatePaymentStatus(entity.PaymentStatusAuthorized); err != nil {
 		return nil, err
 	}
 

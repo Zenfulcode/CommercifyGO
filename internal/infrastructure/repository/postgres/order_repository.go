@@ -55,12 +55,12 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 		// Add guest order fields
 		query = `
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
 				total_weight, currency
 			)
-			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			RETURNING id
 		`
 
@@ -68,6 +68,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			query,
 			order.TotalAmount,
 			order.Status,
+			order.PaymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			order.PaymentID,
@@ -90,12 +91,12 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 		// Regular user order
 		query = `
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, shipping_method_id, shipping_cost, total_weight,
 				currency
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			RETURNING id
 		`
 
@@ -104,6 +105,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.UserID,
 			order.TotalAmount,
 			order.Status,
+			order.PaymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			order.PaymentID,
@@ -169,7 +171,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	// Get order
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
@@ -200,6 +202,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		&userID,
 		&order.TotalAmount,
 		&order.Status,
+		&order.PaymentStatus,
 		&shippingAddrJSON,
 		&billingAddrJSON,
 		&order.PaymentID,
@@ -362,20 +365,20 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 	// Update order
 	query := `
 		UPDATE orders
-		SET status = $1, shipping_address = $2, billing_address = $3,
-			payment_id = $4, payment_provider = $5, tracking_code = $6, updated_at = $7, completed_at = $8, order_number = $9,
-			final_amount = $10,
-			discount_id = $11,
-			discount_amount = $12,
-			discount_code = $13,
-			action_url = $14,
-			shipping_method_id = $15,
-			shipping_cost = $16,
-			total_weight = $17,
-			customer_email = $18,
-			customer_phone = $19,
-			customer_full_name = $20
-		WHERE id = $21
+		SET status = $1, payment_status = $2, shipping_address = $3, billing_address = $4,
+			payment_id = $5, payment_provider = $6, tracking_code = $7, updated_at = $8, completed_at = $9, order_number = $10,
+			final_amount = $11,
+			discount_id = $12,
+			discount_amount = $13,
+			discount_code = $14,
+			action_url = $15,
+			shipping_method_id = $16,
+			shipping_cost = $17,
+			total_weight = $18,
+			customer_email = $19,
+			customer_phone = $20,
+			customer_full_name = $21
+		WHERE id = $22
 	`
 
 	var discountID sql.NullInt64
@@ -393,6 +396,7 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 	_, err = r.db.Exec(
 		query,
 		order.Status,
+		order.PaymentStatus,
 		shippingAddrJSON,
 		billingAddrJSON,
 		order.PaymentID,
@@ -421,7 +425,7 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 // GetByUser retrieves orders for a user
 func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			customer_email, customer_phone, customer_full_name, is_guest_order, currency
 		FROM orders
@@ -453,6 +457,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 			&userIDNull,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&shippingAddrJSON,
 			&billingAddrJSON,
 			&order.PaymentID,
@@ -552,7 +557,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 // ListByStatus retrieves orders by status
 func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, created_at, updated_at, completed_at,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, created_at, updated_at, completed_at,
 			customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
 		WHERE status = $1
@@ -581,6 +586,7 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 			&userIDNull,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&order.CreatedAt,
 			&order.UpdatedAt,
 			&completedAt,
@@ -674,7 +680,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 
 	// Get order by payment_id
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
@@ -705,6 +711,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 		&userID,
 		&order.TotalAmount,
 		&order.Status,
+		&order.PaymentStatus,
 		&shippingAddrJSON,
 		&billingAddrJSON,
 		&order.PaymentID,
@@ -856,7 +863,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 // ListAll lists all orders
 func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status,
+		SELECT id, order_number, user_id, total_amount, status, payment_status,
 			payment_provider, created_at, updated_at, completed_at,
 			final_amount, customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
@@ -884,6 +891,7 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 			&userID,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&order.PaymentProvider,
 			&order.CreatedAt,
 			&order.UpdatedAt,

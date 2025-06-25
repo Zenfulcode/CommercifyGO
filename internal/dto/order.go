@@ -15,6 +15,7 @@ type OrderDTO struct {
 	OrderNumber     string             `json:"order_number"`
 	Items           []OrderItemDTO     `json:"items"`
 	Status          OrderStatus        `json:"status"`
+	PaymentStatus   PaymentStatus      `json:"payment_status"`
 	TotalAmount     float64            `json:"total_amount"`  // Subtotal (items only)
 	ShippingCost    float64            `json:"shipping_cost"` // Shipping cost
 	FinalAmount     float64            `json:"final_amount"`  // Total including shipping and discounts
@@ -31,17 +32,18 @@ type OrderDTO struct {
 }
 
 type OrderSummaryDTO struct {
-	ID               uint        `json:"id"`
-	OrderNumber      string      `json:"order_number"`
-	UserID           uint        `json:"user_id"`
-	Status           OrderStatus `json:"status"`
-	TotalAmount      float64     `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost     float64     `json:"shipping_cost"` // Shipping cost
-	FinalAmount      float64     `json:"final_amount"`  // Total including shipping and discounts
-	OrderLinesAmount int         `json:"order_lines_amount"`
-	Currency         string      `json:"currency"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
+	ID               uint          `json:"id"`
+	OrderNumber      string        `json:"order_number"`
+	UserID           uint          `json:"user_id"`
+	Status           OrderStatus   `json:"status"`
+	PaymentStatus    PaymentStatus `json:"payment_status"`
+	TotalAmount      float64       `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64       `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64       `json:"final_amount"`  // Total including shipping and discounts
+	OrderLinesAmount int           `json:"order_lines_amount"`
+	Currency         string        `json:"currency"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
 }
 
 type PaymentDetails struct {
@@ -117,14 +119,23 @@ type ProcessPaymentRequest struct {
 type OrderStatus string
 
 const (
-	OrderStatusPending       OrderStatus = "pending"
-	OrderStatusPendingAction OrderStatus = "pending_action" // Requires user action (e.g., redirect to payment provider)
-	OrderStatusPaid          OrderStatus = "paid"
-	OrderStatusCaptured      OrderStatus = "captured" // Payment captured
-	OrderStatusShipped       OrderStatus = "shipped"
-	OrderStatusDelivered     OrderStatus = "delivered"
-	OrderStatusCancelled     OrderStatus = "cancelled"
-	OrderStatusRefunded      OrderStatus = "refunded"
+	OrderStatusPending   OrderStatus = "pending"
+	OrderStatusPaid      OrderStatus = "paid"
+	OrderStatusShipped   OrderStatus = "shipped"
+	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusCompleted OrderStatus = "completed"
+)
+
+// PaymentStatus represents the status of a payment
+type PaymentStatus string
+
+const (
+	PaymentStatusPending    PaymentStatus = "pending"
+	PaymentStatusAuthorized PaymentStatus = "authorized"
+	PaymentStatusCaptured   PaymentStatus = "captured"
+	PaymentStatusRefunded   PaymentStatus = "refunded"
+	PaymentStatusCancelled  PaymentStatus = "cancelled"
+	PaymentStatusFailed     PaymentStatus = "failed"
 )
 
 // PaymentMethod represents the payment method used for an order
@@ -176,6 +187,7 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		OrderNumber:      order.OrderNumber,
 		UserID:           order.UserID,
 		Status:           OrderStatus(order.Status),
+		PaymentStatus:    PaymentStatus(order.PaymentStatus),
 		TotalAmount:      money.FromCents(order.TotalAmount),
 		ShippingCost:     money.FromCents(order.ShippingCost),
 		FinalAmount:      money.FromCents(order.FinalAmount),
@@ -264,6 +276,7 @@ func toOrderDTO(order *entity.Order) OrderDTO {
 		OrderNumber:     order.OrderNumber,
 		UserID:          order.UserID,
 		Status:          OrderStatus(order.Status),
+		PaymentStatus:   PaymentStatus(order.PaymentStatus),
 		TotalAmount:     money.FromCents(order.TotalAmount),
 		ShippingCost:    money.FromCents(order.ShippingCost),
 		FinalAmount:     money.FromCents(order.FinalAmount),

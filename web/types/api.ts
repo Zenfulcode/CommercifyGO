@@ -214,8 +214,8 @@ export interface ResponseDTO<T extends any> {
 export interface ListResponseDTO<T extends any> {
   success: boolean;
   message?: string;
-  data?: T[];
-  pagination?: PaginationDTO;
+  data: T[];
+  pagination: PaginationDTO;
   error?: string;
 }
 /**
@@ -423,6 +423,7 @@ export interface OrderDTO {
   order_number: string;
   items: OrderItemDTO[];
   status: OrderStatus;
+  payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
   shipping_cost: number /* float64 */; // Shipping cost
   final_amount: number /* float64 */; // Total including shipping and discounts
@@ -442,6 +443,7 @@ export interface OrderSummaryDTO {
   order_number: string;
   user_id: number /* uint */;
   status: OrderStatus;
+  payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
   shipping_cost: number /* float64 */; // Shipping cost
   final_amount: number /* float64 */; // Total including shipping and discounts
@@ -529,13 +531,20 @@ export interface ProcessPaymentRequest {
  */
 export type OrderStatus = string;
 export const OrderStatusPending: OrderStatus = "pending";
-export const OrderStatusPendingAction: OrderStatus = "pending_action"; // Requires user action (e.g., redirect to payment provider)
 export const OrderStatusPaid: OrderStatus = "paid";
-export const OrderStatusCaptured: OrderStatus = "captured"; // Payment captured
 export const OrderStatusShipped: OrderStatus = "shipped";
-export const OrderStatusDelivered: OrderStatus = "delivered";
 export const OrderStatusCancelled: OrderStatus = "cancelled";
-export const OrderStatusRefunded: OrderStatus = "refunded";
+export const OrderStatusCompleted: OrderStatus = "completed";
+/**
+ * PaymentStatus represents the status of a payment
+ */
+export type PaymentStatus = string;
+export const PaymentStatusPending: PaymentStatus = "pending";
+export const PaymentStatusAuthorized: PaymentStatus = "authorized";
+export const PaymentStatusCaptured: PaymentStatus = "captured";
+export const PaymentStatusRefunded: PaymentStatus = "refunded";
+export const PaymentStatusCancelled: PaymentStatus = "cancelled";
+export const PaymentStatusFailed: PaymentStatus = "failed";
 /**
  * PaymentMethod represents the payment method used for an order
  */

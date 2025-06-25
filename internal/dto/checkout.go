@@ -171,7 +171,7 @@ func CreateCheckoutResponse(checkout *entity.Checkout) ResponseDTO[CheckoutDTO] 
 func CreateCompleteCheckoutResponse(order *entity.Order) ResponseDTO[CheckoutCompleteResponse] {
 	response := CheckoutCompleteResponse{
 		Order:          ToOrderSummaryDTO(order),
-		ActionRequired: order.Status == entity.OrderStatusPendingAction,
+		ActionRequired: order.Status == entity.OrderStatusPending && order.PaymentStatus == entity.PaymentStatusPending && order.ActionURL != "",
 		ActionURL:      order.ActionURL,
 	}
 	return SuccessResponse(response)

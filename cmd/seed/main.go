@@ -786,7 +786,7 @@ func seedOrders(db *sql.DB) error {
 	}
 
 	// Order statuses
-	statuses := []string{"pending", "paid", "shipped", "delivered", "cancelled"}
+	statuses := []string{"pending", "paid", "shipped", "completed", "cancelled"}
 
 	// Payment providers
 	paymentProviders := []string{"stripe", "paypal", "mock"}
@@ -820,24 +820,24 @@ func seedOrders(db *sql.DB) error {
 		createdAt := now.Add(time.Duration(-i*24) * time.Hour) // Each order created a day apart
 		updatedAt := createdAt
 
-		// Set completed_at for delivered orders
+		// Set completed_at for completed orders
 		var completedAt *time.Time
-		if status == "delivered" {
+		if status == "completed" {
 			completedTime := updatedAt.Add(3 * 24 * time.Hour) // 3 days after creation
 			completedAt = &completedTime
 		}
 
-		// Set payment details for paid, shipped, or delivered orders
+		// Set payment details for paid, shipped, or completed orders
 		var paymentID string
 		var paymentProvider string
 		var trackingCode string
 
-		if status == "paid" || status == "shipped" || status == "delivered" {
+		if status == "paid" || status == "shipped" || status == "completed" {
 			paymentID = fmt.Sprintf("payment_%d_%s", i, time.Now().Format("20060102"))
 			paymentProvider = paymentProviders[i%len(paymentProviders)]
 		}
 
-		if status == "shipped" || status == "delivered" {
+		if status == "shipped" || status == "completed" {
 			trackingCode = fmt.Sprintf("TRACK%d%s", i, time.Now().Format("20060102"))
 		}
 
@@ -852,17 +852,31 @@ func seedOrders(db *sql.DB) error {
 
 		// Insert order
 		var orderID int
+		// Set payment status based on order status
+		var paymentStatus string
+		switch status {
+		case "pending":
+			paymentStatus = "pending"
+		case "paid", "shipped", "completed":
+			paymentStatus = "captured"
+		case "cancelled":
+			paymentStatus = "cancelled"
+		default:
+			paymentStatus = "pending"
+		}
+
 		err = tx.QueryRow(`
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, order_number
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			RETURNING id
 		`,
 			userID,
 			0, // Total amount will be updated after adding items
 			status,
+			paymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			paymentID,
@@ -1610,7 +1624,7 @@ func seedPaymentTransactions(db *sql.DB) error {
 		SELECT id, payment_id, payment_provider, total_amount, order_number 
 		FROM orders 
 		WHERE payment_provider IS NOT NULL 
-		AND status IN ('paid', 'shipped', 'delivered')
+		AND status IN ('paid', 'shipped', 'completed')
 	`)
 	if err != nil {
 		return err
