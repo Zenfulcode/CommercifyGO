@@ -10,6 +10,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 )
 
 // OrderHandler handles order-related HTTP requests
@@ -29,7 +30,10 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 // GetOrder handles getting an order by ID
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(uint)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
+
+	h.logger.Debug("User ID from context: %d", userID)
+
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -58,8 +62,8 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the user is authorized to view this order
 	if order.UserID != userID {
-		role, ok := r.Context().Value("role").(string)
-		if !ok || role != "admin" {
+		role, ok := r.Context().Value(middleware.RoleKey).(string)
+		if !ok || role != string(entity.RoleAdmin) {
 			h.logger.Error("Unauthorized access to order %d by user %d", order.ID, userID)
 			response := dto.ErrorResponse("You are not authorized to view this order")
 			w.Header().Set("Content-Type", "application/json")
