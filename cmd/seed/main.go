@@ -110,6 +110,13 @@ func main() {
 		fmt.Println("Shipping rates seeded successfully")
 	}
 
+	if *allFlag || *ordersFlag {
+		if err := seedOrders(db); err != nil {
+			log.Fatalf("Failed to seed orders: %v", err)
+		}
+		fmt.Println("Orders seeded successfully")
+	}
+
 	// if *allFlag || *paymentTransactionsFlag {
 	// 	if err := seedPaymentTransactions(db); err != nil {
 	// 		log.Fatalf("Failed to seed payment transactions: %v", err)
@@ -135,8 +142,15 @@ func clearData(db *sql.DB) error {
 
 	// Clear tables in reverse order of dependencies
 	tables := []string{
+		"checkout_items",
+		"checkouts",
 		"order_items",
 		"orders",
+		"shipping_rates",
+		"shipping_zones",
+		"shipping_methods",
+		"discounts",
+		"product_variants",
 		"products",
 		"categories",
 		"users",
@@ -728,22 +742,31 @@ func seedOrders(db *sql.DB) error {
 		return fmt.Errorf("no users found to create orders for")
 	}
 
-	// Get product data
-	productRows, err := db.Query("SELECT id, price FROM products")
+	// Get product data with their default variants
+	productRows, err := db.Query(`
+		SELECT p.id, p.name, pv.id as variant_id, pv.price, pv.sku, pv.stock 
+		FROM products p 
+		JOIN product_variants pv ON p.id = pv.product_id 
+		WHERE pv.is_default = true
+	`)
 	if err != nil {
 		return err
 	}
 	defer productRows.Close()
 
 	type productInfo struct {
-		id    int
-		price float64
+		id        int
+		name      string
+		variantID int
+		price     int64 // Price is stored as int64 (cents)
+		sku       string
+		stock     int
 	}
 
 	var products []productInfo
 	for productRows.Next() {
 		var p productInfo
-		if err := productRows.Scan(&p.id, &p.price); err != nil {
+		if err := productRows.Scan(&p.id, &p.name, &p.variantID, &p.price, &p.sku, &p.stock); err != nil {
 			return err
 		}
 		products = append(products, p)
@@ -909,22 +932,26 @@ func seedOrders(db *sql.DB) error {
 			// Random quantity between 1 and 3
 			quantity := (j % 3) + 1
 
-			// Calculate subtotal
-			subtotal := float64(quantity) * product.price
-			totalAmount += subtotal
+			// Calculate subtotal (price is already in cents)
+			subtotal := int64(quantity) * product.price
+			totalAmount += float64(subtotal)
 
 			// Insert order item
 			_, err = tx.Exec(`
 				INSERT INTO order_items (
-					order_id, product_id, quantity, price, subtotal, created_at
+					order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku, created_at
 				)
-				VALUES ($1, $2, $3, $4, $5, $6)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`,
 				orderID,
 				product.id,
+				product.variantID,
 				quantity,
-				int64(product.price),
-				int64(subtotal),
+				product.price,
+				subtotal,
+				0.5, // Default weight for seeded items
+				product.name,
+				product.sku,
 				createdAt,
 			)
 
@@ -934,7 +961,7 @@ func seedOrders(db *sql.DB) error {
 			}
 		}
 
-		// Update order with total amount
+		// Update order with total amount (totalAmount is already in cents)
 		_, err = tx.Exec(`
 			UPDATE orders
 			SET total_amount = $1

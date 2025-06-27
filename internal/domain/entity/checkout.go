@@ -387,13 +387,14 @@ func (c *Checkout) ToOrder() *Order {
 	items := make([]OrderItem, len(c.Items))
 	for i, item := range c.Items {
 		items[i] = OrderItem{
-			ProductID:   item.ProductID,
-			Quantity:    item.Quantity,
-			Price:       item.Price,
-			Subtotal:    item.Price * int64(item.Quantity),
-			Weight:      item.Weight,
-			ProductName: item.ProductName,
-			SKU:         item.SKU,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			Quantity:         item.Quantity,
+			Price:            item.Price,
+			Subtotal:         item.Price * int64(item.Quantity),
+			Weight:           item.Weight,
+			ProductName:      item.ProductName,
+			SKU:              item.SKU,
 		}
 	}
 
