@@ -5,7 +5,6 @@ import (
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
 // OrderDTO represents an order in the system
@@ -26,24 +25,26 @@ type OrderDTO struct {
 	ShippingDetails ShippingOptionDTO  `json:"shipping_details"`
 	DiscountDetails AppliedDiscountDTO `json:"discount_details"`
 	Customer        CustomerDetailsDTO `json:"customer"`
-	CheckoutID      string             `json:"checkout_id,omitempty"`
+	CheckoutID      string             `json:"checkout_id"`
 	CreatedAt       time.Time          `json:"created_at"`
 	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
 type OrderSummaryDTO struct {
-	ID               uint          `json:"id"`
-	OrderNumber      string        `json:"order_number"`
-	UserID           uint          `json:"user_id"`
-	Status           OrderStatus   `json:"status"`
-	PaymentStatus    PaymentStatus `json:"payment_status"`
-	TotalAmount      float64       `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost     float64       `json:"shipping_cost"` // Shipping cost
-	FinalAmount      float64       `json:"final_amount"`  // Total including shipping and discounts
-	OrderLinesAmount int           `json:"order_lines_amount"`
-	Currency         string        `json:"currency"`
-	CreatedAt        time.Time     `json:"created_at"`
-	UpdatedAt        time.Time     `json:"updated_at"`
+	ID               uint               `json:"id"`
+	OrderNumber      string             `json:"order_number"`
+	CheckoutID       string             `json:"checkout_id"`
+	UserID           uint               `json:"user_id"`
+	Customer         CustomerDetailsDTO `json:"customer"`
+	Status           OrderStatus        `json:"status"`
+	PaymentStatus    PaymentStatus      `json:"payment_status"`
+	TotalAmount      float64            `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64            `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64            `json:"final_amount"`  // Total including shipping and discounts
+	OrderLinesAmount int                `json:"order_lines_amount"`
+	Currency         string             `json:"currency"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 type PaymentDetails struct {
@@ -67,6 +68,7 @@ type OrderItemDTO struct {
 	Quantity    int       `json:"quantity"`
 	UnitPrice   float64   `json:"unit_price"`
 	TotalPrice  float64   `json:"total_price"`
+	ImageURL    string    `json:"image_url,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -105,14 +107,6 @@ type OrderSearchRequest struct {
 	StartDate     *time.Time  `json:"start_date,omitempty"`
 	EndDate       *time.Time  `json:"end_date,omitempty"`
 	PaginationDTO `json:"pagination"`
-}
-
-// ProcessPaymentRequest represents the data needed to process a payment
-type ProcessPaymentRequest struct {
-	PaymentMethod   PaymentMethod        `json:"payment_method"`
-	PaymentProvider PaymentProvider      `json:"payment_provider"`
-	CardDetails     *service.CardDetails `json:"card_details,omitempty"`
-	PhoneNumber     string               `json:"phone_number,omitempty"`
 }
 
 // OrderStatus represents the status of an order
@@ -185,6 +179,7 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 	return OrderSummaryDTO{
 		ID:               order.ID,
 		OrderNumber:      order.OrderNumber,
+		CheckoutID:       order.CheckoutSessionID,
 		UserID:           order.UserID,
 		Status:           OrderStatus(order.Status),
 		PaymentStatus:    PaymentStatus(order.PaymentStatus),
@@ -193,8 +188,13 @@ func ToOrderSummaryDTO(order *entity.Order) OrderSummaryDTO {
 		FinalAmount:      money.FromCents(order.FinalAmount),
 		OrderLinesAmount: len(order.Items),
 		Currency:         order.Currency,
-		CreatedAt:        order.CreatedAt,
-		UpdatedAt:        order.UpdatedAt,
+		Customer: CustomerDetailsDTO{
+			Email:    order.CustomerDetails.Email,
+			Phone:    order.CustomerDetails.Phone,
+			FullName: order.CustomerDetails.FullName,
+		},
+		CreatedAt: order.CreatedAt,
+		UpdatedAt: order.UpdatedAt,
 	}
 }
 
@@ -205,14 +205,18 @@ func toOrderDTO(order *entity.Order) OrderDTO {
 		items = make([]OrderItemDTO, len(order.Items))
 		for i, item := range order.Items {
 			items[i] = OrderItemDTO{
-				ID:         item.ID,
-				OrderID:    order.ID,
-				ProductID:  item.ProductID,
-				Quantity:   item.Quantity,
-				UnitPrice:  money.FromCents(item.Price),
-				TotalPrice: money.FromCents(item.Subtotal),
-				CreatedAt:  order.CreatedAt,
-				UpdatedAt:  order.UpdatedAt,
+				ID:          item.ID,
+				OrderID:     order.ID,
+				ProductID:   item.ProductID,
+				Quantity:    item.Quantity,
+				UnitPrice:   money.FromCents(item.Price),
+				TotalPrice:  money.FromCents(item.Subtotal),
+				ImageURL:    item.ImageURL,
+				SKU:         item.SKU,
+				ProductName: item.ProductName,
+				VariantID:   item.ProductVariantID,
+				CreatedAt:   order.CreatedAt,
+				UpdatedAt:   order.UpdatedAt,
 			}
 		}
 	}

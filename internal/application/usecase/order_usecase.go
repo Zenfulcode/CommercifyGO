@@ -14,19 +14,21 @@ import (
 
 // OrderUseCase implements order-related use cases
 type OrderUseCase struct {
-	orderRepo      repository.OrderRepository
-	productRepo    repository.ProductRepository
-	userRepo       repository.UserRepository
-	paymentSvc     service.PaymentService
-	emailSvc       service.EmailService
-	paymentTxnRepo repository.PaymentTransactionRepository
-	currencyRepo   repository.CurrencyRepository
+	orderRepo          repository.OrderRepository
+	productRepo        repository.ProductRepository
+	productVariantRepo repository.ProductVariantRepository
+	userRepo           repository.UserRepository
+	paymentSvc         service.PaymentService
+	emailSvc           service.EmailService
+	paymentTxnRepo     repository.PaymentTransactionRepository
+	currencyRepo       repository.CurrencyRepository
 }
 
 // NewOrderUseCase creates a new OrderUseCase
 func NewOrderUseCase(
 	orderRepo repository.OrderRepository,
 	productRepo repository.ProductRepository,
+	productVariantRepo repository.ProductVariantRepository,
 	userRepo repository.UserRepository,
 	paymentSvc service.PaymentService,
 	emailSvc service.EmailService,
@@ -34,13 +36,14 @@ func NewOrderUseCase(
 	currencyRepo repository.CurrencyRepository,
 ) *OrderUseCase {
 	return &OrderUseCase{
-		orderRepo:      orderRepo,
-		productRepo:    productRepo,
-		userRepo:       userRepo,
-		paymentSvc:     paymentSvc,
-		emailSvc:       emailSvc,
-		paymentTxnRepo: paymentTxnRepo,
-		currencyRepo:   currencyRepo,
+		orderRepo:          orderRepo,
+		productRepo:        productRepo,
+		productVariantRepo: productVariantRepo,
+		userRepo:           userRepo,
+		paymentSvc:         paymentSvc,
+		emailSvc:           emailSvc,
+		paymentTxnRepo:     paymentTxnRepo,
+		currencyRepo:       currencyRepo,
 	}
 }
 
@@ -192,14 +195,16 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 	}
 
 	// Update payment status to captured, which will also update order status to completed
-	if err := order.UpdatePaymentStatus(entity.PaymentStatusCaptured); err != nil {
-		return fmt.Errorf("failed to update payment status: %v", err)
-	}
+	// if err := order.UpdatePaymentStatus(entity.PaymentStatusCaptured); err != nil {
+	// 	return fmt.Errorf("failed to update payment status: %v", err)
+	// }
 
 	// Save the updated order in repository
 	if err := uc.orderRepo.Update(order); err != nil {
 		return fmt.Errorf("failed to save order status: %v", err)
 	}
+
+	// Stock was already decreased when payment was authorized, no need to decrease again
 
 	// Record successful capture transaction
 	// Track if this is a full or partial capture
@@ -478,6 +483,7 @@ func (uc *OrderUseCase) RecordPaymentTransaction(transaction *entity.PaymentTran
 type UpdatePaymentStatusInput struct {
 	OrderID       uint
 	PaymentStatus entity.PaymentStatus
+	TransactionID string // Optional, for logging purposes
 }
 
 // UpdatePaymentStatus updates the payment status of an order
@@ -487,6 +493,9 @@ func (uc *OrderUseCase) UpdatePaymentStatus(input UpdatePaymentStatusInput) (*en
 	if err != nil {
 		return nil, fmt.Errorf("order not found: %w", err)
 	}
+
+	// Store the previous payment status to determine if stock updates are needed
+	previousPaymentStatus := order.PaymentStatus
 
 	// Update payment status
 	if err := order.UpdatePaymentStatus(input.PaymentStatus); err != nil {
@@ -498,5 +507,106 @@ func (uc *OrderUseCase) UpdatePaymentStatus(input UpdatePaymentStatusInput) (*en
 		return nil, fmt.Errorf("failed to save order: %w", err)
 	}
 
+	// Handle stock updates based on payment status transitions
+	if err := uc.handleStockUpdatesForPaymentStatusChange(order, previousPaymentStatus, input.PaymentStatus); err != nil {
+		// Log the error but don't fail the status update since the payment status change was successful
+		log.Printf("Warning: Failed to update stock for order %d: %v", order.ID, err)
+	}
+
 	return order, nil
+}
+
+// handleStockUpdatesForPaymentStatusChange handles stock updates when payment status changes
+func (uc *OrderUseCase) handleStockUpdatesForPaymentStatusChange(order *entity.Order, previousStatus, newStatus entity.PaymentStatus) error {
+	// Only handle stock changes for specific transitions
+	switch {
+	case previousStatus != entity.PaymentStatusAuthorized && newStatus == entity.PaymentStatusAuthorized:
+		// Payment was just authorized - decrease stock to reserve items
+		return uc.decreaseStock(order)
+
+	case previousStatus == entity.PaymentStatusAuthorized && newStatus == entity.PaymentStatusCancelled:
+		// Payment was authorized but now cancelled - restore stock
+		return uc.increaseStock(order)
+
+	case previousStatus == entity.PaymentStatusAuthorized && newStatus == entity.PaymentStatusFailed:
+		// Payment was authorized but now failed - restore stock
+		return uc.increaseStock(order)
+
+	case previousStatus == entity.PaymentStatusCaptured && newStatus == entity.PaymentStatusRefunded:
+		// Payment was captured but now refunded - restore stock
+		return uc.increaseStock(order)
+
+	case previousStatus != entity.PaymentStatusCancelled && newStatus == entity.PaymentStatusCancelled && previousStatus != entity.PaymentStatusAuthorized:
+		// Payment was cancelled without being authorized first - no stock change needed
+		return nil
+
+	case previousStatus != entity.PaymentStatusFailed && newStatus == entity.PaymentStatusFailed && previousStatus != entity.PaymentStatusAuthorized:
+		// Payment failed without being authorized first - no stock change needed
+		return nil
+
+	default:
+		// No stock change needed for other transitions (e.g., authorized -> captured)
+		return nil
+	}
+}
+
+// decreaseStock decreases stock for all items in an order
+func (uc *OrderUseCase) decreaseStock(order *entity.Order) error {
+	for _, item := range order.Items {
+		// Skip items without variant ID (shouldn't happen, but safety check)
+		if item.ProductVariantID == 0 {
+			continue
+		}
+
+		// Get the variant
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return fmt.Errorf("failed to get variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Check if there's enough stock
+		if variant.Stock < item.Quantity {
+			return fmt.Errorf("insufficient stock for product %s (SKU: %s): available %d, required %d",
+				item.ProductName, item.SKU, variant.Stock, item.Quantity)
+		}
+
+		// Update stock
+		changeAmount := -item.Quantity // Negative because we're decreasing
+		if err := variant.UpdateStock(changeAmount); err != nil {
+			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Save the updated variant
+		if err := uc.productVariantRepo.Update(variant); err != nil {
+			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
+		}
+	}
+	return nil
+}
+
+// increaseStock increases stock for all items in an order (for cancellations/refunds)
+func (uc *OrderUseCase) increaseStock(order *entity.Order) error {
+	for _, item := range order.Items {
+		// Skip items without variant ID (shouldn't happen, but safety check)
+		if item.ProductVariantID == 0 {
+			continue
+		}
+
+		// Get the variant
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return fmt.Errorf("failed to get variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Update stock
+		if err := variant.UpdateStock(item.Quantity); err != nil { // Positive quantity to increase stock
+			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Save the updated variant
+		if err := uc.productVariantRepo.Update(variant); err != nil {
+			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
+		}
+	}
+	return nil
 }

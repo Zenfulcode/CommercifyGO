@@ -3,8 +3,6 @@ package dto
 import (
 	"testing"
 	"time"
-
-	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
 func TestOrderDTO(t *testing.T) {
@@ -380,36 +378,6 @@ func TestOrderSearchRequest(t *testing.T) {
 	}
 	if request.Page != 1 {
 		t.Errorf("Expected Page 1, got %d", request.Page)
-	}
-}
-
-func TestProcessPaymentRequest(t *testing.T) {
-	cardDetails := &service.CardDetails{
-		CardNumber:     "4111111111111111",
-		ExpiryMonth:    12,
-		ExpiryYear:     2025,
-		CVV:            "123",
-		CardholderName: "John Doe",
-	}
-
-	request := ProcessPaymentRequest{
-		PaymentMethod:   PaymentMethodCard,
-		PaymentProvider: PaymentProviderStripe,
-		CardDetails:     cardDetails,
-		PhoneNumber:     "+1-555-123-4567",
-	}
-
-	if request.PaymentMethod != PaymentMethodCard {
-		t.Errorf("Expected PaymentMethod %s, got %s", PaymentMethodCard, request.PaymentMethod)
-	}
-	if request.PaymentProvider != PaymentProviderStripe {
-		t.Errorf("Expected PaymentProvider %s, got %s", PaymentProviderStripe, request.PaymentProvider)
-	}
-	if request.CardDetails.CardNumber != "4111111111111111" {
-		t.Errorf("Expected CardDetails.CardNumber '4111111111111111', got %s", request.CardDetails.CardNumber)
-	}
-	if request.PhoneNumber != "+1-555-123-4567" {
-		t.Errorf("Expected PhoneNumber '+1-555-123-4567', got %s", request.PhoneNumber)
 	}
 }
 

@@ -127,6 +127,7 @@ func (p *useCaseProvider) OrderUseCase() *usecase.OrderUseCase {
 		p.orderUseCase = usecase.NewOrderUseCase(
 			p.container.Repositories().OrderRepository(),
 			p.container.Repositories().ProductRepository(),
+			p.container.Repositories().ProductVariantRepository(),
 			p.container.Repositories().UserRepository(),
 			p.container.Services().PaymentService(),
 			p.container.Services().EmailService(),

@@ -18,6 +18,7 @@ type HandlerProvider interface {
 	DiscountHandler() *handler.DiscountHandler
 	ShippingHandler() *handler.ShippingHandler
 	CurrencyHandler() *handler.CurrencyHandler
+	HealthHandler() *handler.HealthHandler
 }
 
 // handlerProvider is the concrete implementation of HandlerProvider
@@ -35,6 +36,7 @@ type handlerProvider struct {
 	discountHandler *handler.DiscountHandler
 	shippingHandler *handler.ShippingHandler
 	currencyHandler *handler.CurrencyHandler
+	healthHandler   *handler.HealthHandler
 }
 
 // NewHandlerProvider creates a new handler provider
@@ -189,4 +191,18 @@ func (p *handlerProvider) CurrencyHandler() *handler.CurrencyHandler {
 		)
 	}
 	return p.currencyHandler
+}
+
+// HealthHandler returns the health handler
+func (p *handlerProvider) HealthHandler() *handler.HealthHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.healthHandler == nil {
+		p.healthHandler = handler.NewHealthHandler(
+			p.container.DB(),
+			p.container.Logger(),
+		)
+	}
+	return p.healthHandler
 }
