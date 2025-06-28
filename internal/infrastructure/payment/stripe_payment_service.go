@@ -272,9 +272,10 @@ func (s *StripePaymentService) VerifyPayment(transactionID string, provider serv
 	}
 
 	// Check if the payment intent was successful
-	if paymentIntent.Status == stripe.PaymentIntentStatusSucceeded {
+	switch paymentIntent.Status {
+	case stripe.PaymentIntentStatusSucceeded:
 		return true, nil
-	} else if paymentIntent.Status == stripe.PaymentIntentStatusRequiresCapture {
+	case stripe.PaymentIntentStatusRequiresCapture:
 		// Payment is authorized but requires capture
 		return true, nil
 	}
