@@ -62,7 +62,7 @@ docker-build: ## Build Docker image
 
 docker-build-tag: ## Build Docker image with specific tag (use TAG=version)
 	@if [ -z "$(TAG)" ]; then echo "Error: TAG is required. Use: make docker-build-tag TAG=v1.0.0"; exit 1; fi
-	docker build -t ghcr.io/zenfulcode/commercifygo:$(TAG) -t ghcr.io/zenfulcode/commercifygo:latest .
+	docker build -t ghcr.io/zenfulcode/commercifygo:$(TAG) -t ghcr.io/zenfulcode/commercifygo:latest -t ghcr.io/zenfulcode/commercifygo:dev .
 
 docker-push: ## Push Docker image to registry (use REGISTRY and TAG)
 	@if [ -z "$(REGISTRY)" ]; then echo "Error: REGISTRY is required. Use: make docker-push REGISTRY=your-registry.com"; exit 1; fi
@@ -71,6 +71,7 @@ docker-push: ## Push Docker image to registry (use REGISTRY and TAG)
 # docker tag $(REGISTRY)commercifygo:latest $(REGISTRY)/commercifygo:latest
 	docker push $(REGISTRY)/commercifygo:$(TAG)
 	docker push $(REGISTRY)/commercifygo:latest
+	docker push $(REGISTRY)/commercifygo:dev
 
 docker-build-push: docker-build-tag docker-push ## Build and push Docker image (use REGISTRY and TAG)
 
