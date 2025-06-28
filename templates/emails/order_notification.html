@@ -72,8 +72,7 @@
       <p><strong>Name:</strong> {{.User.FirstName}} {{.User.LastName}}</p>
       <p><strong>Email:</strong> {{.User.Email}}</p>
       <p>
-        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006
-        at 3:04 PM"}}
+        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006 at 3:04 PM"}}
       </p>
     </div>
 
@@ -93,15 +92,35 @@
         <tr>
           <td>{{.ProductID}}</td>
           <td>{{.Quantity}}</td>
-          <td>${{printf "%.2f" .Price}}</td>
-          <td>${{printf "%.2f" .Subtotal}}</td>
+          <td>${{formatPrice .Price}}</td>
+          <td>${{formatPrice .Subtotal}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
 
-    <div class="total">
-      <p>Total: ${{printf "%.2f" .Order.TotalAmount}}</p>
+    <div class="order-summary">
+      <p><strong>Subtotal:</strong> ${{formatPrice .Order.TotalAmount}}</p>
+      
+      {{if gt .Order.ShippingCost 0}}
+      <p><strong>Shipping:</strong> ${{formatPrice .Order.ShippingCost}}</p>
+      {{else}}
+      <p><strong>Shipping:</strong> Free</p>
+      {{end}}
+      
+      {{if gt .Order.DiscountAmount 0}}
+      <p><strong>Discount Applied:</strong> -${{formatPrice .Order.DiscountAmount}}
+      {{if .Order.AppliedDiscount}}
+        {{if .Order.AppliedDiscount.DiscountCode}}
+          (Code: {{.Order.AppliedDiscount.DiscountCode}})
+        {{end}}
+      {{end}}
+      </p>
+      {{end}}
+      
+      <div class="total">
+        <p><strong>Final Total:</strong> ${{formatPrice .Order.FinalAmount}}</p>
+      </div>
     </div>
 
     <h2>Shipping Address</h2>

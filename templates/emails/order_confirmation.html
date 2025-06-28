@@ -66,8 +66,7 @@
     <div class="order-details">
       <p><strong>Order Number:</strong> #{{.Order.ID}}</p>
       <p>
-        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2,
-        2006"}}
+        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006"}}
       </p>
       <p><strong>Order Status:</strong> {{.Order.Status}}</p>
     </div>
@@ -88,15 +87,35 @@
         <tr>
           <td>Product #{{.ProductID}}</td>
           <td>{{.Quantity}}</td>
-          <td>${{printf "%.2f" .Price}}</td>
-          <td>${{printf "%.2f" .Subtotal}}</td>
+          <td>${{formatPrice .Price}}</td>
+          <td>${{formatPrice .Subtotal}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
 
-    <div class="total">
-      <p>Total: ${{printf "%.2f" .Order.TotalAmount}}</p>
+    <div class="order-summary">
+      <p><strong>Subtotal:</strong> ${{formatPrice .Order.TotalAmount}}</p>
+      
+      {{if gt .Order.ShippingCost 0}}
+      <p><strong>Shipping:</strong> ${{formatPrice .Order.ShippingCost}}</p>
+      {{else}}
+      <p><strong>Shipping:</strong> Free</p>
+      {{end}}
+      
+      {{if gt .Order.DiscountAmount 0}}
+      <p><strong>Discount:</strong> -${{formatPrice .Order.DiscountAmount}}
+      {{if .Order.AppliedDiscount}}
+        {{if .Order.AppliedDiscount.DiscountCode}}
+          (Code: {{.Order.AppliedDiscount.DiscountCode}})
+        {{end}}
+      {{end}}
+      </p>
+      {{end}}
+      
+      <div class="total">
+        <p><strong>Total:</strong> ${{formatPrice .Order.FinalAmount}}</p>
+      </div>
     </div>
 
     <h2>Shipping Address</h2>

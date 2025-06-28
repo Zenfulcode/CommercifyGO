@@ -29,6 +29,8 @@ func NewSMTPEmailService(config config.EmailConfig, logger logger.Logger) *SMTPE
 
 // SendEmail sends an email with the given data
 func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
+	s.logger.Info("Attempting to send email to: %s, Subject: %s, Enabled: %t", data.To, data.Subject, s.config.Enabled)
+
 	// If email service is disabled, log and return
 	if !s.config.Enabled {
 		s.logger.Info("Email service is disabled. Would have sent email to: %s, Subject: %s", data.To, data.Subject)
@@ -43,8 +45,10 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 		// Use template if provided
 		body, err = s.renderTemplate(data.Template, data.Data)
 		if err != nil {
+			s.logger.Error("Failed to render email template %s: %v", data.Template, err)
 			return err
 		}
+		s.logger.Info("Email template rendered successfully")
 	} else {
 		// Use provided body
 		body = data.Body
@@ -74,6 +78,7 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body))
 
 	// Send email
+	s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
 	err = smtp.SendMail(
 		fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort),
 		auth,
@@ -83,7 +88,7 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 	)
 
 	if err != nil {
-		s.logger.Error("Failed to send email: %v", err)
+		s.logger.Error("Failed to send email to %s: %v", data.To, err)
 		return err
 	}
 
@@ -93,6 +98,8 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 
 // SendOrderConfirmation sends an order confirmation email to the customer
 func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *entity.User) error {
+	s.logger.Info("Sending order confirmation email for Order ID: %d to User: %s", order.ID, user.Email)
+
 	// Prepare data for the template
 	data := map[string]interface{}{
 		"Order":        order,
@@ -113,6 +120,8 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 
 // SendOrderNotification sends an order notification email to the admin
 func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *entity.User) error {
+	s.logger.Info("Sending order notification email for Order ID: %d to Admin: %s", order.ID, s.config.AdminEmail)
+
 	// Prepare data for the template
 	data := map[string]interface{}{
 		"Order":     order,
@@ -135,8 +144,18 @@ func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]i
 	// Get template path
 	templatePath := filepath.Join("templates", "emails", templateName)
 
+	// Create template with helper functions
+	tmpl := template.New(templateName).Funcs(template.FuncMap{
+		"centsToDollars": func(cents int64) float64 {
+			return float64(cents) / 100.0
+		},
+		"formatPrice": func(cents int64) string {
+			return fmt.Sprintf("%.2f", float64(cents)/100.0)
+		},
+	})
+
 	// Parse template
-	tmpl, err := template.ParseFiles(templatePath)
+	tmpl, err := tmpl.ParseFiles(templatePath)
 	if err != nil {
 		return "", err
 	}
