@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all configuration for the application
@@ -222,7 +223,7 @@ func LoadConfig() (*Config, error) {
 			IsTestMode:           mobilePayTestMode,
 		},
 		CORS: CORSConfig{
-			AllowedOrigins:  []string{"*"},
+			AllowedOrigins:  strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "*"), ","),
 			AllowAllOrigins: true,
 		},
 		DefaultCurrency: getEnv("DEFAULT_CURRENCY", "USD"),

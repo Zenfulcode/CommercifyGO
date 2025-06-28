@@ -146,17 +146,21 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 	for i := range order.Items {
 		order.Items[i].OrderID = order.ID
 		query := `
-			INSERT INTO order_items (order_id, product_id, quantity, price, subtotal, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO order_items (order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			RETURNING id
 		`
 		err = tx.QueryRow(
 			query,
 			order.Items[i].OrderID,
 			order.Items[i].ProductID,
+			order.Items[i].ProductVariantID,
 			order.Items[i].Quantity,
 			order.Items[i].Price,
 			order.Items[i].Subtotal,
+			order.Items[i].Weight,
+			order.Items[i].ProductName,
+			order.Items[i].SKU,
 			order.CreatedAt,
 		).Scan(&order.Items[i].ID)
 		if err != nil {
@@ -307,7 +311,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 
 	// Get order items
 	query = `
-		SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.subtotal,
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
 			p.name as product_name, p.product_number as sku
 		FROM order_items oi
 		LEFT JOIN products p ON p.id = oi.product_id
@@ -324,18 +328,24 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	for rows.Next() {
 		item := entity.OrderItem{}
 		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
 		err := rows.Scan(
 			&item.ID,
 			&item.OrderID,
 			&item.ProductID,
+			&productVariantID,
 			&item.Quantity,
 			&item.Price,
 			&item.Subtotal,
+			&item.Weight,
 			&productName,
 			&sku,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
 		}
 		if productName.Valid {
 			item.ProductName = productName.String
@@ -519,7 +529,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 
 		// Get order items
 		itemsQuery := `
-			SELECT id, order_id, product_id, quantity, price, subtotal
+			SELECT id, order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku
 			FROM order_items
 			WHERE order_id = $1
 		`
@@ -532,17 +542,32 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 		order.Items = []entity.OrderItem{}
 		for itemRows.Next() {
 			item := entity.OrderItem{}
+			var productVariantID sql.NullInt64
+			var productName, sku sql.NullString
 			err := itemRows.Scan(
 				&item.ID,
 				&item.OrderID,
 				&item.ProductID,
+				&productVariantID,
 				&item.Quantity,
 				&item.Price,
 				&item.Subtotal,
+				&item.Weight,
+				&productName,
+				&sku,
 			)
 			if err != nil {
 				itemRows.Close()
 				return nil, err
+			}
+			if productVariantID.Valid {
+				item.ProductVariantID = uint(productVariantID.Int64)
+			}
+			if productName.Valid {
+				item.ProductName = productName.String
+			}
+			if sku.Valid {
+				item.SKU = sku.String
 			}
 			order.Items = append(order.Items, item)
 		}
@@ -818,7 +843,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 
 	// Get order items
 	query = `
-		SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.subtotal,
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
 			p.name as product_name, p.product_number as sku
 		FROM order_items oi
 		LEFT JOIN products p ON p.id = oi.product_id
@@ -835,18 +860,24 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 	for rows.Next() {
 		item := entity.OrderItem{}
 		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
 		err := rows.Scan(
 			&item.ID,
 			&item.OrderID,
 			&item.ProductID,
+			&productVariantID,
 			&item.Quantity,
 			&item.Price,
 			&item.Subtotal,
+			&item.Weight,
 			&productName,
 			&sku,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
 		}
 		if productName.Valid {
 			item.ProductName = productName.String

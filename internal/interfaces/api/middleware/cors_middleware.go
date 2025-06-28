@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 
 	"slices"
@@ -26,8 +27,17 @@ func (m *CorsMiddleware) ApplyCors(next http.Handler) http.Handler {
 		// Get allowed origins from config or use default
 		allowedOrigins := m.getAllowedOrigins()
 
+		if len(allowedOrigins) == 0 {
+			// If no origins are configured, allow all origins
+			allowedOrigins = []string{"*"}
+		}
+
+		fmt.Println("Allowed Origins:", allowedOrigins)
+
 		// Get origin from request
 		origin := r.Header.Get("Origin")
+
+		fmt.Println("Request Origin:", origin)
 
 		// Check if the origin is allowed
 		if m.isAllowedOrigin(origin, allowedOrigins) {

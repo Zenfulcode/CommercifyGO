@@ -70,16 +70,18 @@ type Order struct {
 
 // OrderItem represents an item in an order
 type OrderItem struct {
-	ID        uint    `json:"id"`
-	OrderID   uint    `json:"order_id"`
-	ProductID uint    `json:"product_id"`
-	Quantity  int     `json:"quantity"`
-	Price     int64   `json:"price"`    // stored in cents
-	Subtotal  int64   `json:"subtotal"` // stored in cents
-	Weight    float64 `json:"weight"`   // Weight per item
+	ID               uint    `json:"id"`
+	OrderID          uint    `json:"order_id"`
+	ProductID        uint    `json:"product_id"`
+	ProductVariantID uint    `json:"product_variant_id,omitempty"`
+	Quantity         int     `json:"quantity"`
+	Price            int64   `json:"price"`    // stored in cents
+	Subtotal         int64   `json:"subtotal"` // stored in cents
+	Weight           float64 `json:"weight"`   // Weight per item
 
 	ProductName string `json:"product_name"`
 	SKU         string `json:"sku"`
+	ImageURL    string `json:"image_url,omitempty"`
 }
 
 // Address represents a shipping or billing address

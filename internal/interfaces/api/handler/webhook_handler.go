@@ -188,6 +188,7 @@ func (h *WebhookHandler) HandleMobilePayAuthorized(event *models.WebhookEvent) e
 	input := usecase.UpdatePaymentStatusInput{
 		OrderID:       orderID,
 		PaymentStatus: entity.PaymentStatusAuthorized,
+		TransactionID: event.Reference,
 	}
 
 	order, err := h.orderUseCase.UpdatePaymentStatus(input)

@@ -101,6 +101,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Process payment
 	paymentResult, err := uc.paymentSvc.ProcessPayment(service.PaymentRequest{
 		OrderID:         order.ID,
+		OrderNumber:     order.OrderNumber,
 		Amount:          order.FinalAmount, // Use final amount (after discounts)
 		Currency:        order.Currency,
 		PaymentMethod:   input.PaymentMethod,
@@ -202,6 +203,25 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Update order in repository
 	if err := uc.orderRepo.Update(order); err != nil {
 		return nil, err
+	}
+
+	// Decrease stock when payment is authorized to reserve items
+	if err := uc.decreaseStockForOrder(order); err != nil {
+		// If stock update fails, we should consider the payment failed
+		// Try to update the order status to indicate the failure
+		log.Printf("Failed to decrease stock for order %d: %v", order.ID, err)
+
+		// Update payment status to failed since we can't fulfill the order
+		if updateErr := order.UpdatePaymentStatus(entity.PaymentStatusFailed); updateErr != nil {
+			log.Printf("Failed to update payment status to failed: %v", updateErr)
+		} else {
+			// Save the updated order status
+			if saveErr := uc.orderRepo.Update(order); saveErr != nil {
+				log.Printf("Failed to save failed payment status: %v", saveErr)
+			}
+		}
+
+		return nil, fmt.Errorf("unable to reserve stock for order: %w", err)
 	}
 
 	// Record the successful authorization transaction
@@ -982,4 +1002,37 @@ func (uc *CheckoutUseCase) getPriceInCurrency(variant *entity.ProductVariant, ta
 	// Convert the price
 	convertedPrice := fromCurrency.ConvertAmount(variant.Price, toCurrency)
 	return convertedPrice, nil
+}
+
+// decreaseStockForOrder decreases stock for all items in an order when payment is authorized
+func (uc *CheckoutUseCase) decreaseStockForOrder(order *entity.Order) error {
+	for _, item := range order.Items {
+		// Skip items without variant ID (shouldn't happen, but safety check)
+		if item.ProductVariantID == 0 {
+			continue
+		}
+
+		// Get the variant
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return fmt.Errorf("failed to get variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Check if there's enough stock
+		if variant.Stock < item.Quantity {
+			return fmt.Errorf("insufficient stock for product %s (SKU: %s): available %d, required %d",
+				item.ProductName, item.SKU, variant.Stock, item.Quantity)
+		}
+
+		// Update stock
+		if err := variant.UpdateStock(variant.Stock - item.Quantity); err != nil {
+			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Save the updated variant
+		if err := uc.productVariantRepo.Update(variant); err != nil {
+			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
+		}
+	}
+	return nil
 }

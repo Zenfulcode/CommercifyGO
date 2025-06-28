@@ -80,12 +80,18 @@ func (s *Server) setupRoutes() {
 	discountHandler := s.container.Handlers().DiscountHandler()
 	shippingHandler := s.container.Handlers().ShippingHandler()
 	currencyHandler := s.container.Handlers().CurrencyHandler()
+	healthHandler := s.container.Handlers().HealthHandler()
 
 	// Extract middleware from container
 	authMiddleware := s.container.Middlewares().AuthMiddleware()
+	corsMiddleware := s.container.Middlewares().CorsMiddleware()
+
+	// Health check routes (no prefix, for load balancers and monitoring)
+	s.router.HandleFunc("/health", healthHandler.Health).Methods(http.MethodGet)
 
 	// Register routes
 	api := s.router.PathPrefix("/api").Subrouter()
+	api.Use(corsMiddleware.ApplyCors)
 
 	// Public routes
 	api.HandleFunc("/auth/register", userHandler.Register).Methods(http.MethodPost)

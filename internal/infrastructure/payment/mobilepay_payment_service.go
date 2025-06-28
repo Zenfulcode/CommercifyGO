@@ -107,7 +107,7 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 			Type: "WALLET",
 		},
 		Reference:          reference,
-		ReturnURL:          s.config.ReturnURL + "?reference=" + reference,
+		ReturnURL:          s.config.ReturnURL + "?order=" + request.OrderNumber,
 		UserFlow:           models.UserFlowWebRedirect,
 		PaymentDescription: s.config.PaymentDescription,
 	}

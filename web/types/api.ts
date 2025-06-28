@@ -434,14 +434,16 @@ export interface OrderDTO {
   shipping_details: ShippingOptionDTO;
   discount_details: AppliedDiscountDTO;
   customer: CustomerDetailsDTO;
-  checkout_id?: string;
+  checkout_id: string;
   created_at: string;
   updated_at: string;
 }
 export interface OrderSummaryDTO {
   id: number /* uint */;
   order_number: string;
+  checkout_id: string;
   user_id: number /* uint */;
+  customer: CustomerDetailsDTO;
   status: OrderStatus;
   payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
@@ -474,6 +476,7 @@ export interface OrderItemDTO {
   quantity: number /* int */;
   unit_price: number /* float64 */;
   total_price: number /* float64 */;
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -516,15 +519,6 @@ export interface OrderSearchRequest {
   start_date?: string;
   end_date?: string;
   pagination: PaginationDTO;
-}
-/**
- * ProcessPaymentRequest represents the data needed to process a payment
- */
-export interface ProcessPaymentRequest {
-  payment_method: PaymentMethod;
-  payment_provider: PaymentProvider;
-  card_details?: any /* service.CardDetails */;
-  phone_number?: string;
 }
 /**
  * OrderStatus represents the status of an order
