@@ -139,6 +139,11 @@ func (s *Server) setupRoutes() {
 	s.setupMobilePayWebhooks(api, webhookHandler)
 	s.setupStripeWebhooks(api, webhookHandler)
 
+	// Routes with optional authentication (accessible via auth or checkout session)
+	optionalAuth := api.PathPrefix("").Subrouter()
+	optionalAuth.Use(authMiddleware.OptionalAuthenticate)
+	optionalAuth.HandleFunc("/orders/{orderId:[0-9]+}", orderHandler.GetOrder).Methods(http.MethodGet)
+
 	// Protected routes
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(authMiddleware.Authenticate)
@@ -148,8 +153,7 @@ func (s *Server) setupRoutes() {
 	protected.HandleFunc("/users/me", userHandler.UpdateProfile).Methods(http.MethodPut)
 	protected.HandleFunc("/users/me/password", userHandler.ChangePassword).Methods(http.MethodPut)
 
-	// Order routes
-	protected.HandleFunc("/orders/{orderId:[0-9]+}", orderHandler.GetOrder).Methods(http.MethodGet)
+	// Order routes (authenticated users only)
 	protected.HandleFunc("/orders", orderHandler.ListOrders).Methods(http.MethodGet)
 
 	// Admin routes

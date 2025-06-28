@@ -58,9 +58,9 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-				total_weight, currency
+				total_weight, currency, checkout_session_id
 			)
-			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 			RETURNING id
 		`
 
@@ -86,6 +86,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingCost,
 			order.TotalWeight,
 			order.Currency,
+			order.CheckoutSessionID,
 		).Scan(&order.ID)
 	} else {
 		// Regular user order
@@ -94,9 +95,9 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, shipping_method_id, shipping_cost, total_weight,
-				currency
+				currency, checkout_session_id
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 			RETURNING id
 		`
 
@@ -122,6 +123,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingCost,
 			order.TotalWeight,
 			order.Currency,
+			order.CheckoutSessionID,
 		).Scan(&order.ID)
 	}
 
@@ -179,7 +181,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-			total_weight, currency
+			total_weight, currency, checkout_session_id
 		FROM orders
 		WHERE id = $1
 	`
@@ -199,6 +201,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 
 	var discountID sql.NullInt64
 	var discountCode sql.NullString
+	var checkoutSessionID sql.NullString
 
 	err := r.db.QueryRow(query, orderID).Scan(
 		&order.ID,
@@ -228,6 +231,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		&shippingCost,
 		&totalWeight,
 		&order.Currency,
+		&checkoutSessionID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -309,6 +313,11 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		order.TotalWeight = totalWeight.Float64
 	}
 
+	// Set checkout session ID if valid
+	if checkoutSessionID.Valid {
+		order.CheckoutSessionID = checkoutSessionID.String
+	}
+
 	// Get order items
 	query = `
 		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
@@ -353,6 +362,199 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		if sku.Valid {
 			item.SKU = sku.String
 		}
+		order.Items = append(order.Items, item)
+	}
+
+	return order, nil
+}
+
+// GetByCheckoutSessionID retrieves an order by checkout session ID
+func (r *OrderRepository) GetByCheckoutSessionID(checkoutSessionID string) (*entity.Order, error) {
+	// Get order
+	query := `
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
+			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
+			discount_amount, discount_id, discount_code, final_amount, action_url,
+			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
+			total_weight, currency, checkout_session_id
+		FROM orders
+		WHERE checkout_session_id = $1
+	`
+
+	order := &entity.Order{}
+	var shippingAddrJSON, billingAddrJSON []byte
+	var completedAt sql.NullTime
+	var paymentProvider sql.NullString
+	var orderNumber sql.NullString
+	var actionURL sql.NullString
+	var userID sql.NullInt64 // Use NullInt64 to handle NULL user_id
+	var customerEmail, customerPhone, customerFullName sql.NullString
+	var isGuestOrder sql.NullBool
+	var shippingMethodID sql.NullInt64
+	var shippingCost sql.NullInt64
+	var totalWeight sql.NullFloat64
+	var discountID sql.NullInt64
+	var discountCode sql.NullString
+	var checkoutSessionIDResult sql.NullString
+
+	err := r.db.QueryRow(query, checkoutSessionID).Scan(
+		&order.ID,
+		&orderNumber,
+		&userID,
+		&order.TotalAmount,
+		&order.Status,
+		&order.PaymentStatus,
+		&shippingAddrJSON,
+		&billingAddrJSON,
+		&order.PaymentID,
+		&paymentProvider,
+		&order.TrackingCode,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+		&completedAt,
+		&order.DiscountAmount,
+		&discountID,
+		&discountCode,
+		&order.FinalAmount,
+		&actionURL,
+		&customerEmail,
+		&customerPhone,
+		&customerFullName,
+		&isGuestOrder,
+		&shippingMethodID,
+		&shippingCost,
+		&totalWeight,
+		&order.Currency,
+		&checkoutSessionIDResult,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.New("order not found")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle user_id properly
+	if userID.Valid {
+		order.UserID = uint(userID.Int64)
+	} else {
+		order.UserID = 0 // Use 0 to represent NULL in our application
+	}
+
+	// Handle guest order fields
+	if isGuestOrder.Valid && isGuestOrder.Bool {
+		order.IsGuestOrder = true
+		order.CustomerDetails = &entity.CustomerDetails{}
+		if customerEmail.Valid {
+			order.CustomerDetails.Email = customerEmail.String
+		}
+		if customerPhone.Valid {
+			order.CustomerDetails.Phone = customerPhone.String
+		}
+		if customerFullName.Valid {
+			order.CustomerDetails.FullName = customerFullName.String
+		}
+	}
+
+	// Set order number if valid
+	if orderNumber.Valid {
+		order.OrderNumber = orderNumber.String
+	}
+
+	// Set payment provider if valid
+	if paymentProvider.Valid {
+		order.PaymentProvider = paymentProvider.String
+	}
+
+	// Set action URL if valid
+	if actionURL.Valid {
+		order.ActionURL = actionURL.String
+	}
+
+	// Set checkout session ID if valid
+	if checkoutSessionIDResult.Valid {
+		order.CheckoutSessionID = checkoutSessionIDResult.String
+	}
+
+	// Unmarshal addresses
+	if err := json.Unmarshal(shippingAddrJSON, &order.ShippingAddr); err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(billingAddrJSON, &order.BillingAddr); err != nil {
+		return nil, err
+	}
+
+	// Set completed at if valid
+	if completedAt.Valid {
+		order.CompletedAt = &completedAt.Time
+	}
+
+	// Set shipping method ID if valid
+	if shippingMethodID.Valid {
+		order.ShippingMethodID = uint(shippingMethodID.Int64)
+	}
+
+	// Set shipping cost if valid
+	if shippingCost.Valid {
+		order.ShippingCost = shippingCost.Int64
+	}
+
+	// Set total weight if valid
+	if totalWeight.Valid {
+		order.TotalWeight = totalWeight.Float64
+	}
+
+	// Get order items
+	query = `
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
+			p.name as product_name, p.product_number as sku
+		FROM order_items oi
+		LEFT JOIN products p ON p.id = oi.product_id
+		WHERE oi.order_id = $1
+	`
+
+	rows, err := r.db.Query(query, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	order.Items = []entity.OrderItem{}
+	for rows.Next() {
+		item := entity.OrderItem{}
+		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
+		err := rows.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ProductID,
+			&productVariantID,
+			&item.Quantity,
+			&item.Price,
+			&item.Subtotal,
+			&item.Weight,
+			&productName,
+			&sku,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
+		}
+
+		if productName.Valid {
+			item.ProductName = productName.String
+		}
+
+		if sku.Valid {
+			item.SKU = sku.String
+		}
+
 		order.Items = append(order.Items, item)
 	}
 

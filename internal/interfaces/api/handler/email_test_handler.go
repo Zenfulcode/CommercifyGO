@@ -43,16 +43,17 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Create a mock order
 	mockOrder := &entity.Order{
-		ID:             12345,
-		OrderNumber:    "ORD-12345",
-		UserID:         mockUser.ID,
-		Status:         entity.OrderStatusCompleted,
-		PaymentStatus:  entity.PaymentStatusCaptured,
-		TotalAmount:    9950, // $99.50 in cents (subtotal before shipping/discounts)
-		ShippingCost:   850,  // $8.50 shipping cost
-		DiscountAmount: 1500, // $15.00 discount
-		FinalAmount:    8300, // $83.00 final amount (99.50 + 8.50 - 15.00)
-		Currency:       "USD",
+		ID:                12345,
+		OrderNumber:       "ORD-12345",
+		UserID:            mockUser.ID,
+		Status:            entity.OrderStatusCompleted,
+		PaymentStatus:     entity.PaymentStatusCaptured,
+		TotalAmount:       9950, // $99.50 in cents (subtotal before shipping/discounts)
+		ShippingCost:      850,  // $8.50 shipping cost
+		DiscountAmount:    1500, // $15.00 discount
+		FinalAmount:       8300, // $83.00 final amount (99.50 + 8.50 - 15.00)
+		Currency:          "USD",
+		CheckoutSessionID: "test-checkout-session-12345", // Add checkout session ID for testing
 		ShippingAddr: entity.Address{
 			Street:     "123 Test Street",
 			City:       "Test City",

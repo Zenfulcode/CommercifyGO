@@ -75,6 +75,9 @@ docker-push: ## Push Docker image to registry (use REGISTRY and TAG)
 
 docker-build-push: docker-build-tag docker-push ## Build and push Docker image (use REGISTRY and TAG)
 
+docker-dev-build: ## Build Docker image for development
+	docker build -t ghcr.io/zenfulcode/commercifygo:dev .
+
 # Development commands
 test: ## Run tests
 	go test ./...

@@ -60,7 +60,7 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	healthStatus := HealthStatus{
 		Status:    status,
 		Timestamp: time.Now(),
-		Version:   "1.0.4", // TODO: Make this configurable
+		Version:   "1.0.6", // TODO: Make this configurable
 		Services:  services,
 		Uptime:    uptime,
 	}

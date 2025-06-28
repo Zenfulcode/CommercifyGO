@@ -25,6 +25,23 @@ func NewMockOrderRepository(
 	}
 }
 
+// GetByCheckoutSessionID implements repository.OrderRepository.
+func (r *OrderRepository) GetByCheckoutSessionID(checkoutSessionID string) (*entity.Order, error) {
+	if checkoutSessionID == "" {
+		return nil, errors.New("checkout session ID cannot be empty")
+	}
+
+	for _, order := range r.orders {
+		if order.CheckoutSessionID == checkoutSessionID {
+			// Return a clone to prevent unintended modifications
+			clone := *order
+			return &clone, nil
+		}
+	}
+
+	return nil, errors.New("order not found for checkout session ID")
+}
+
 // ListAll implements repository.OrderRepository.
 func (r *OrderRepository) ListAll(offset int, limit int) ([]*entity.Order, error) {
 	orders := make([]*entity.Order, 0, len(r.orders))
