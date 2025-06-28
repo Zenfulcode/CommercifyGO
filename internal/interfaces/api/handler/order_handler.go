@@ -30,13 +30,8 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 
 // GetOrder handles getting an order by ID
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("GetOrder called")
-
 	// Get user ID from context (optional for checkout session access)
 	userID, isAuthenticated := r.Context().Value(middleware.UserIDKey).(uint)
-
-	h.logger.Debug("GetOrder called with userID: %d, isAuthenticated: %t", userID, isAuthenticated)
-
 	// Get order ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
@@ -45,8 +40,6 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid order ID", http.StatusBadRequest)
 		return
 	}
-
-	h.logger.Debug("Fetching order with ID: %d", id)
 
 	// Get order
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
@@ -58,8 +51,6 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	}
-
-	h.logger.Debug("Order %d fetched successfully: CheckoutSessionID=%s", order.ID, order.CheckoutSessionID)
 
 	// Check authorization: user owns the order, admin, or checkout session matches
 	authorized := false
@@ -80,9 +71,6 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	// If not authorized by user auth, check checkout session cookie
 	if !authorized {
 		cookie, err := r.Cookie(common.CheckoutSessionCookie)
-
-		h.logger.Debug("Checking checkout session cookie for order %d: %v", order.ID, err)
-
 		if err == nil && cookie.Value != "" && cookie.Value == order.CheckoutSessionID {
 			authorized = true
 			h.logger.Info("Order %d accessed via checkout session: %s", order.ID, cookie.Value)
