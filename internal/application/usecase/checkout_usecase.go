@@ -101,6 +101,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Process payment
 	paymentResult, err := uc.paymentSvc.ProcessPayment(service.PaymentRequest{
 		OrderID:         order.ID,
+		OrderNumber:     order.OrderNumber,
 		Amount:          order.FinalAmount, // Use final amount (after discounts)
 		Currency:        order.Currency,
 		PaymentMethod:   input.PaymentMethod,

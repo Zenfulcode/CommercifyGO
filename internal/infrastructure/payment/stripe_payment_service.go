@@ -185,7 +185,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 				"method":   paymentMethodType,
 			},
 		},
-		ReturnURL: stripe.String(s.config.ReturnURL),
+		ReturnURL: stripe.String(s.config.ReturnURL + "?order=" + request.OrderNumber),
 	}
 
 	// Create a customer if email is provided
