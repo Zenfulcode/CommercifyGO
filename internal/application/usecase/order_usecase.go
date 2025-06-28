@@ -513,6 +513,12 @@ func (uc *OrderUseCase) UpdatePaymentStatus(input UpdatePaymentStatusInput) (*en
 		log.Printf("Warning: Failed to update stock for order %d: %v", order.ID, err)
 	}
 
+	// Send emails for payment status changes
+	if err := uc.handleEmailsForPaymentStatusChange(order, previousPaymentStatus, input.PaymentStatus); err != nil {
+		// Log the error but don't fail the status update since the payment status change was successful
+		log.Printf("Warning: Failed to send emails for order %d: %v", order.ID, err)
+	}
+
 	return order, nil
 }
 
@@ -608,5 +614,60 @@ func (uc *OrderUseCase) increaseStock(order *entity.Order) error {
 			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
 		}
 	}
+	return nil
+}
+
+// handleEmailsForPaymentStatusChange sends appropriate emails when payment status changes
+func (uc *OrderUseCase) handleEmailsForPaymentStatusChange(order *entity.Order, previousStatus, newStatus entity.PaymentStatus) error {
+	// Only send emails when payment status changes to authorized or paid
+	shouldSendEmails := false
+
+	switch {
+	case previousStatus != entity.PaymentStatusAuthorized && newStatus == entity.PaymentStatusAuthorized:
+		// Payment was just authorized - send order confirmation and notification emails
+		shouldSendEmails = true
+	case previousStatus != entity.PaymentStatusCaptured && newStatus == entity.PaymentStatusCaptured:
+		// Payment was just captured/paid - send order confirmation and notification emails
+		shouldSendEmails = true
+	default:
+		// No emails needed for other transitions
+		return nil
+	}
+
+	if !shouldSendEmails {
+		return nil
+	}
+
+	// Create user object for email sending
+	var user *entity.User
+	if order.IsGuestOrder || order.UserID == 0 {
+		// Guest order - create a temporary user object with customer details
+		if order.CustomerDetails == nil {
+			return fmt.Errorf("guest order missing customer details")
+		}
+		user = &entity.User{
+			Email:     order.CustomerDetails.Email,
+			FirstName: order.CustomerDetails.FullName, // Use FullName as FirstName for guest orders
+		}
+	} else {
+		// Registered user - get from repository
+		var err error
+		user, err = uc.userRepo.GetByID(order.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user %d: %w", order.UserID, err)
+		}
+	}
+
+	// Send order confirmation email to customer
+	if err := uc.emailSvc.SendOrderConfirmation(order, user); err != nil {
+		return fmt.Errorf("failed to send order confirmation email: %w", err)
+	}
+
+	// Send order notification email to admin
+	if err := uc.emailSvc.SendOrderNotification(order, user); err != nil {
+		return fmt.Errorf("failed to send order notification email: %w", err)
+	}
+
+	log.Printf("Sent order confirmation and notification emails for order %d (status: %s)", order.ID, newStatus)
 	return nil
 }

@@ -1035,30 +1035,3 @@ func (uc *CheckoutUseCase) decreaseStockForOrder(order *entity.Order) error {
 	}
 	return nil
 }
-
-// increaseStockForOrder increases stock for all items in an order (for cancellations/failures)
-func (uc *CheckoutUseCase) increaseStockForOrder(order *entity.Order) error {
-	for _, item := range order.Items {
-		// Skip items without variant ID (shouldn't happen, but safety check)
-		if item.ProductVariantID == 0 {
-			continue
-		}
-
-		// Get the variant
-		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
-		if err != nil {
-			return fmt.Errorf("failed to get variant %d: %w", item.ProductVariantID, err)
-		}
-
-		// Update stock
-		if err := variant.UpdateStock(variant.Stock + item.Quantity); err != nil {
-			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
-		}
-
-		// Save the updated variant
-		if err := uc.productVariantRepo.Update(variant); err != nil {
-			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
-		}
-	}
-	return nil
-}
