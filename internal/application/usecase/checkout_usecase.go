@@ -492,12 +492,14 @@ func (uc *CheckoutUseCase) RemoveDiscountCode(checkout *entity.Checkout) (*entit
 }
 
 // ExpireOldCheckouts marks expired checkouts as expired
-func (uc *CheckoutUseCase) ExpireOldCheckouts() error {
+func (uc *CheckoutUseCase) ExpireOldCheckouts() (int, error) {
 	// Get expired checkouts
 	expiredCheckouts, err := uc.checkoutRepo.GetExpiredCheckouts()
 	if err != nil {
-		return err
+		return 0, err
 	}
+
+	amountExpired := len(expiredCheckouts)
 
 	// Mark each as expired
 	for _, checkout := range expiredCheckouts {
@@ -509,7 +511,7 @@ func (uc *CheckoutUseCase) ExpireOldCheckouts() error {
 		}
 	}
 
-	return nil
+	return amountExpired, nil
 }
 
 // CreateOrderFromCheckout creates an order from a checkout

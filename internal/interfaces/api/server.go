@@ -237,6 +237,11 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices/{currency}", productHandler.RemoveVariantPrice).Methods(http.MethodDelete)
 }
 
+// GetContainer returns the dependency injection container
+func (s *Server) GetContainer() container.Container {
+	return s.container
+}
+
 // setupStripeWebhooks configures Stripe webhooks
 func (s *Server) setupStripeWebhooks(api *mux.Router, webhookHandler *handler.WebhookHandler) {
 	if !s.config.Stripe.Enabled {

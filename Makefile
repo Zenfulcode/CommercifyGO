@@ -41,6 +41,7 @@ build: ## Build the application
 	go build -o bin/api ./cmd/api
 	go build -o bin/migrate ./cmd/migrate
 	go build -o bin/seed ./cmd/seed
+	go build -o bin/expire-checkouts ./cmd/expire-checkouts
 
 run: db-start ## Run the application locally with database
 	@echo "Starting database and waiting for it to be ready..."
@@ -105,3 +106,7 @@ vet: ## Run go vet
 
 mod-tidy: ## Tidy Go modules
 	go mod tidy
+
+# Maintenance commands
+expire-checkouts: ## Expire old checkouts manually
+	go run ./cmd/expire-checkouts
