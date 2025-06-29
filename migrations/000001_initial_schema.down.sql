@@ -1,0 +1,46 @@
+-- Drop all tables and functions (reverse order due to dependencies)
+DROP TRIGGER IF EXISTS generate_product_friendly_id ON products;
+DROP TRIGGER IF EXISTS generate_order_friendly_id ON orders;
+DROP TRIGGER IF EXISTS update_users_timestamp ON users;
+DROP TRIGGER IF EXISTS update_categories_timestamp ON categories;
+DROP TRIGGER IF EXISTS update_currencies_timestamp ON currencies;
+DROP TRIGGER IF EXISTS update_products_timestamp ON products;
+DROP TRIGGER IF EXISTS update_product_variants_timestamp ON product_variants;
+DROP TRIGGER IF EXISTS update_product_prices_timestamp ON product_prices;
+DROP TRIGGER IF EXISTS update_product_variant_prices_timestamp ON product_variant_prices;
+DROP TRIGGER IF EXISTS update_payment_providers_timestamp ON payment_providers;
+DROP TRIGGER IF EXISTS update_discounts_timestamp ON discounts;
+DROP TRIGGER IF EXISTS update_webhooks_timestamp ON webhooks;
+DROP TRIGGER IF EXISTS update_shipping_zones_timestamp ON shipping_zones;
+DROP TRIGGER IF EXISTS update_shipping_methods_timestamp ON shipping_methods;
+DROP TRIGGER IF EXISTS update_shipping_rates_timestamp ON shipping_rates;
+DROP TRIGGER IF EXISTS update_weight_based_rates_timestamp ON weight_based_rates;
+DROP TRIGGER IF EXISTS update_value_based_rates_timestamp ON value_based_rates;
+DROP TRIGGER IF EXISTS update_checkouts_timestamp ON checkouts;
+DROP TRIGGER IF EXISTS update_checkout_items_timestamp ON checkout_items;
+DROP TRIGGER IF EXISTS update_orders_timestamp ON orders;
+DROP TRIGGER IF EXISTS update_payment_transactions_timestamp ON payment_transactions;
+
+DROP FUNCTION IF EXISTS update_timestamp();
+DROP FUNCTION IF EXISTS generate_friendly_id();
+
+DROP TABLE IF EXISTS payment_transactions;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS checkout_items;
+DROP TABLE IF EXISTS checkouts;
+DROP TABLE IF EXISTS value_based_rates;
+DROP TABLE IF EXISTS weight_based_rates;
+DROP TABLE IF EXISTS shipping_rates;
+DROP TABLE IF EXISTS shipping_methods;
+DROP TABLE IF EXISTS shipping_zones;
+DROP TABLE IF EXISTS webhooks;
+DROP TABLE IF EXISTS discounts;
+DROP TABLE IF EXISTS payment_providers;
+DROP TABLE IF EXISTS product_variant_prices;
+DROP TABLE IF EXISTS product_prices;
+DROP TABLE IF EXISTS product_variants;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS currencies;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS users;
