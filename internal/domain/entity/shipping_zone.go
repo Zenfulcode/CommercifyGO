@@ -2,20 +2,19 @@ package entity
 
 import (
 	"errors"
-	"time"
+
+	"gorm.io/gorm"
 )
 
 // ShippingZone represents a geographical shipping zone
 type ShippingZone struct {
-	ID          uint
-	Name        string
-	Description string
-	Countries   []string
-	States      []string
-	ZipCodes    []string
-	Active      bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	gorm.Model
+	Name        string   `gorm:"not null;size:255"`
+	Description string   `gorm:"type:text"`
+	Countries   []string `gorm:"type:jsonb;default:'[]'"`
+	States      []string `gorm:"type:jsonb;default:'[]'"`
+	ZipCodes    []string `gorm:"type:jsonb;default:'[]'"`
+	Active      bool     `gorm:"default:true"`
 }
 
 // NewShippingZone creates a new shipping zone
@@ -24,7 +23,6 @@ func NewShippingZone(name string, description string) (*ShippingZone, error) {
 		return nil, errors.New("shipping zone name cannot be empty")
 	}
 
-	now := time.Now()
 	return &ShippingZone{
 		Name:        name,
 		Description: description,
@@ -32,8 +30,6 @@ func NewShippingZone(name string, description string) (*ShippingZone, error) {
 		States:      []string{},
 		ZipCodes:    []string{},
 		Active:      true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
 	}, nil
 }
 
@@ -45,33 +41,33 @@ func (z *ShippingZone) Update(name string, description string) error {
 
 	z.Name = name
 	z.Description = description
-	z.UpdatedAt = time.Now()
+
 	return nil
 }
 
 // SetCountries sets the countries for this shipping zone
 func (z *ShippingZone) SetCountries(countries []string) {
 	z.Countries = countries
-	z.UpdatedAt = time.Now()
+
 }
 
 // SetStates sets the states/provinces for this shipping zone
 func (z *ShippingZone) SetStates(states []string) {
 	z.States = states
-	z.UpdatedAt = time.Now()
+
 }
 
 // SetZipCodes sets the zip/postal codes for this shipping zone
 func (z *ShippingZone) SetZipCodes(zipCodes []string) {
 	z.ZipCodes = zipCodes
-	z.UpdatedAt = time.Now()
+
 }
 
 // Activate activates a shipping zone
 func (z *ShippingZone) Activate() {
 	if !z.Active {
 		z.Active = true
-		z.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -79,7 +75,7 @@ func (z *ShippingZone) Activate() {
 func (z *ShippingZone) Deactivate() {
 	if z.Active {
 		z.Active = false
-		z.UpdatedAt = time.Now()
+
 	}
 }
 

@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
@@ -15,7 +16,8 @@ type Product struct {
 	Name        string            `gorm:"not null;size:255"`
 	Description string            `gorm:"type:text"`
 	CategoryID  uint              `gorm:"not null;index"`
-	Images      []string          `gorm:"type:json;default:'[]'"`
+	Category    Category          `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Images      []string          `gorm:"type:jsonb;default:'[]'"`
 	Active      bool              `gorm:"default:true"`
 	Variants    []*ProductVariant `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
@@ -67,10 +69,7 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 		return errors.New("variant cannot be nil")
 	}
 
-	// Ensure variant belongs to this product
-	if variant.ProductID != p.ID {
-		return errors.New("variant does not belong to this product")
-	}
+	variant.ProductID = p.ID
 
 	// Add variant to product
 	p.Variants = append(p.Variants, variant)
@@ -189,6 +188,28 @@ func (p *Product) GetTotalStock() int {
 
 func (p *Product) HasVariants() bool {
 	return len(p.Variants) > 0
+}
+
+func (p *Product) Update(name string, description string, images []string, active bool) bool {
+	updated := false
+	if name != "" && p.Name != name {
+		p.Name = name
+		updated = true
+	}
+	if description != "" && p.Description != description {
+		p.Description = description
+		updated = true
+	}
+	if len(images) > 0 && !slices.Equal(p.Images, images) {
+		p.Images = images
+		updated = true
+	}
+	if p.Active != active {
+		p.Active = active
+		updated = true
+	}
+
+	return updated
 }
 
 func (product *Product) ToProductDTO(variantId *uint) *dto.ProductDTO {

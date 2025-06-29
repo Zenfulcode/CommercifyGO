@@ -9,9 +9,12 @@ import (
 // Category represents a product category
 type Category struct {
 	gorm.Model
-	Name        string `gorm:"not null;size:255"`
-	Description string `gorm:"type:text"`
-	ParentID    *uint  `gorm:"index"` // Nullable for top-level categories
+	Name        string     `gorm:"not null;size:255"`
+	Description string     `gorm:"type:text"`
+	ParentID    *uint      `gorm:"index"` // Nullable for top-level categories
+	Parent      *Category  `gorm:"foreignKey:ParentID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	Children    []Category `gorm:"foreignKey:ParentID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	Products    []Product  `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
 }
 
 // NewCategory creates a new category

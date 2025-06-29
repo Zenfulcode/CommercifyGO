@@ -58,9 +58,79 @@ func (r *ProductRepository) GetByID(productID uint) (*entity.Product, error) {
 	return &product, nil
 }
 
+// GetBySKU implements repository.ProductRepository.
+func (r *ProductRepository) GetBySKU(sku string) (*entity.Product, error) {
+	var product entity.Product
+	if err := r.db.Preload("Variants.Prices").Joins("JOIN product_variants ON products.id = product_variants.product_id").
+		Where("product_variants.sku = ?", sku).First(&product).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("product not found")
+		}
+		return nil, err
+	}
+	// Ensure product has variants loaded
+	if len(product.Variants) == 0 {
+		return nil, errors.New("product has no variants")
+	}
+	return &product, nil
+}
+
+func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) (*entity.Product, error) {
+	var product entity.Product
+	if err := r.db.Preload("Variants.Prices", func(db *gorm.DB) *gorm.DB {
+		if currency != "" {
+			return db.Where("currency_code = ?", currency)
+		}
+		return db
+	}).First(&product, productID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("product not found")
+		}
+		return nil, err
+	}
+	// Ensure product has variants loaded
+	if len(product.Variants) == 0 {
+		return nil, errors.New("product has no variants")
+	}
+	// Ensure at least one variant has prices
+	hasPrices := false
+	for _, variant := range product.Variants {
+		if len(variant.Prices) > 0 {
+			hasPrices = true
+			break
+		}
+	}
+	if !hasPrices {
+		return nil, errors.New("product has no prices for its variants")
+	}
+	return &product, nil
+}
+
 // Update updates an existing product
 func (r *ProductRepository) Update(product *entity.Product) error {
-	return r.db.Save(product).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Update the product itself
+		if err := tx.Save(product).Error; err != nil {
+			return err
+		}
+
+		// Update variants
+		for _, variant := range product.Variants {
+			if err := tx.Save(variant).Error; err != nil {
+				return err
+			}
+
+			// Update prices for this variant
+			for i := range variant.Prices {
+				variant.Prices[i].VariantID = variant.ID // Ensure the foreign key is set
+				if err := tx.Save(&variant.Prices[i]).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
 }
 
 // Delete deletes a product by ID

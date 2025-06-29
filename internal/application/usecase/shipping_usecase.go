@@ -203,8 +203,6 @@ func (uc *ShippingUseCase) CreateShippingRate(input CreateShippingRateInput) (*e
 		MinOrderValue:         minOrderValueCents,
 		FreeShippingThreshold: freeShippingThresholdCents,
 		Active:                input.Active,
-		CreatedAt:             time.Now(),
-		UpdatedAt:             time.Now(),
 	}
 
 	// Save to repository

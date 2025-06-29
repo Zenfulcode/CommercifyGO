@@ -3,29 +3,31 @@ package entity
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"gorm.io/gorm"
 )
 
 // Currency represents a currency in the system
 type Currency struct {
-	gorm.Model           // Includes ID, CreatedAt, UpdatedAt, DeletedAt
-	Code         string  `gorm:"primaryKey;size:3"`
-	Name         string  `gorm:"size:100;not null"`
-	Symbol       string  `gorm:"size:10;not null"`
-	ExchangeRate float64 `gorm:"not null;default:1.0"`
-	IsEnabled    bool    `gorm:"not null;default:true"`
-	IsDefault    bool    ` gorm:"not null;default:false"`
+	gorm.Model                   // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	Code          string         `gorm:"primaryKey;size:3"`
+	Name          string         `gorm:"size:100;not null"`
+	Symbol        string         `gorm:"size:10;not null"`
+	ExchangeRate  float64        `gorm:"not null;default:1.0"`
+	IsEnabled     bool           `gorm:"not null;default:true"`
+	IsDefault     bool           `gorm:"not null;default:false"`
+	ProductPrices []ProductPrice `gorm:"foreignKey:CurrencyCode;references:Code;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
 }
 
 // ProductPrice represents a price for a product variant in a specific currency
 // This maps to the product_prices table which is linked to variants, not products directly
 type ProductPrice struct {
-	gorm.Model          // Includes ID, CreatedAt, UpdatedAt, DeletedAt
-	VariantID    uint   `gorm:"uniqueIndex:idx_variantprice"`
-	CurrencyCode string `gorm:"uniqueIndex:idx_variantprice;size:3;not null"`
-	Price        int64  `gorm:"not null"` // Price in cents
+	gorm.Model                  // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	VariantID    uint           `gorm:"uniqueIndex:idx_variantprice;not null"`
+	Variant      ProductVariant `gorm:"foreignKey:VariantID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	CurrencyCode string         `gorm:"uniqueIndex:idx_variantprice;size:3;not null"`
+	Currency     Currency       `gorm:"foreignKey:CurrencyCode;references:Code;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Price        int64          `gorm:"not null"` // Price in cents
 } // Unique constraint: UNIQUE(variant_id, currency_code)
 
 // TableName returns the table name for ProductPrice
@@ -68,14 +70,14 @@ func (c *Currency) SetExchangeRate(rate float64) error {
 		return errors.New("exchange rate must be positive")
 	}
 	c.ExchangeRate = rate
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 
 // Enable enables the currency
 func (c *Currency) Enable() {
 	c.IsEnabled = true
-	c.UpdatedAt = time.Now()
+
 }
 
 // Disable disables the currency
@@ -84,7 +86,7 @@ func (c *Currency) Disable() error {
 		return errors.New("cannot disable the default currency")
 	}
 	c.IsEnabled = false
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -92,13 +94,13 @@ func (c *Currency) Disable() error {
 func (c *Currency) SetAsDefault() {
 	c.IsDefault = true
 	c.IsEnabled = true // Default currency must be enabled
-	c.UpdatedAt = time.Now()
+
 }
 
 // UnsetAsDefault unsets this currency as the default currency
 func (c *Currency) UnsetAsDefault() error {
 	c.IsDefault = false
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 

@@ -4,7 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"time"
+	"maps"
+	"slices"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
@@ -37,18 +38,19 @@ func (va *VariantAttributes) Scan(value any) error {
 // ProductVariant represents a specific variant of a product
 type ProductVariant struct {
 	gorm.Model
-	ProductID  uint              `gorm:"index"`
+	ProductID  uint              `gorm:"index;not null"`
+	Product    Product           `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	SKU        string            `gorm:"uniqueIndex;size:100;not null"`
 	Stock      int               `gorm:"default:0"`
-	Attributes VariantAttributes `gorm:"type:json;not null"`
-	Images     []string          `gorm:"type:json"`
+	Attributes VariantAttributes `gorm:"type:jsonb;not null"`
+	Images     []string          `gorm:"type:jsonb"`
 	IsDefault  bool              `gorm:"default:false"`
 	Weight     float64           `gorm:"default:0"`
 	Prices     []ProductPrice    `gorm:"foreignKey:VariantID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE;"`
 }
 
 // NewProductVariant creates a new product variant
-func NewProductVariant(sku string, stock int, weight float64, attributes VariantAttributes, prices []ProductPrice, images []string, isDefault bool) (*ProductVariant, error) {
+func NewProductVariant(sku string, stock int, weight float64, attributes VariantAttributes, prices map[string]int64, images []string, isDefault bool) (*ProductVariant, error) {
 	if sku == "" {
 		return nil, errors.New("SKU cannot be empty")
 	}
@@ -67,13 +69,17 @@ func NewProductVariant(sku string, stock int, weight float64, attributes Variant
 		return nil, errors.New("at least one price must be provided")
 	}
 
-	for _, price := range prices {
-		if price.CurrencyCode == "" {
-			return nil, errors.New("currency code cannot be empty")
+	// Convert prices from float64 to ProductPrice
+	var pricesList []ProductPrice
+	for currency, price := range prices {
+		if price < 0 {
+			return nil, errors.New("price cannot be negative")
 		}
-		if price.Price < 0 {
-			return nil, errors.New("price cannot be negative for currency " + price.CurrencyCode)
-		}
+
+		pricesList = append(pricesList, ProductPrice{
+			CurrencyCode: currency,
+			Price:        price, // Convert to cents
+		})
 	}
 
 	return &ProductVariant{
@@ -83,8 +89,44 @@ func NewProductVariant(sku string, stock int, weight float64, attributes Variant
 		Images:     images,
 		IsDefault:  isDefault,
 		Weight:     weight,
-		Prices:     prices,
+		Prices:     pricesList,
 	}, nil
+}
+
+func (v *ProductVariant) Update(SKU string, stock int, images []string, attributes VariantAttributes, prices map[string]int64) (bool, error) {
+	updated := false
+	if SKU != "" && v.SKU != SKU {
+		v.SKU = SKU
+		updated = true
+	}
+	if stock >= 0 && v.Stock != stock {
+		v.Stock = stock
+		updated = true
+	}
+
+	if len(images) > 0 && !slices.Equal(v.Images, images) {
+		v.Images = images
+		updated = true
+	}
+	if len(attributes) > 0 {
+		// Convert slice of maps to VariantAttributes map
+		newAttributes := make(VariantAttributes)
+		maps.Copy(newAttributes, attributes)
+		if !maps.Equal(v.Attributes, newAttributes) {
+			v.Attributes = newAttributes
+			updated = true
+		}
+	}
+	if len(prices) > 0 {
+		for currency, price := range prices {
+			if err := v.SetPriceInCurrency(currency, price); err != nil {
+				return false, err
+			}
+		}
+		updated = true
+	}
+
+	return updated, nil
 }
 
 // UpdateStock updates the variant's stock
@@ -150,7 +192,7 @@ func (v *ProductVariant) RemovePriceInCurrency(currencyCode string) error {
 		if price.CurrencyCode == currencyCode {
 			// Remove the price by slicing
 			v.Prices = append(v.Prices[:i], v.Prices[i+1:]...)
-			v.UpdatedAt = time.Now()
+
 			return nil
 		}
 	}

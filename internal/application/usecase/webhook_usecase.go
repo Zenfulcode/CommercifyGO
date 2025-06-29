@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"errors"
+
 	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -32,10 +34,10 @@ func NewWebhookUseCase(webhookRepo repository.WebhookRepository, webhookService 
 func (u *WebhookUseCase) RegisterMobilePayWebhook(input RegisterWebhookInput) (*entity.Webhook, error) {
 	// Validate input
 	if input.URL == "" {
-		return nil, entity.ErrInvalidInput{Field: "url", Message: "URL is required"}
+		return nil, errors.New("URL is required")
 	}
 	if len(input.Events) == 0 {
-		return nil, entity.ErrInvalidInput{Field: "events", Message: "At least one event is required"}
+		return nil, errors.New("at least one event is required")
 	}
 
 	// Register webhook with MobilePay
@@ -45,7 +47,7 @@ func (u *WebhookUseCase) RegisterMobilePayWebhook(input RegisterWebhookInput) (*
 func (u *WebhookUseCase) DeleteMobilePayWebhook(externalID string) error {
 	// Validate ID
 	if externalID == "" {
-		return entity.ErrInvalidInput{Field: "id", Message: "ID is required"}
+		return errors.New("external ID is required")
 	}
 
 	// Delete webhook from MobilePay

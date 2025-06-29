@@ -3,6 +3,8 @@ package entity
 import (
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // CheckoutStatus represents the current status of a checkout
@@ -21,31 +23,32 @@ const (
 
 // Checkout represents a user's checkout session
 type Checkout struct {
-	ID               uint
-	UserID           uint
-	SessionID        string
-	Items            []CheckoutItem
-	Status           CheckoutStatus
-	ShippingAddr     Address
-	BillingAddr      Address
-	ShippingMethodID uint
-	ShippingOption   *ShippingOption
-	PaymentProvider  string
-	TotalAmount      int64
-	ShippingCost     int64
-	TotalWeight      float64
-	CustomerDetails  CustomerDetails
-	Currency         string
-	DiscountCode     string
-	DiscountAmount   int64
-	FinalAmount      int64
-	AppliedDiscount  *AppliedDiscount
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	LastActivityAt   time.Time
-	ExpiresAt        time.Time
+	gorm.Model
+	UserID           uint             `gorm:"index"`
+	User             *User            `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	SessionID        string           `gorm:"uniqueIndex;not null;size:255"`
+	Items            []CheckoutItem   `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Status           CheckoutStatus   `gorm:"not null;size:50;default:'active'"`
+	ShippingAddr     Address          `gorm:"embedded;embeddedPrefix:shipping_"`
+	BillingAddr      Address          `gorm:"embedded;embeddedPrefix:billing_"`
+	ShippingMethodID uint             `gorm:"index"`
+	ShippingMethod   *ShippingMethod  `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	ShippingOption   *ShippingOption  `gorm:"embedded;embeddedPrefix:shipping_option_"`
+	PaymentProvider  string           `gorm:"size:100"`
+	TotalAmount      int64            `gorm:"default:0"`
+	ShippingCost     int64            `gorm:"default:0"`
+	TotalWeight      float64          `gorm:"default:0"`
+	CustomerDetails  CustomerDetails  `gorm:"embedded;embeddedPrefix:customer_"`
+	Currency         string           `gorm:"not null;size:3"`
+	DiscountCode     string           `gorm:"size:100"`
+	DiscountAmount   int64            `gorm:"default:0"`
+	FinalAmount      int64            `gorm:"default:0"`
+	AppliedDiscount  *AppliedDiscount `gorm:"embedded;embeddedPrefix:discount_"`
+	LastActivityAt   time.Time        `gorm:"index"`
+	ExpiresAt        time.Time        `gorm:"index"`
 	CompletedAt      *time.Time
-	ConvertedOrderID uint
+	ConvertedOrderID uint   `gorm:"index"`
+	ConvertedOrder   *Order `gorm:"foreignKey:ConvertedOrderID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
 }
 
 func (c *Checkout) CalculateTotals() {
@@ -54,26 +57,28 @@ func (c *Checkout) CalculateTotals() {
 
 // CheckoutItem represents an item in a checkout
 type CheckoutItem struct {
-	ID               uint
-	CheckoutID       uint
-	ProductID        uint
-	ProductVariantID uint
-	ImageURL         string
-	Quantity         int
-	Price            int64
-	Weight           float64
-	ProductName      string
-	VariantName      string
-	SKU              string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	gorm.Model
+	CheckoutID       uint           `gorm:"index;not null"`
+	Checkout         Checkout       `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ProductID        uint           `gorm:"index;not null"`
+	Product          Product        `gorm:"foreignKey:ProductID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	ProductVariantID uint           `gorm:"index;not null"`
+	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	ImageURL         string         `gorm:"size:500"`
+	Quantity         int            `gorm:"not null"`
+	Price            int64          `gorm:"not null"` // Price at time of adding to cart
+	Weight           float64        `gorm:"default:0"`
+	ProductName      string         `gorm:"not null;size:255"`
+	VariantName      string         `gorm:"size:255"`
+	SKU              string         `gorm:"not null;size:100"`
 }
 
 // AppliedDiscount represents a discount applied to a checkout
 type AppliedDiscount struct {
-	DiscountID     uint
-	DiscountCode   string
-	DiscountAmount int64
+	DiscountID     uint      `gorm:"index"`
+	Discount       *Discount `gorm:"foreignKey:DiscountID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	DiscountCode   string    `gorm:"size:100"`
+	DiscountAmount int64     `gorm:"default:0"`
 }
 
 // NewCheckout creates a new checkout for a guest user
@@ -98,8 +103,6 @@ func NewCheckout(sessionID string, currency string) (*Checkout, error) {
 		ShippingCost:   0,
 		DiscountAmount: 0,
 		FinalAmount:    0,
-		CreatedAt:      now,
-		UpdatedAt:      now,
 		LastActivityAt: now,
 		ExpiresAt:      expiresAt,
 	}, nil
@@ -124,11 +127,10 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 			(variantID == 0 || item.ProductVariantID == variantID) {
 			// Update quantity if product already exists
 			c.Items[i].Quantity += quantity
-			c.Items[i].UpdatedAt = time.Now()
 
 			// Update checkout
 			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
+
 			c.LastActivityAt = time.Now()
 
 			return nil
@@ -146,13 +148,10 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 		ProductName:      productName,
 		VariantName:      variantName,
 		SKU:              sku,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	})
 
 	// Update checkout
 	c.recalculateTotals()
-	c.UpdatedAt = now
 	c.LastActivityAt = now
 
 	return nil
@@ -172,11 +171,10 @@ func (c *Checkout) UpdateItem(productID uint, variantID uint, quantity int) erro
 		if item.ProductID == productID &&
 			(variantID == 0 || item.ProductVariantID == variantID) {
 			c.Items[i].Quantity = quantity
-			c.Items[i].UpdatedAt = time.Now()
 
 			// Update checkout
 			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
+
 			c.LastActivityAt = time.Now()
 
 			return nil
@@ -201,7 +199,7 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 
 			// Update checkout
 			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
+
 			c.LastActivityAt = time.Now()
 
 			return nil
@@ -214,21 +212,21 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 // SetShippingAddress sets the shipping address for the checkout
 func (c *Checkout) SetShippingAddress(address Address) {
 	c.ShippingAddr = address
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
 // SetBillingAddress sets the billing address for the checkout
 func (c *Checkout) SetBillingAddress(address Address) {
 	c.BillingAddr = address
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
 // SetCustomerDetails sets the customer details for the checkout
 func (c *Checkout) SetCustomerDetails(details CustomerDetails) {
 	c.CustomerDetails = details
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -240,14 +238,13 @@ func (c *Checkout) SetShippingMethod(option *ShippingOption) {
 
 	c.recalculateTotals()
 
-	c.UpdatedAt = time.Now()
 	c.LastActivityAt = time.Now()
 }
 
 // SetPaymentProvider sets the payment provider for the checkout
 func (c *Checkout) SetPaymentProvider(provider string) {
 	c.PaymentProvider = provider
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -273,7 +270,7 @@ func (c *Checkout) SetCurrency(newCurrency string, fromCurrency *Currency, toCur
 
 	// Recalculate totals with new currency prices
 	c.recalculateTotals()
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -302,7 +299,7 @@ func (c *Checkout) ApplyDiscount(discount *Discount) {
 	}
 
 	c.recalculateTotals()
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -314,7 +311,7 @@ func (c *Checkout) Clear() {
 	c.DiscountAmount = 0
 	c.FinalAmount = 0
 	c.AppliedDiscount = nil
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -331,14 +328,14 @@ func (c *Checkout) MarkAsCompleted(orderID uint) {
 // MarkAsAbandoned marks the checkout as abandoned
 func (c *Checkout) MarkAsAbandoned() {
 	c.Status = CheckoutStatusAbandoned
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
 // MarkAsExpired marks the checkout as expired
 func (c *Checkout) MarkAsExpired() {
 	c.Status = CheckoutStatusExpired
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -350,7 +347,7 @@ func (c *Checkout) IsExpired() bool {
 // ExtendExpiry extends the expiry time of the checkout
 func (c *Checkout) ExtendExpiry(duration time.Duration) {
 	c.ExpiresAt = time.Now().Add(duration)
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -488,8 +485,6 @@ func (c *Checkout) ToOrder() *Order {
 		PaymentMethod:     "wallet", // Default payment method
 		AppliedDiscount:   c.AppliedDiscount,
 		CheckoutSessionID: c.SessionID,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
 	}
 
 	// Generate a friendly order number (will be replaced with actual ID after creation)

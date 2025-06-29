@@ -45,11 +45,39 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 // autoMigrate performs automatic migration of all entities
 func autoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&entity.Currency{},
+		// Core entities
+		&entity.User{},
+		&entity.Category{},
+
+		// Product entities
 		&entity.Product{},
 		&entity.ProductVariant{},
+		&entity.Currency{},
 		&entity.ProductPrice{},
-		// Add other entities as needed
+
+		// Order entities
+		&entity.Order{},
+		&entity.OrderItem{},
+
+		// Checkout entities
+		&entity.Checkout{},
+		&entity.CheckoutItem{},
+
+		// Discount entities
+		&entity.Discount{},
+
+		// Shipping entities
+		&entity.ShippingMethod{},
+		&entity.ShippingZone{},
+		&entity.ShippingRate{},
+		&entity.WeightBasedRate{},
+		&entity.ValueBasedRate{},
+
+		// Payment entities
+		&entity.PaymentTransaction{},
+
+		// Webhook entities
+		&entity.Webhook{},
 	)
 }
 

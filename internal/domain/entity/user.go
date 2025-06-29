@@ -10,11 +10,11 @@ import (
 // User represents a user in the system
 type User struct {
 	gorm.Model
-	Email     string
-	Password  string
-	FirstName string
-	LastName  string
-	Role      string
+	Email     string `gorm:"uniqueIndex;not null;size:255"`
+	Password  string `gorm:"not null;size:255"`
+	FirstName string `gorm:"not null;size:100"`
+	LastName  string `gorm:"not null;size:100"`
+	Role      string `gorm:"not null;size:50;default:'user'"`
 }
 
 // UserRole defines the available roles for users

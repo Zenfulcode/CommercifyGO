@@ -2,46 +2,43 @@ package entity
 
 import (
 	"errors"
-	"time"
+
+	"gorm.io/gorm"
 )
 
 // ShippingRate connects shipping methods to zones with pricing
 type ShippingRate struct {
-	ID                    uint
-	ShippingMethodID      uint
-	ShippingMethod        *ShippingMethod
-	ShippingZoneID        uint
-	ShippingZone          *ShippingZone
-	BaseRate              int64
-	MinOrderValue         int64
-	FreeShippingThreshold *int64
-	WeightBasedRates      []WeightBasedRate
-	ValueBasedRates       []ValueBasedRate
-	Active                bool
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	gorm.Model
+	ShippingMethodID      uint              `gorm:"index;not null"`
+	ShippingMethod        *ShippingMethod   `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ShippingZoneID        uint              `gorm:"index;not null"`
+	ShippingZone          *ShippingZone     `gorm:"foreignKey:ShippingZoneID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	BaseRate              int64             `gorm:"not null;default:0"`
+	MinOrderValue         int64             `gorm:"default:0"`
+	FreeShippingThreshold *int64            `gorm:"default:null"`
+	WeightBasedRates      []WeightBasedRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ValueBasedRates       []ValueBasedRate  `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Active                bool              `gorm:"default:true"`
 }
 
 // WeightBasedRate represents additional costs based on order weight
 type WeightBasedRate struct {
-	ID             uint
-	ShippingRateID uint
-	MinWeight      float64
-	MaxWeight      float64
-	Rate           int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	gorm.Model
+	ShippingRateID uint         `gorm:"index;not null"`
+	ShippingRate   ShippingRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	MinWeight      float64      `gorm:"not null"`
+	MaxWeight      float64      `gorm:"not null"`
+	Rate           int64        `gorm:"not null"`
 }
 
 // ValueBasedRate represents additional costs/discounts based on order value
 type ValueBasedRate struct {
-	ID             uint
-	ShippingRateID uint
-	MinOrderValue  int64
-	MaxOrderValue  int64
-	Rate           int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	gorm.Model
+	ShippingRateID uint         `gorm:"index;not null"`
+	ShippingRate   ShippingRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	MinOrderValue  int64        `gorm:"not null"`
+	MaxOrderValue  int64        `gorm:"not null"`
+	Rate           int64        `gorm:"not null"`
 }
 
 // ShippingOption represents a single shipping option with its cost
@@ -78,15 +75,12 @@ func NewShippingRate(
 		return nil, errors.New("minimum order value cannot be negative")
 	}
 
-	now := time.Now()
 	return &ShippingRate{
 		ShippingMethodID: shippingMethodID,
 		ShippingZoneID:   shippingZoneID,
 		BaseRate:         baseRate,
 		MinOrderValue:    minOrderValue,
 		Active:           true,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}, nil
 }
 
@@ -102,7 +96,7 @@ func (r *ShippingRate) Update(baseRate, minOrderValue int64) error {
 
 	r.BaseRate = baseRate
 	r.MinOrderValue = minOrderValue
-	r.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -114,7 +108,7 @@ func (r *ShippingRate) SetFreeShippingThreshold(threshold *int64) {
 	}
 
 	r.FreeShippingThreshold = threshold
-	r.UpdatedAt = time.Now()
+
 }
 
 // CalculateShippingCost calculates the shipping cost for an order
@@ -155,7 +149,7 @@ func (r *ShippingRate) CalculateShippingCost(orderValue int64, weight float64) (
 func (r *ShippingRate) Activate() {
 	if !r.Active {
 		r.Active = true
-		r.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -163,6 +157,6 @@ func (r *ShippingRate) Activate() {
 func (r *ShippingRate) Deactivate() {
 	if r.Active {
 		r.Active = false
-		r.UpdatedAt = time.Now()
+
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/gorm"
 )
 
 // DiscountType represents the type of discount
@@ -30,22 +31,20 @@ const (
 
 // Discount represents a discount in the system
 type Discount struct {
-	ID               uint
-	Code             string
-	Type             DiscountType
-	Method           DiscountMethod
-	Value            float64
-	MinOrderValue    int64
-	MaxDiscountValue int64
-	ProductIDs       []uint
-	CategoryIDs      []uint
-	StartDate        time.Time
-	EndDate          time.Time
-	UsageLimit       int
-	CurrentUsage     int
-	Active           bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	gorm.Model
+	Code             string         `gorm:"uniqueIndex;not null;size:100"`
+	Type             DiscountType   `gorm:"not null;size:50"`
+	Method           DiscountMethod `gorm:"not null;size:50"`
+	Value            float64        `gorm:"not null"`
+	MinOrderValue    int64          `gorm:"default:0"`
+	MaxDiscountValue int64          `gorm:"default:0"`
+	ProductIDs       []uint         `gorm:"type:jsonb"`
+	CategoryIDs      []uint         `gorm:"type:jsonb"`
+	StartDate        time.Time      `gorm:"index"`
+	EndDate          time.Time      `gorm:"index"`
+	UsageLimit       int            `gorm:"default:0"`
+	CurrentUsage     int            `gorm:"default:0"`
+	Active           bool           `gorm:"default:true"`
 }
 
 // NewDiscount creates a new discount
@@ -82,7 +81,6 @@ func NewDiscount(
 		return nil, errors.New("end date cannot be before start date")
 	}
 
-	now := time.Now()
 	return &Discount{
 		Code:             code,
 		Type:             discountType,
@@ -97,8 +95,6 @@ func NewDiscount(
 		UsageLimit:       usageLimit,
 		CurrentUsage:     0,
 		Active:           true,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}, nil
 }
 
@@ -204,5 +200,5 @@ func (d *Discount) CalculateDiscount(order *Order) int64 {
 // IncrementUsage increments the usage count of the discount
 func (d *Discount) IncrementUsage() {
 	d.CurrentUsage++
-	d.UpdatedAt = time.Now()
+
 }

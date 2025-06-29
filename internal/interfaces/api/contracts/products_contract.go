@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
 
@@ -37,12 +38,13 @@ type UpdateProductRequest struct {
 
 // UpdateVariantRequest represents the data needed to update an existing product variant
 type UpdateVariantRequest struct {
-	SKU        string            `json:"sku,omitempty"`
-	Stock      *int              `json:"stock,omitempty"`
-	Attributes map[string]string `json:"attributes,omitempty"`
-	Images     []string          `json:"images,omitempty"`
-	IsDefault  *bool             `json:"is_default,omitempty"`
-	Weight     *float64          `json:"weight,omitempty"`
+	SKU        string             `json:"sku,omitempty"`
+	Stock      *int               `json:"stock,omitempty"`
+	Attributes map[string]string  `json:"attributes,omitempty"`
+	Images     []string           `json:"images,omitempty"`
+	IsDefault  *bool              `json:"is_default,omitempty"`
+	Weight     *float64           `json:"weight,omitempty"`
+	Prices     map[string]float64 `json:"prices,omitempty"`
 }
 
 // ProductListResponse represents a paginated list of products
@@ -67,14 +69,24 @@ func (cp *CreateProductRequest) ToUseCaseInput() usecase.CreateProductInput {
 }
 
 func (cv *CreateVariantRequest) ToUseCaseInput() usecase.CreateVariantInput {
+	var prices map[string]int64
+	if cv.Prices != nil {
+		prices = make(map[string]int64, len(cv.Prices))
+		for currency, price := range cv.Prices {
+			prices[currency] = money.ToCents(price)
+		}
+	}
+
 	return usecase.CreateVariantInput{
-		SKU:        cv.SKU,
-		Stock:      cv.Stock,
-		Attributes: cv.Attributes,
-		Images:     cv.Images,
-		IsDefault:  cv.IsDefault,
-		Weight:     cv.Weight,
-		Prices:     cv.Prices,
+		VariantInput: usecase.VariantInput{
+			SKU:        cv.SKU,
+			Stock:      cv.Stock,
+			Weight:     cv.Weight,
+			Images:     cv.Images,
+			Attributes: cv.Attributes,
+			Prices:     prices,
+		},
+		IsDefault: cv.IsDefault,
 	}
 }
 

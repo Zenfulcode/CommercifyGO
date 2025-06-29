@@ -45,6 +45,15 @@ func NewProductUseCase(
 	}
 }
 
+type VariantInput struct {
+	SKU        string
+	Stock      int
+	Weight     float64
+	Images     []string
+	Attributes entity.VariantAttributes
+	Prices     map[string]int64
+}
+
 // CreateProductInput contains the data needed to create a product
 type CreateProductInput struct {
 	Name        string
@@ -58,14 +67,8 @@ type CreateProductInput struct {
 
 // CreateVariantInput contains the data needed to create a product variant
 type CreateVariantInput struct {
-	SKU        string
-	Price      float64
-	Stock      int
-	Attributes entity.VariantAttributes
-	Images     []string
-	IsDefault  bool
-	Weight     float64
-	Prices     map[string]float64 // currency_code -> price in dollars
+	VariantInput
+	IsDefault bool
 }
 
 // CreateProduct creates a new product
@@ -86,22 +89,30 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 
 	// If product has variants, create them
 	if len(input.Variants) > 0 {
-		for _, variantInput := range input.Variants {
+		defaultVariantCount := 0
 
+		// First pass: count default variants and validate there's only one
+		for _, variantInput := range input.Variants {
+			if variantInput.IsDefault {
+				defaultVariantCount++
+			}
+		}
+
+		// Ensure only one default variant
+		if defaultVariantCount > 1 {
+			return nil, errors.New("only one variant can be set as default")
+		}
+
+		// If no default variant specified, set the first one as default
+		if defaultVariantCount == 0 && len(input.Variants) > 0 {
+			input.Variants[0].IsDefault = true
+		}
+
+		for _, variantInput := range input.Variants {
 			// Create variant with new schema - weight defaults to 0 if not provided
 			weight := variantInput.Weight
 			if weight == 0 {
 				weight = 0.0 // default weight
-			}
-
-			prices := make([]entity.ProductPrice, 0, len(variantInput.Prices))
-			// Convert prices from dollars to cents and create ProductPrice entities
-			for currencyCode, price := range variantInput.Prices {
-				priceInCents := money.ToCents(price) // Convert to cents
-				prices = append(prices, entity.ProductPrice{
-					CurrencyCode: currencyCode,
-					Price:        priceInCents,
-				})
 			}
 
 			variant, err := entity.NewProductVariant(
@@ -109,7 +120,7 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 				variantInput.Stock,
 				weight,
 				variantInput.Attributes,
-				prices,
+				variantInput.Prices,
 				variantInput.Images,
 				variantInput.IsDefault,
 			)
@@ -157,7 +168,7 @@ func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.
 	}
 
 	// First get the product with all its data
-	product, err := uc.productRepo.GetByID(id)
+	product, err := uc.productRepo.GetByIDAndCurrency(id, currency.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -191,22 +202,10 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 		product.CategoryID = input.CategoryID
 	}
 
-	// Update product fields
-	if input.Name != "" {
-		product.Name = input.Name
+	updated := product.Update(input.Name, input.Description, input.Images, input.Active)
+	if !updated {
+		return product, nil // No changes to update
 	}
-	if input.Description != "" {
-		product.Description = input.Description
-	}
-
-	if len(input.Images) > 0 {
-		product.Images = input.Images
-	}
-	if input.Active != product.Active {
-		product.Active = input.Active
-	}
-
-	product.CalculateStock()
 
 	// Update product in repository
 	if err := uc.productRepo.Update(product); err != nil {
@@ -218,59 +217,39 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 
 // UpdateVariantInput contains the data needed to update a product variant (prices in dollars)
 type UpdateVariantInput struct {
-	SKU        string
-	Price      float64
-	Stock      int
-	Attributes []entity.VariantAttribute
-	Images     []string
-	IsDefault  bool
+	VariantInput
+	IsDefault bool
 }
 
 // UpdateVariant updates a product variant
-func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input UpdateVariantInput) (*entity.ProductVariant, error) {
-	// Get variant
-	variant, err := uc.productVariantRepo.GetByID(variantID)
+func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateVariantInput) (*entity.ProductVariant, error) {
+	product, err := uc.productRepo.GetByID(productId)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if variant belongs to the product
-	if variant.ProductID != productID {
-		return nil, errors.New("variant does not belong to this product")
+	// Get the variant by SKU
+	variant := product.GetVariantByID(variantId)
+	if variant == nil {
+		return nil, errors.New("variant not found")
 	}
 
 	// Update variant fields
-	if input.SKU != "" {
-		variant.SKU = input.SKU
-	}
-	if input.Price > 0 {
-		variant.Price = money.ToCents(input.Price) // Convert to cents
-	}
-	if input.Stock >= 0 {
-		variant.Stock = input.Stock
-	}
-	if len(input.Attributes) > 0 {
-		variant.Attributes = input.Attributes
-	}
-	if len(input.Images) > 0 {
-		variant.Images = input.Images
-	}
+	variant.Update(
+		input.SKU,
+		input.Stock,
+		input.Images,
+		input.Attributes,
+		input.Prices,
+	)
 
 	// Handle default status
 	if input.IsDefault != variant.IsDefault {
 		// If setting this variant as default, unset any other default variants
 		if input.IsDefault {
-			variants, err := uc.productVariantRepo.GetByProduct(productID)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, v := range variants {
-				if v.ID != variantID && v.IsDefault {
+			for _, v := range product.Variants {
+				if v.ID != variantId && v.IsDefault {
 					v.IsDefault = false
-					if err := uc.productVariantRepo.Update(v); err != nil {
-						return nil, err
-					}
 				}
 			}
 		}
@@ -279,18 +258,8 @@ func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input Up
 	}
 
 	// Update variant in repository
-	if err := uc.productVariantRepo.Update(variant); err != nil {
+	if err := uc.productRepo.Update(product); err != nil {
 		return nil, err
-	}
-
-	// If stock was updated, recalculate product stock
-	if input.Stock >= 0 {
-		product, err := uc.productRepo.GetByIDWithVariants(productID)
-		if err != nil {
-			return variant, nil // Return the variant even if product update fails
-		}
-		product.CalculateStock()
-		uc.productRepo.Update(product) // Ignore error to not fail the variant update
 	}
 
 	return variant, nil
@@ -298,30 +267,24 @@ func (uc *ProductUseCase) UpdateVariant(productID uint, variantID uint, input Up
 
 // AddVariantInput contains the data needed to add a variant to a product
 type AddVariantInput struct {
-	ProductID  uint
-	SKU        string
-	Price      float64
-	Stock      int
-	Attributes []entity.VariantAttribute
-	Images     []string
-	IsDefault  bool
+	VariantInput
+	IsDefault bool
 }
 
 // AddVariant adds a new variant to a product
-func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVariant, error) {
-	product, err := uc.productRepo.GetByIDWithVariants(input.ProductID)
+func (uc *ProductUseCase) AddVariant(productID uint, input AddVariantInput) (*entity.ProductVariant, error) {
+	product, err := uc.productRepo.GetByID(productID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create variant
 	variant, err := entity.NewProductVariant(
-		input.ProductID,
 		input.SKU,
-		input.Price, // Use cents
-		product.CurrencyCode,
 		input.Stock,
+		input.Weight,
 		input.Attributes,
+		input.Prices,
 		input.Images,
 		input.IsDefault,
 	)
@@ -340,16 +303,8 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 		for _, v := range variants {
 			if v.ID != variant.ID && v.IsDefault {
 				v.IsDefault = false
-				if err := uc.productVariantRepo.Update(v); err != nil {
-					return nil, err
-				}
 			}
 		}
-	}
-
-	// Save variant
-	if err := uc.productVariantRepo.Create(variant); err != nil {
-		return nil, err
 	}
 
 	// Update the product to persist the recalculated stock
@@ -361,30 +316,20 @@ func (uc *ProductUseCase) AddVariant(input AddVariantInput) (*entity.ProductVari
 }
 
 // DeleteVariant deletes a product variant
-func (uc *ProductUseCase) DeleteVariant(productID uint, variantID uint) error {
-	variant, err := uc.productVariantRepo.GetByID(variantID)
+func (uc *ProductUseCase) DeleteVariant(productID, variantID uint) error {
+	product, err := uc.productRepo.GetByID(productID)
 	if err != nil {
 		return err
 	}
 
-	// Check if variant belongs to the product
-	if variant.ProductID != productID {
-		return errors.New("variant does not belong to this product")
+	err = product.RemoveVariant(variantID)
+	if err != nil {
+		return fmt.Errorf("failed to remove variant: %w", err)
 	}
 
-	// Delete variant
-	err = uc.productVariantRepo.Delete(variantID)
-	if err != nil {
-		return err
+	if err := uc.productRepo.Update(product); err != nil {
+		return fmt.Errorf("failed to update product after removing variant: %w", err)
 	}
-
-	// Recalculate product stock after variant deletion
-	product, err := uc.productRepo.GetByIDWithVariants(productID)
-	if err != nil {
-		return nil // Variant was deleted successfully, product update failure shouldn't fail the operation
-	}
-	product.CalculateStock()
-	uc.productRepo.Update(product) // Ignore error to not fail the variant deletion
 
 	return nil
 }
@@ -505,7 +450,7 @@ func (uc *ProductUseCase) SetVariantPriceInCurrency(input SetVariantPriceInput) 
 	}
 
 	// Set the price in the variant
-	err = variant.SetPriceInCurrency(input.CurrencyCode, input.Price)
+	err = variant.SetPriceInCurrency(input.CurrencyCode, money.ToCents(input.Price))
 	if err != nil {
 		return nil, fmt.Errorf("failed to set price: %w", err)
 	}
@@ -618,7 +563,7 @@ func (uc *ProductUseCase) SetMultipleVariantPrices(input SetMultipleVariantPrice
 
 	// Set all prices
 	for currencyCode, price := range input.Prices {
-		err = variant.SetPriceInCurrency(currencyCode, price)
+		err = variant.SetPriceInCurrency(currencyCode, money.ToCents(price))
 		if err != nil {
 			return nil, fmt.Errorf("failed to set price for %s: %w", currencyCode, err)
 		}

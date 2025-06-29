@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/dto"
+	"gorm.io/gorm"
 )
 
 // OrderStatus represents the status of an order
@@ -34,71 +35,78 @@ const (
 
 // Order represents an order entity
 type Order struct {
-	ID                uint
-	OrderNumber       string
-	Currency          string // e.g., "USD", "EUR"
-	UserID            uint   // 0 for guest orders
-	Items             []OrderItem
-	TotalAmount       int64 // stored in cents
-	Status            OrderStatus
-	PaymentStatus     PaymentStatus // New field for payment status
-	ShippingAddr      Address
-	BillingAddr       Address
-	PaymentID         string
-	PaymentProvider   string
-	PaymentMethod     string
-	TrackingCode      string
-	ActionURL         string // URL for redirect to payment provider
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	gorm.Model
+	OrderNumber       string        `gorm:"uniqueIndex;not null;size:100"`
+	Currency          string        `gorm:"not null;size:3"` // e.g., "USD", "EUR"
+	UserID            uint          `gorm:"index"`           // 0 for guest orders
+	User              *User         `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	Items             []OrderItem   `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	TotalAmount       int64         `gorm:"not null"` // stored in cents
+	Status            OrderStatus   `gorm:"not null;size:50;default:'pending'"`
+	PaymentStatus     PaymentStatus `gorm:"not null;size:50;default:'pending'"` // New field for payment status
+	ShippingAddr      Address       `gorm:"embedded;embeddedPrefix:shipping_"`
+	BillingAddr       Address       `gorm:"embedded;embeddedPrefix:billing_"`
+	PaymentID         string        `gorm:"size:255"`
+	PaymentProvider   string        `gorm:"size:100"`
+	PaymentMethod     string        `gorm:"size:100"`
+	TrackingCode      string        `gorm:"size:255"`
+	ActionURL         string        `gorm:"size:500"` // URL for redirect to payment provider
 	CompletedAt       *time.Time
-	CheckoutSessionID string // Tracks which checkout session created this order
+	CheckoutSessionID string `gorm:"size:255"` // Tracks which checkout session created this order
 
 	// Guest information (only used for guest orders where UserID is 0)
-	CustomerDetails *CustomerDetails
-	IsGuestOrder    bool
+	CustomerDetails *CustomerDetails `gorm:"embedded;embeddedPrefix:customer_"`
+	IsGuestOrder    bool             `gorm:"default:false"`
 
 	// Shipping information
-	ShippingMethodID uint
-	ShippingOption   *ShippingOption
-	ShippingCost     int64
-	TotalWeight      float64
+	ShippingMethodID uint            `gorm:"index"`
+	ShippingMethod   *ShippingMethod `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	ShippingOption   *ShippingOption `gorm:"embedded;embeddedPrefix:shipping_option_"`
+	ShippingCost     int64           `gorm:"default:0"`
+	TotalWeight      float64         `gorm:"default:0"`
 
 	// Discount-related fields
-	DiscountAmount  int64 // stored in cents
-	FinalAmount     int64 // stored in cents
-	AppliedDiscount *AppliedDiscount
+	DiscountAmount  int64            `gorm:"default:0"` // stored in cents
+	FinalAmount     int64            `gorm:"not null"`  // stored in cents
+	AppliedDiscount *AppliedDiscount `gorm:"embedded;embeddedPrefix:discount_"`
+
+	// Payment transactions
+	PaymentTransactions []PaymentTransaction `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
 
 // OrderItem represents an item in an order
 type OrderItem struct {
-	ID               uint
-	OrderID          uint
-	ProductID        uint
-	ProductVariantID uint
-	Quantity         int
-	Price            int64
-	Subtotal         int64
-	Weight           float64
+	gorm.Model
+	OrderID          uint           `gorm:"index;not null"`
+	Order            Order          `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ProductID        uint           `gorm:"index;not null"`
+	Product          Product        `gorm:"foreignKey:ProductID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	ProductVariantID uint           `gorm:"index;not null"`
+	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Quantity         int            `gorm:"not null"`
+	Price            int64          `gorm:"not null"` // Price at time of order
+	Subtotal         int64          `gorm:"not null"`
+	Weight           float64        `gorm:"default:0"`
 
-	ProductName string
-	SKU         string
-	ImageURL    string
+	// Snapshot data at time of order
+	ProductName string `gorm:"not null;size:255"`
+	SKU         string `gorm:"not null;size:100"`
+	ImageURL    string `gorm:"size:500"`
 }
 
 // Address represents a shipping or billing address
 type Address struct {
-	Street     string
-	City       string
-	State      string
-	PostalCode string
-	Country    string
+	Street     string `gorm:"size:255"`
+	City       string `gorm:"size:100"`
+	State      string `gorm:"size:100"`
+	PostalCode string `gorm:"size:20"`
+	Country    string `gorm:"size:100"`
 }
 
 type CustomerDetails struct {
-	Email    string
-	Phone    string
-	FullName string
+	Email    string `gorm:"size:255"`
+	Phone    string `gorm:"size:50"`
+	FullName string `gorm:"size:200"`
 }
 
 // NewOrder creates a new order
@@ -147,8 +155,6 @@ func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, bil
 		PaymentStatus:   PaymentStatusPending, // Initialize payment status
 		ShippingAddr:    shippingAddr,
 		BillingAddr:     billingAddr,
-		CreatedAt:       now,
-		UpdatedAt:       now,
 		CustomerDetails: &customerDetails,
 		IsGuestOrder:    false,
 	}, nil
@@ -192,8 +198,6 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 		PaymentStatus:  PaymentStatusPending, // Initialize payment status
 		ShippingAddr:   shippingAddr,
 		BillingAddr:    billingAddr,
-		CreatedAt:      now,
-		UpdatedAt:      now,
 
 		// Guest-specific information
 		CustomerDetails: &customerDetails,
@@ -208,7 +212,6 @@ func (o *Order) UpdateStatus(status OrderStatus) error {
 	}
 
 	o.Status = status
-	o.UpdatedAt = time.Now()
 
 	// If the status is cancelled or completed, set the completed_at timestamp
 	if status == OrderStatusCancelled || status == OrderStatusCompleted {
@@ -239,7 +242,6 @@ func (o *Order) SetPaymentID(paymentID string) error {
 	}
 
 	o.PaymentID = paymentID
-	o.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -250,7 +252,7 @@ func (o *Order) SetPaymentProvider(provider string) error {
 	}
 
 	o.PaymentProvider = provider
-	o.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -261,7 +263,7 @@ func (o *Order) SetPaymentMethod(method string) error {
 	}
 
 	o.PaymentMethod = method
-	o.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -272,7 +274,7 @@ func (o *Order) SetTrackingCode(trackingCode string) error {
 	}
 
 	o.TrackingCode = trackingCode
-	o.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -310,7 +312,6 @@ func (o *Order) ApplyDiscount(discount *Discount) error {
 		DiscountAmount: discountAmount,
 	}
 
-	o.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -319,7 +320,7 @@ func (o *Order) RemoveDiscount() {
 	o.DiscountAmount = 0
 	o.FinalAmount = o.TotalAmount + o.ShippingCost
 	o.AppliedDiscount = nil
-	o.UpdatedAt = time.Now()
+
 }
 
 // SetActionURL sets the action URL for the order
@@ -329,7 +330,7 @@ func (o *Order) SetActionURL(actionURL string) error {
 	}
 
 	o.ActionURL = actionURL
-	o.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -346,7 +347,6 @@ func (o *Order) SetShippingMethod(option *ShippingOption) error {
 	// Update final amount with new shipping cost
 	o.FinalAmount = o.TotalAmount + o.ShippingCost - o.DiscountAmount
 
-	o.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -377,7 +377,6 @@ func (o *Order) UpdatePaymentStatus(status PaymentStatus) error {
 	}
 
 	o.PaymentStatus = status
-	o.UpdatedAt = time.Now()
 
 	// Handle automatic order status transitions based on payment status
 	switch status {

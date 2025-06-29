@@ -2,18 +2,17 @@ package entity
 
 import (
 	"errors"
-	"time"
+
+	"gorm.io/gorm"
 )
 
 // ShippingMethod represents a shipping method option (e.g., standard, express)
 type ShippingMethod struct {
-	ID                    uint
-	Name                  string
-	Description           string
-	EstimatedDeliveryDays int
-	Active                bool
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	gorm.Model
+	Name                  string `gorm:"not null;size:255"`
+	Description           string `gorm:"type:text"`
+	EstimatedDeliveryDays int    `gorm:"not null;default:0"`
+	Active                bool   `gorm:"default:true"`
 }
 
 // NewShippingMethod creates a new shipping method
@@ -26,14 +25,11 @@ func NewShippingMethod(name string, description string, estimatedDeliveryDays in
 		return nil, errors.New("estimated delivery days must be a non-negative number")
 	}
 
-	now := time.Now()
 	return &ShippingMethod{
 		Name:                  name,
 		Description:           description,
 		EstimatedDeliveryDays: estimatedDeliveryDays,
 		Active:                true,
-		CreatedAt:             now,
-		UpdatedAt:             now,
 	}, nil
 }
 
@@ -50,7 +46,7 @@ func (s *ShippingMethod) Update(name string, description string, estimatedDelive
 	s.Name = name
 	s.Description = description
 	s.EstimatedDeliveryDays = estimatedDeliveryDays
-	s.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -58,7 +54,7 @@ func (s *ShippingMethod) Update(name string, description string, estimatedDelive
 func (s *ShippingMethod) Activate() {
 	if !s.Active {
 		s.Active = true
-		s.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -66,6 +62,6 @@ func (s *ShippingMethod) Activate() {
 func (s *ShippingMethod) Deactivate() {
 	if s.Active {
 		s.Active = false
-		s.UpdatedAt = time.Now()
+
 	}
 }
