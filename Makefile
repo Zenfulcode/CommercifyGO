@@ -1,11 +1,18 @@
-.PHONY: help db-start db-stop db-restart db-logs db-clean migrate-up migrate-down seed-data build run test clean docker-build docker-build-tag docker-push docker-build-push
+.PHONY: help db-start db-stop db-restart db-logs db-clean seed-data build run test clean docker-build docker-build-tag docker-push docker-build-push dev-sqlite dev-postgres
 
 # Default target
 help: ## Show this help message
 	@echo "Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Database commands
+# Development environment setup
+dev-sqlite: ## Setup local development environment with SQLite
+	@echo "Setting up SQLite development environment..."
+	@cp .env.local .env 2>/dev/null || true
+	@echo "Environment configured for SQLite. Starting application..."
+	go run ./cmd/api
+
+# Database commands (PostgreSQL)
 db-start: ## Start PostgreSQL database container
 	docker compose up -d postgres
 
@@ -22,16 +29,6 @@ db-clean: ## Stop and remove PostgreSQL container and volumes
 	docker compose down postgres
 	docker volume rm commercify_postgres_data 2>/dev/null || true
 
-# Migration commands
-migrate-up: ## Run database migrations up
-	docker compose run --rm migrate -up
-
-migrate-down: ## Run database migrations down
-	docker compose run --rm migrate -down
-
-migrate-status: ## Show migration status
-	docker compose run --rm migrate -status
-
 # Seed data
 seed-data: ## Seed database with sample data
 	docker compose run --rm seed -all
@@ -39,7 +36,6 @@ seed-data: ## Seed database with sample data
 # Application commands
 build: ## Build the application
 	go build -o bin/api ./cmd/api
-	go build -o bin/migrate ./cmd/migrate
 	go build -o bin/seed ./cmd/seed
 	go build -o bin/expire-checkouts ./cmd/expire-checkouts
 
@@ -48,14 +44,23 @@ run: db-start ## Run the application locally with database
 	@sleep 3
 	go run ./cmd/api
 
-run-docker: ## Run the entire application stack with Docker
+run-docker: ## Run the entire application stack with Docker (PostgreSQL)
 	docker compose up -d
+
+run-docker-sqlite: ## Run the application with Docker using SQLite
+	docker compose -f docker-compose.local.yml up -d
 
 stop-docker: ## Stop the entire application stack
 	docker compose down
 
+stop-docker-sqlite: ## Stop the SQLite application stack
+	docker compose -f docker-compose.local.yml down
+
 logs: ## Show application logs
 	docker compose logs -f api
+
+logs-sqlite: ## Show SQLite application logs
+	docker compose -f docker-compose.local.yml logs -f api
 
 # Docker image commands
 docker-build: ## Build Docker image
@@ -90,12 +95,21 @@ clean: ## Clean build artifacts
 	rm -rf bin/
 	go clean
 
-# Database setup for development
-dev-setup: db-start migrate-up seed-data ## Setup development environment (start db, migrate, seed)
-	@echo "Development environment ready!"
+# Database setup commands
+dev-setup: ## Setup development environment with PostgreSQL (start db, seed)
+	make db-start
+	@sleep 3
+	make seed-data
+	@echo "Development environment ready with PostgreSQL!"
 
-dev-reset: db-clean db-start migrate-up seed-data ## Reset development environment
-	@echo "Development environment reset!"
+dev-reset: db-clean db-start seed-data ## Reset PostgreSQL development environment
+	@echo "Development environment reset with PostgreSQL!"
+
+dev-reset-sqlite: ## Reset SQLite development environment
+	@echo "Resetting SQLite development environment..."
+	@rm -f commercify.db 2>/dev/null || true
+	@cp .env.local .env 2>/dev/null || true
+	@echo "SQLite database reset!"
 
 # Format and lint
 fmt: ## Format Go code

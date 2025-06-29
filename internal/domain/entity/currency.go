@@ -9,30 +9,13 @@ import (
 
 // Currency represents a currency in the system
 type Currency struct {
-	gorm.Model                   // Includes ID, CreatedAt, UpdatedAt, DeletedAt
-	Code          string         `gorm:"primaryKey;size:3"`
-	Name          string         `gorm:"size:100;not null"`
-	Symbol        string         `gorm:"size:10;not null"`
-	ExchangeRate  float64        `gorm:"not null;default:1.0"`
-	IsEnabled     bool           `gorm:"not null;default:true"`
-	IsDefault     bool           `gorm:"not null;default:false"`
-	ProductPrices []ProductPrice `gorm:"foreignKey:CurrencyCode;references:Code;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
-}
-
-// ProductPrice represents a price for a product variant in a specific currency
-// This maps to the product_prices table which is linked to variants, not products directly
-type ProductPrice struct {
-	gorm.Model                  // Includes ID, CreatedAt, UpdatedAt, DeletedAt
-	VariantID    uint           `gorm:"uniqueIndex:idx_variantprice;not null"`
-	Variant      ProductVariant `gorm:"foreignKey:VariantID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	CurrencyCode string         `gorm:"uniqueIndex:idx_variantprice;size:3;not null"`
-	Currency     Currency       `gorm:"foreignKey:CurrencyCode;references:Code;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
-	Price        int64          `gorm:"not null"` // Price in cents
-} // Unique constraint: UNIQUE(variant_id, currency_code)
-
-// TableName returns the table name for ProductPrice
-func (ProductPrice) TableName() string {
-	return "product_prices"
+	gorm.Model           // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	Code         string  `gorm:"primaryKey;size:3"`
+	Name         string  `gorm:"size:100;not null"`
+	Symbol       string  `gorm:"size:10;not null"`
+	ExchangeRate float64 `gorm:"not null;default:1.0"`
+	IsEnabled    bool    `gorm:"not null;default:true"`
+	IsDefault    bool    `gorm:"not null;default:false"`
 }
 
 // NewCurrency creates a new Currency

@@ -23,6 +23,13 @@ go.work.sum
 
 # env file
 .env
+.env.local
+.env.production
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
 
 bin/
 commercify

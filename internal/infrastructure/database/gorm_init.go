@@ -3,15 +3,66 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 // InitDB initializes the GORM database connection and auto-migrates tables
 func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
+	var db *gorm.DB
+	var err error
+
+	// Choose database driver based on configuration
+	switch strings.ToLower(cfg.Driver) {
+	case "sqlite":
+		db, err = initSQLiteDB(cfg)
+	case "postgres":
+		db, err = initPostgresDB(cfg)
+	default:
+		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Auto-migrate the schema
+	if err := autoMigrate(db); err != nil {
+		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+	}
+
+	log.Printf("Database connected (%s) and migrated successfully", cfg.Driver)
+	return db, nil
+}
+
+// initSQLiteDB initializes SQLite database connection
+func initSQLiteDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
+	dbPath := cfg.DBName
+	if dbPath == "" {
+		dbPath = "commercify.db"
+	}
+
+	// Open SQLite database connection
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
+	}
+
+	// Enable foreign key constraints for SQLite
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+
+	return db, nil
+}
+
+// initPostgresDB initializes PostgreSQL database connection
+func initPostgresDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	// Get database connection details from environment
 	host := cfg.Host
 	port := cfg.Port
@@ -25,20 +76,11 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		host, port, user, password, dbname, sslmode)
 
 	// Open database connection
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		// Logger: gormLogger,
-		// DisableForeignKeyConstraintWhenMigrating: true,
-	})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
 	}
 
-	// Auto-migrate the schema
-	if err := autoMigrate(db); err != nil {
-		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
-	}
-
-	log.Println("Database connected and migrated successfully")
 	return db, nil
 }
 
@@ -53,7 +95,6 @@ func autoMigrate(db *gorm.DB) error {
 		&entity.Product{},
 		&entity.ProductVariant{},
 		&entity.Currency{},
-		&entity.ProductPrice{},
 
 		// Order entities
 		&entity.Order{},
