@@ -275,8 +275,8 @@ CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_active ON products(active);
 CREATE INDEX idx_product_variants_product_id ON product_variants(product_id);
 CREATE INDEX idx_product_variants_sku ON product_variants(sku);
-CREATE INDEX idx_product_variant_prices_variant_id ON product_prices(variant_id);
-CREATE INDEX idx_product_variant_prices_currency ON product_prices(currency_code);
+CREATE INDEX idx_product_prices_variant_id ON product_prices(variant_id);
+CREATE INDEX idx_product_prices_currency ON product_prices(currency_code);
 CREATE INDEX idx_discounts_code ON discounts(code);
 CREATE INDEX idx_discounts_active ON discounts(active);
 CREATE INDEX idx_checkouts_user_id ON checkouts(user_id);
@@ -309,7 +309,6 @@ CREATE TRIGGER update_currencies_timestamp BEFORE UPDATE ON currencies FOR EACH 
 CREATE TRIGGER update_products_timestamp BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER update_product_variants_timestamp BEFORE UPDATE ON product_variants FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER update_product_prices_timestamp BEFORE UPDATE ON product_prices FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER update_product_variant_prices_timestamp BEFORE UPDATE ON product_prices FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER update_payment_providers_timestamp BEFORE UPDATE ON payment_providers FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER update_discounts_timestamp BEFORE UPDATE ON discounts FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER update_webhooks_timestamp BEFORE UPDATE ON webhooks FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -349,8 +348,7 @@ CREATE TRIGGER generate_product_friendly_id BEFORE INSERT ON products FOR EACH R
 CREATE TRIGGER generate_order_friendly_id BEFORE INSERT ON orders FOR EACH ROW WHEN (NEW.friendly_id IS NULL) EXECUTE FUNCTION generate_friendly_id();
 
 -- Constraints to ensure data integrity
-ALTER TABLE products ADD CONSTRAINT chk_products_price_positive CHECK (price >= 0);
-ALTER TABLE product_variants ADD CONSTRAINT chk_variants_price_positive CHECK (price >= 0);
+ALTER TABLE product_prices ADD CONSTRAINT chk_price_positive CHECK (price >= 0);
 ALTER TABLE checkouts ADD CONSTRAINT chk_checkouts_amounts_positive CHECK (subtotal >= 0 AND shipping_cost >= 0 AND discount_amount >= 0 AND final_amount >= 0);
 ALTER TABLE orders ADD CONSTRAINT chk_orders_amounts_positive CHECK (subtotal >= 0 AND shipping_cost >= 0 AND discount_amount >= 0 AND final_amount >= 0);
 ALTER TABLE order_items ADD CONSTRAINT chk_order_items_amounts_positive CHECK (price >= 0 AND subtotal >= 0 AND quantity > 0);
@@ -374,7 +372,7 @@ COMMENT ON TABLE shipping_methods IS 'Available shipping methods per zone';
 COMMENT ON TABLE shipping_rates IS 'Shipping cost calculation rules';
 COMMENT ON TABLE webhooks IS 'External webhook integrations';
 
-COMMENT ON COLUMN product_variants.price IS 'Price stored in cents to avoid floating point precision issues';
+COMMENT ON COLUMN product_prices.price IS 'Price stored in cents to avoid floating point precision issues';
 COMMENT ON COLUMN checkouts.session_id IS 'Session ID for guest checkouts, nullable for authenticated users';
 COMMENT ON COLUMN checkout_items.product_variant_id IS 'Reference to product_variants.id. NULL indicates this is a regular product without variants';
 COMMENT ON COLUMN orders.checkout_session_id IS 'Links order back to the checkout session that created it';
