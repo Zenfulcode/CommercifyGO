@@ -1,7 +1,3 @@
--- Commercify E-commerce Database Schema
--- This is a consolidated migration that replaces all previous migrations
--- with a clean, up-to-date schema without legacy components
-
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -177,6 +173,43 @@ CREATE TABLE IF NOT EXISTS value_based_rates (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Create orders table
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE,
+    user_id INTEGER REFERENCES users(id),
+    checkout_session_id VARCHAR(255),
+    subtotal BIGINT NOT NULL, -- stored in cents
+    shipping_cost BIGINT NOT NULL DEFAULT 0, -- stored in cents
+    final_amount BIGINT NOT NULL, -- stored in cents
+    discount_amount BIGINT NOT NULL DEFAULT 0, -- stored in cents
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    shipping_address JSONB NOT NULL,
+    billing_address JSONB NOT NULL,
+    customer_details JSONB NOT NULL DEFAULT '{}',
+    currency VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    payment_id VARCHAR(255),
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP
+);
+
+-- Create order_items table
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    product_variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL,
+    quantity INTEGER NOT NULL,
+    price BIGINT NOT NULL, -- stored in cents
+    subtotal BIGINT NOT NULL, -- stored in cents
+    product_name VARCHAR(255) NOT NULL,
+    variant_name VARCHAR(255),
+    sku VARCHAR(100),
+    created_at TIMESTAMP NOT NULL
+);
+
 -- Create checkouts table (replaces deprecated carts)
 CREATE TABLE IF NOT EXISTS checkouts (
     id SERIAL PRIMARY KEY,
@@ -217,43 +250,6 @@ CREATE TABLE IF NOT EXISTS checkout_items (
     sku VARCHAR(100),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
--- Create orders table
-CREATE TABLE IF NOT EXISTS orders (
-    id SERIAL PRIMARY KEY,
-    order_number VARCHAR(50) UNIQUE,
-    user_id INTEGER REFERENCES users(id),
-    checkout_session_id VARCHAR(255),
-    subtotal BIGINT NOT NULL, -- stored in cents
-    shipping_cost BIGINT NOT NULL DEFAULT 0, -- stored in cents
-    final_amount BIGINT NOT NULL, -- stored in cents
-    discount_amount BIGINT NOT NULL DEFAULT 0, -- stored in cents
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    shipping_address JSONB NOT NULL,
-    billing_address JSONB NOT NULL,
-    customer_details JSONB NOT NULL DEFAULT '{}',
-    currency VARCHAR(3) NOT NULL REFERENCES currencies(code),
-    payment_id VARCHAR(255),
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
-    completed_at TIMESTAMP
-);
-
--- Create order_items table
-CREATE TABLE IF NOT EXISTS order_items (
-    id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(id),
-    product_variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL,
-    quantity INTEGER NOT NULL,
-    price BIGINT NOT NULL, -- stored in cents
-    subtotal BIGINT NOT NULL, -- stored in cents
-    product_name VARCHAR(255) NOT NULL,
-    variant_name VARCHAR(255),
-    sku VARCHAR(100),
-    created_at TIMESTAMP NOT NULL
 );
 
 -- Create payment_transactions table
