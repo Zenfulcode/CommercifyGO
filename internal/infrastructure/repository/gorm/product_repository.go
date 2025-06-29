@@ -110,11 +110,6 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 // Delete deletes a product by ID
 func (r *ProductRepository) Delete(productID uint) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Delete all associated prices first (cascade should handle this, but being explicit)
-		if err := tx.Where("variant_id IN (SELECT id FROM product_variants WHERE product_id = ?)", productID).Delete(&entity.ProductPrice{}).Error; err != nil {
-			return err
-		}
-
 		// Delete all variants (cascade should handle this)
 		if err := tx.Where("product_id = ?", productID).Delete(&entity.ProductVariant{}).Error; err != nil {
 			return err

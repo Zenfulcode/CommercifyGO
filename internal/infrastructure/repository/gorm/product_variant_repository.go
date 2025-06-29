@@ -83,11 +83,6 @@ func (r *ProductVariantRepository) Update(variant *entity.ProductVariant) error 
 // Delete deletes a variant by ID
 func (r *ProductVariantRepository) Delete(variantID uint) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Delete associated prices first (cascade should handle this)
-		if err := tx.Where("variant_id = ?", variantID).Delete(&entity.ProductPrice{}).Error; err != nil {
-			return err
-		}
-
 		// Delete the variant
 		return tx.Delete(&entity.ProductVariant{}, variantID).Error
 	})
