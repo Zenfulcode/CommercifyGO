@@ -491,27 +491,74 @@ func (uc *CheckoutUseCase) RemoveDiscountCode(checkout *entity.Checkout) (*entit
 	return checkout, nil
 }
 
-// ExpireOldCheckouts marks expired checkouts as expired
-func (uc *CheckoutUseCase) ExpireOldCheckouts() (int, error) {
-	// Get expired checkouts
-	expiredCheckouts, err := uc.checkoutRepo.GetExpiredCheckouts()
+// CheckoutCleanupResult represents the results of checkout cleanup operations
+type CheckoutCleanupResult struct {
+	AbandonedCount int `json:"abandoned_count"`
+	DeletedCount   int `json:"deleted_count"`
+	ExpiredCount   int `json:"expired_count"`
+}
+
+// ExpireOldCheckouts performs comprehensive checkout cleanup operations
+func (uc *CheckoutUseCase) ExpireOldCheckouts() (*CheckoutCleanupResult, error) {
+	result := &CheckoutCleanupResult{}
+
+	// 1. Mark checkouts with customer/shipping info as abandoned after 15 minutes
+	checkoutsToAbandon, err := uc.checkoutRepo.GetCheckoutsToAbandon()
 	if err != nil {
-		return 0, err
+		return result, fmt.Errorf("failed to get checkouts to abandon: %w", err)
 	}
 
-	amountExpired := len(expiredCheckouts)
+	for _, checkout := range checkoutsToAbandon {
+		checkout.MarkAsAbandoned()
+		err = uc.checkoutRepo.Update(checkout)
+		if err != nil {
+			log.Printf("Failed to mark checkout %d as abandoned: %v", checkout.ID, err)
+			continue
+		}
+		result.AbandonedCount++
+	}
 
-	// Mark each as expired
+	// 2. Delete checkouts that should be deleted (empty > 24h or abandoned > 7 days)
+	checkoutsToDelete, err := uc.checkoutRepo.GetCheckoutsToDelete()
+	if err != nil {
+		return result, fmt.Errorf("failed to get checkouts to delete: %w", err)
+	}
+
+	for _, checkout := range checkoutsToDelete {
+		err = uc.checkoutRepo.Delete(checkout.ID)
+		if err != nil {
+			log.Printf("Failed to delete checkout %d: %v", checkout.ID, err)
+			continue
+		}
+		result.DeletedCount++
+	}
+
+	// 3. Mark remaining expired checkouts as expired (legacy support)
+	expiredCheckouts, err := uc.checkoutRepo.GetExpiredCheckouts()
+	if err != nil {
+		return result, fmt.Errorf("failed to get expired checkouts: %w", err)
+	}
+
 	for _, checkout := range expiredCheckouts {
 		checkout.MarkAsExpired()
 		err = uc.checkoutRepo.Update(checkout)
 		if err != nil {
-			// Continue despite errors
+			log.Printf("Failed to mark checkout %d as expired: %v", checkout.ID, err)
 			continue
 		}
+		result.ExpiredCount++
 	}
 
-	return amountExpired, nil
+	return result, nil
+}
+
+// ExpireOldCheckoutsLegacy returns only the total count for backward compatibility
+func (uc *CheckoutUseCase) ExpireOldCheckoutsLegacy() (int, error) {
+	result, err := uc.ExpireOldCheckouts()
+	if err != nil {
+		return 0, err
+	}
+	return result.AbandonedCount + result.DeletedCount + result.ExpiredCount, nil
 }
 
 // CreateOrderFromCheckout creates an order from a checkout

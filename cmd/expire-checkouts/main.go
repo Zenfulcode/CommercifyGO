@@ -40,10 +40,14 @@ func main() {
 	checkoutUseCase := diContainer.UseCases().CheckoutUseCase()
 
 	// Expire old checkouts
-	amountExpired, err := checkoutUseCase.ExpireOldCheckouts()
+	result, err := checkoutUseCase.ExpireOldCheckouts()
 	if err != nil {
 		logger.Fatal("Failed to expire old checkouts: %v", err)
 	}
 
-	logger.Info("Expired %d old checkouts", amountExpired)
+	logger.Info("Checkout cleanup completed:")
+	logger.Info("- Abandoned checkouts: %d", result.AbandonedCount)
+	logger.Info("- Deleted checkouts: %d", result.DeletedCount)
+	logger.Info("- Expired checkouts: %d", result.ExpiredCount)
+	logger.Info("Total processed: %d", result.AbandonedCount+result.DeletedCount+result.ExpiredCount)
 }

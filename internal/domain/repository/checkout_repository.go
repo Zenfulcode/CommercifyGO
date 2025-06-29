@@ -28,6 +28,12 @@ type CheckoutRepository interface {
 	// GetExpiredCheckouts retrieves all checkouts that have expired
 	GetExpiredCheckouts() ([]*entity.Checkout, error)
 
+	// GetCheckoutsToAbandon retrieves active checkouts with customer/shipping info that should be marked as abandoned
+	GetCheckoutsToAbandon() ([]*entity.Checkout, error)
+
+	// GetCheckoutsToDelete retrieves checkouts that should be deleted (empty checkouts > 24h or abandoned > 7 days)
+	GetCheckoutsToDelete() ([]*entity.Checkout, error)
+
 	// GetCheckoutsByStatus retrieves checkouts by status
 	GetCheckoutsByStatus(status entity.CheckoutStatus, offset, limit int) ([]*entity.Checkout, error)
 

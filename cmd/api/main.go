@@ -99,10 +99,12 @@ func expireCheckouts(server *api.Server, logger logger.Logger) {
 		return
 	}
 
-	amountExpired, err := checkoutUseCase.ExpireOldCheckouts()
+	result, err := checkoutUseCase.ExpireOldCheckouts()
 	if err != nil {
 		logger.Error("Failed to expire old checkouts: %v", err)
 	} else {
-		logger.Info("Expired %d old checkouts", amountExpired)
+		logger.Info("Checkout cleanup completed: %d abandoned, %d deleted, %d expired (total: %d)",
+			result.AbandonedCount, result.DeletedCount, result.ExpiredCount,
+			result.AbandonedCount+result.DeletedCount+result.ExpiredCount)
 	}
 }
