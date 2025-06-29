@@ -201,8 +201,14 @@ func (p *handlerProvider) HealthHandler() *handler.HealthHandler {
 	defer p.mu.Unlock()
 
 	if p.healthHandler == nil {
+		db, err := p.container.DB().DB()
+		if err != nil {
+			p.container.Logger().Error("Failed to get database connection for health check", "error", err)
+			return nil
+		}
+
 		p.healthHandler = handler.NewHealthHandler(
-			p.container.DB(),
+			db,
 			p.container.Logger(),
 		)
 	}

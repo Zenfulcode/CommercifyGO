@@ -823,19 +823,9 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("product is not available")
 	}
 
-	// Extract variant name from attributes
-	variantName := ""
-	for _, attr := range variant.Attributes {
-		if variantName == "" {
-			variantName = attr.Value
-		} else {
-			variantName += " / " + attr.Value
-		}
-	}
-
 	// Get the price in the checkout's currency
-	priceInCheckoutCurrency, err := uc.getPriceInCurrency(variant, checkout.Currency)
-	if err != nil {
+	price, found := variant.GetPriceInCurrency(checkout.Currency)
+	if !found {
 		return nil, fmt.Errorf("failed to get price in checkout currency: %w", err)
 	}
 
@@ -843,9 +833,9 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 	input.ProductID = variant.ProductID
 	input.VariantID = variant.ID
 	input.ProductName = product.Name
-	input.VariantName = variantName
-	input.Price = priceInCheckoutCurrency
-	input.Weight = product.Weight
+	input.VariantName = variant.Name()
+	input.Price = price
+	input.Weight = variant.Weight
 
 	// Add the item to the checkout
 	err = checkout.AddItem(input.ProductID, input.VariantID, input.Quantity, input.Price, input.Weight, input.ProductName, input.VariantName, input.SKU)
@@ -1023,34 +1013,6 @@ func (uc *CheckoutUseCase) ChangeCurrencyByUserID(userID uint, newCurrencyCode s
 	}
 
 	return uc.ChangeCurrency(checkout, newCurrencyCode)
-}
-
-// getPriceInCurrency gets the price of a variant in the specified currency
-func (uc *CheckoutUseCase) getPriceInCurrency(variant *entity.ProductVariant, targetCurrency string) (int64, error) {
-	// If the variant already has a price in the target currency, use it
-	if price, found := variant.GetPriceInCurrency(targetCurrency); found {
-		return price, nil
-	}
-
-	// If the variant's default currency matches the target, return the default price
-	if variant.CurrencyCode == targetCurrency {
-		return variant.Price, nil
-	}
-
-	// Convert from variant's currency to target currency
-	fromCurrency, err := uc.currencyRepo.GetByCode(variant.CurrencyCode)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get variant currency %s: %w", variant.CurrencyCode, err)
-	}
-
-	toCurrency, err := uc.currencyRepo.GetByCode(targetCurrency)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get target currency %s: %w", targetCurrency, err)
-	}
-
-	// Convert the price
-	convertedPrice := fromCurrency.ConvertAmount(variant.Price, toCurrency)
-	return convertedPrice, nil
 }
 
 // decreaseStockForOrder decreases stock for all items in an order when payment is authorized

@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/zenfulcode/commercify/internal/domain/repository"
-	"github.com/zenfulcode/commercify/internal/infrastructure/repository/postgres"
+	"github.com/zenfulcode/commercify/internal/infrastructure/repository/gorm"
 )
 
 // RepositoryProvider provides access to all repositories
@@ -60,7 +60,7 @@ func (p *repositoryProvider) UserRepository() repository.UserRepository {
 	defer p.mu.Unlock()
 
 	if p.userRepo == nil {
-		p.userRepo = postgres.NewUserRepository(p.container.DB())
+		p.userRepo = gorm.NewUserRepository(p.container.DB())
 	}
 	return p.userRepo
 }
@@ -73,9 +73,9 @@ func (p *repositoryProvider) ProductRepository() repository.ProductRepository {
 	if p.productRepo == nil {
 		// Initialize both repositories under the same lock
 		if p.productVariantRepo == nil {
-			p.productVariantRepo = postgres.NewProductVariantRepository(p.container.DB())
+			p.productVariantRepo = gorm.NewProductVariantRepository(p.container.DB())
 		}
-		p.productRepo = postgres.NewProductRepository(p.container.DB(), p.productVariantRepo)
+		p.productRepo = gorm.NewProductRepository(p.container.DB())
 	}
 	return p.productRepo
 }
@@ -86,7 +86,7 @@ func (p *repositoryProvider) ProductVariantRepository() repository.ProductVarian
 	defer p.mu.Unlock()
 
 	if p.productVariantRepo == nil {
-		p.productVariantRepo = postgres.NewProductVariantRepository(p.container.DB())
+		p.productVariantRepo = gorm.NewProductVariantRepository(p.container.DB())
 	}
 	return p.productVariantRepo
 }
@@ -97,7 +97,7 @@ func (p *repositoryProvider) CategoryRepository() repository.CategoryRepository 
 	defer p.mu.Unlock()
 
 	if p.categoryRepo == nil {
-		p.categoryRepo = postgres.NewCategoryRepository(p.container.DB())
+		p.categoryRepo = gorm.NewCategoryRepository(p.container.DB())
 	}
 	return p.categoryRepo
 }
@@ -108,7 +108,7 @@ func (p *repositoryProvider) OrderRepository() repository.OrderRepository {
 	defer p.mu.Unlock()
 
 	if p.orderRepo == nil {
-		p.orderRepo = postgres.NewOrderRepository(p.container.DB())
+		p.orderRepo = gorm.NewOrderRepository(p.container.DB())
 	}
 	return p.orderRepo
 }
@@ -119,7 +119,7 @@ func (p *repositoryProvider) CheckoutRepository() repository.CheckoutRepository 
 	defer p.mu.Unlock()
 
 	if p.checkoutRepo == nil {
-		p.checkoutRepo = postgres.NewCheckoutRepository(p.container.DB())
+		p.checkoutRepo = gorm.NewCheckoutRepository(p.container.DB())
 	}
 	return p.checkoutRepo
 }
@@ -130,7 +130,7 @@ func (p *repositoryProvider) DiscountRepository() repository.DiscountRepository 
 	defer p.mu.Unlock()
 
 	if p.discountRepo == nil {
-		p.discountRepo = postgres.NewDiscountRepository(p.container.DB())
+		p.discountRepo = gorm.NewDiscountRepository(p.container.DB())
 	}
 	return p.discountRepo
 }
@@ -141,7 +141,7 @@ func (p *repositoryProvider) WebhookRepository() repository.WebhookRepository {
 	defer p.mu.Unlock()
 
 	if p.webhookRepo == nil {
-		p.webhookRepo = postgres.NewWebhookRepository(p.container.DB())
+		p.webhookRepo = gorm.NewWebhookRepository(p.container.DB())
 	}
 	return p.webhookRepo
 }
@@ -152,7 +152,7 @@ func (p *repositoryProvider) PaymentTransactionRepository() repository.PaymentTr
 	defer p.mu.Unlock()
 
 	if p.paymentTrxRepo == nil {
-		p.paymentTrxRepo = postgres.NewPaymentTransactionRepository(p.container.DB())
+		p.paymentTrxRepo = gorm.NewPaymentTransactionRepository(p.container.DB())
 	}
 	return p.paymentTrxRepo
 }
@@ -163,7 +163,7 @@ func (p *repositoryProvider) ShippingMethodRepository() repository.ShippingMetho
 	defer p.mu.Unlock()
 
 	if p.shippingMethodRepo == nil {
-		p.shippingMethodRepo = postgres.NewShippingMethodRepository(p.container.DB())
+		p.shippingMethodRepo = gorm.NewShippingMethodRepository(p.container.DB())
 	}
 	return p.shippingMethodRepo
 }
@@ -174,7 +174,7 @@ func (p *repositoryProvider) ShippingZoneRepository() repository.ShippingZoneRep
 	defer p.mu.Unlock()
 
 	if p.shippingZoneRepo == nil {
-		p.shippingZoneRepo = postgres.NewShippingZoneRepository(p.container.DB())
+		p.shippingZoneRepo = gorm.NewShippingZoneRepository(p.container.DB())
 	}
 	return p.shippingZoneRepo
 }
@@ -185,7 +185,7 @@ func (p *repositoryProvider) ShippingRateRepository() repository.ShippingRateRep
 	defer p.mu.Unlock()
 
 	if p.shippingRateRepo == nil {
-		p.shippingRateRepo = postgres.NewShippingRateRepository(p.container.DB())
+		p.shippingRateRepo = gorm.NewShippingRateRepository(p.container.DB())
 	}
 	return p.shippingRateRepo
 }
@@ -196,7 +196,7 @@ func (p *repositoryProvider) CurrencyRepository() repository.CurrencyRepository 
 	defer p.mu.Unlock()
 
 	if p.currencyRepo == nil {
-		p.currencyRepo = postgres.NewCurrencyRepository(p.container.DB())
+		p.currencyRepo = gorm.NewCurrencyRepository(p.container.DB())
 	}
 	return p.currencyRepo
 }

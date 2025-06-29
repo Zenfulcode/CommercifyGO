@@ -1,65 +1,89 @@
 package entity
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
+	"gorm.io/gorm"
 )
 
-// VariantAttribute represents a single attribute of a product variant
-type VariantAttribute struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+// VariantAttributes represents JSONB attributes for a product variant
+type VariantAttributes map[string]string
+
+// Value implements the driver.Valuer interface for database storage
+func (va VariantAttributes) Value() (driver.Value, error) {
+	return json.Marshal(va)
+}
+
+// Scan implements the sql.Scanner interface for database retrieval
+func (va *VariantAttributes) Scan(value any) error {
+	if value == nil {
+		*va = make(VariantAttributes)
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(bytes, va)
 }
 
 // ProductVariant represents a specific variant of a product
 type ProductVariant struct {
-	ID           uint                  `json:"id"`
-	ProductID    uint                  `json:"product_id"`
-	SKU          string                `json:"sku"`
-	Price        int64                 `json:"price"` // Stored as cents (in default currency)
-	CurrencyCode string                `json:"currency"`
-	Stock        int                   `json:"stock"`
-	Attributes   []VariantAttribute    `json:"attributes"`
-	Images       []string              `json:"images"`
-	IsDefault    bool                  `json:"is_default"`
-	CreatedAt    time.Time             `json:"created_at"`
-	UpdatedAt    time.Time             `json:"updated_at"`
-	Prices       []ProductVariantPrice `json:"prices,omitempty"` // Prices in different currencies
+	gorm.Model
+	ProductID  uint              `gorm:"index"`
+	SKU        string            `gorm:"uniqueIndex;size:100;not null"`
+	Stock      int               `gorm:"default:0"`
+	Attributes VariantAttributes `gorm:"type:json;not null"`
+	Images     []string          `gorm:"type:json"`
+	IsDefault  bool              `gorm:"default:false"`
+	Weight     float64           `gorm:"default:0"`
+	Prices     []ProductPrice    `gorm:"foreignKey:VariantID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE;"`
 }
 
 // NewProductVariant creates a new product variant
-func NewProductVariant(productID uint, sku string, price float64, currencyCode string, stock int, attributes []VariantAttribute, images []string, isDefault bool) (*ProductVariant, error) {
-	if productID == 0 {
-		return nil, errors.New("product ID cannot be empty")
-	}
+func NewProductVariant(sku string, stock int, weight float64, attributes VariantAttributes, prices []ProductPrice, images []string, isDefault bool) (*ProductVariant, error) {
 	if sku == "" {
 		return nil, errors.New("SKU cannot be empty")
-	}
-	if price <= 0 { // Check cents
-		return nil, errors.New("price must be greater than zero")
 	}
 	if stock < 0 {
 		return nil, errors.New("stock cannot be negative")
 	}
-	// Note: attributes can be empty for default variants
+	if weight < 0 {
+		return nil, errors.New("weight cannot be negative")
+	}
 
-	// Convert price to cents
-	priceInCents := money.ToCents(price)
+	if attributes == nil {
+		attributes = make(VariantAttributes)
+	}
 
-	now := time.Now()
+	if len(prices) == 0 {
+		return nil, errors.New("at least one price must be provided")
+	}
+
+	for _, price := range prices {
+		if price.CurrencyCode == "" {
+			return nil, errors.New("currency code cannot be empty")
+		}
+		if price.Price < 0 {
+			return nil, errors.New("price cannot be negative for currency " + price.CurrencyCode)
+		}
+	}
+
 	return &ProductVariant{
-		ProductID:    productID,
-		SKU:          sku,
-		Price:        priceInCents, // Already in cents
-		CurrencyCode: currencyCode,
-		Stock:        stock,
-		Attributes:   attributes,
-		Images:       images,
-		IsDefault:    isDefault,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		SKU:        sku,
+		Stock:      stock,
+		Attributes: attributes,
+		Images:     images,
+		IsDefault:  isDefault,
+		Weight:     weight,
+		Prices:     prices,
 	}, nil
 }
 
@@ -71,7 +95,6 @@ func (v *ProductVariant) UpdateStock(quantity int) error {
 	}
 
 	v.Stock = newStock
-	v.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -87,44 +110,33 @@ func (v *ProductVariant) GetPriceInCurrency(currencyCode string) (int64, bool) {
 			return price.Price, true
 		}
 	}
-
-	return v.Price, false
+	return 0, false
 }
 
 // SetPriceInCurrency sets or updates the price for a specific currency
-func (v *ProductVariant) SetPriceInCurrency(currencyCode string, price float64) error {
+func (v *ProductVariant) SetPriceInCurrency(currencyCode string, priceInCents int64) error {
 	if currencyCode == "" {
 		return errors.New("currency code cannot be empty")
 	}
-	if price <= 0 {
-		return errors.New("price must be greater than zero")
+	if priceInCents < 0 {
+		return errors.New("price cannot be negative")
 	}
-
-	priceInCents := money.ToCents(price)
 
 	// Check if price already exists for this currency
 	for i, existingPrice := range v.Prices {
 		if existingPrice.CurrencyCode == currencyCode {
-			// Update existing price
 			v.Prices[i].Price = priceInCents
-			v.Prices[i].UpdatedAt = time.Now()
-			v.UpdatedAt = time.Now()
 			return nil
 		}
 	}
 
-	// Add new price
-	now := time.Now()
-	newPrice := ProductVariantPrice{
+	newPrice := ProductPrice{
 		VariantID:    v.ID,
 		CurrencyCode: currencyCode,
 		Price:        priceInCents,
-		CreatedAt:    now,
-		UpdatedAt:    now,
 	}
 
 	v.Prices = append(v.Prices, newPrice)
-	v.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -132,11 +144,6 @@ func (v *ProductVariant) SetPriceInCurrency(currencyCode string, price float64) 
 func (v *ProductVariant) RemovePriceInCurrency(currencyCode string) error {
 	if currencyCode == "" {
 		return errors.New("currency code cannot be empty")
-	}
-
-	// Don't allow removing the default currency price
-	if currencyCode == v.CurrencyCode {
-		return errors.New("cannot remove default currency price")
 	}
 
 	for i, price := range v.Prices {
@@ -151,14 +158,11 @@ func (v *ProductVariant) RemovePriceInCurrency(currencyCode string) error {
 	return errors.New("price not found for the specified currency")
 }
 
-// GetAllPrices returns all prices including the default price
+// GetAllPrices returns all prices for this variant
 func (v *ProductVariant) GetAllPrices() map[string]int64 {
 	prices := make(map[string]int64)
 
-	// Add default price
-	prices[v.CurrencyCode] = v.Price
-
-	// Add additional currency prices
+	// Add all currency prices
 	for _, price := range v.Prices {
 		prices[price.CurrencyCode] = price.Price
 	}
@@ -168,12 +172,7 @@ func (v *ProductVariant) GetAllPrices() map[string]int64 {
 
 // HasPriceInCurrency checks if the variant has a price set for the specified currency
 func (v *ProductVariant) HasPriceInCurrency(currencyCode string) bool {
-	// Check if it's the default currency
-	if currencyCode == v.CurrencyCode {
-		return true
-	}
-
-	// Check additional currency prices
+	// Check currency prices
 	for _, price := range v.Prices {
 		if price.CurrencyCode == currencyCode {
 			return true
@@ -181,4 +180,45 @@ func (v *ProductVariant) HasPriceInCurrency(currencyCode string) bool {
 	}
 
 	return false
+}
+
+func (v *ProductVariant) Name() string {
+	// Combine all attribute values to form a name
+	name := ""
+	for _, value := range v.Attributes {
+		if name == "" {
+			name = value
+		} else {
+			name += " / " + value
+		}
+	}
+	return name
+}
+
+// Remove VariantAttributeDTO as we'll use map directly
+func (variant *ProductVariant) ToVariantDTO() *dto.VariantDTO {
+	if variant == nil {
+		return nil
+	}
+
+	// Get all prices and convert from cents to float
+	allPricesInCents := variant.GetAllPrices()
+	allPrices := make(map[string]float64)
+	for currency, priceInCents := range allPricesInCents {
+		allPrices[currency] = money.FromCents(priceInCents)
+	}
+
+	return &dto.VariantDTO{
+		ID:         variant.ID,
+		ProductID:  variant.ProductID,
+		SKU:        variant.SKU,
+		Stock:      variant.Stock,
+		Attributes: variant.Attributes,
+		Images:     variant.Images,
+		IsDefault:  variant.IsDefault,
+		Weight:     variant.Weight,
+		Prices:     allPrices,
+		CreatedAt:  variant.CreatedAt,
+		UpdatedAt:  variant.UpdatedAt,
+	}
 }

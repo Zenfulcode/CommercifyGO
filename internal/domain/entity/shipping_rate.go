@@ -7,52 +7,52 @@ import (
 
 // ShippingRate connects shipping methods to zones with pricing
 type ShippingRate struct {
-	ID                    uint              `json:"id"`
-	ShippingMethodID      uint              `json:"shipping_method_id"`
-	ShippingMethod        *ShippingMethod   `json:"shipping_method,omitempty"`
-	ShippingZoneID        uint              `json:"shipping_zone_id"`
-	ShippingZone          *ShippingZone     `json:"shipping_zone,omitempty"`
-	BaseRate              int64             `json:"base_rate"`
-	MinOrderValue         int64             `json:"min_order_value"`
-	FreeShippingThreshold *int64            `json:"free_shipping_threshold"`
-	WeightBasedRates      []WeightBasedRate `json:"weight_based_rates,omitempty"`
-	ValueBasedRates       []ValueBasedRate  `json:"value_based_rates,omitempty"`
-	Active                bool              `json:"active"`
-	CreatedAt             time.Time         `json:"created_at"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	ID                    uint
+	ShippingMethodID      uint
+	ShippingMethod        *ShippingMethod
+	ShippingZoneID        uint
+	ShippingZone          *ShippingZone
+	BaseRate              int64
+	MinOrderValue         int64
+	FreeShippingThreshold *int64
+	WeightBasedRates      []WeightBasedRate
+	ValueBasedRates       []ValueBasedRate
+	Active                bool
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // WeightBasedRate represents additional costs based on order weight
 type WeightBasedRate struct {
-	ID             uint      `json:"id"`
-	ShippingRateID uint      `json:"shipping_rate_id"`
-	MinWeight      float64   `json:"min_weight"`
-	MaxWeight      float64   `json:"max_weight"`
-	Rate           int64     `json:"rate"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uint
+	ShippingRateID uint
+	MinWeight      float64
+	MaxWeight      float64
+	Rate           int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // ValueBasedRate represents additional costs/discounts based on order value
 type ValueBasedRate struct {
-	ID             uint      `json:"id"`
-	ShippingRateID uint      `json:"shipping_rate_id"`
-	MinOrderValue  int64     `json:"min_order_value"`
-	MaxOrderValue  int64     `json:"max_order_value"`
-	Rate           int64     `json:"rate"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uint
+	ShippingRateID uint
+	MinOrderValue  int64
+	MaxOrderValue  int64
+	Rate           int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // ShippingOption represents a single shipping option with its cost
 type ShippingOption struct {
-	ShippingRateID        uint   `json:"shipping_rate_id"`
-	ShippingMethodID      uint   `json:"shipping_method_id"`
-	Name                  string `json:"name"`
-	Description           string `json:"description"`
-	EstimatedDeliveryDays int    `json:"estimated_delivery_days"`
-	Cost                  int64  `json:"cost"`
-	FreeShipping          bool   `json:"free_shipping"`
+	ShippingRateID        uint
+	ShippingMethodID      uint
+	Name                  string
+	Description           string
+	EstimatedDeliveryDays int
+	Cost                  int64
+	FreeShipping          bool
 }
 
 // NewShippingRate creates a new shipping rate

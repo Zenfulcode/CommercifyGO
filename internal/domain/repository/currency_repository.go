@@ -20,9 +20,9 @@ type CurrencyRepository interface {
 	DeleteProductPrice(productID uint, currencyCode string) error
 	// SetProductPrice(price *entity.ProductPrice) error
 
-	// Product variant price operations
-	GetVariantPrices(variantID uint) ([]entity.ProductVariantPrice, error)
-	// SetVariantPrices(variantID uint, prices []entity.ProductVariantPrice) error
-	// SetVariantPrice(prices *entity.ProductVariantPrice) error
+	// Product variant price operations (now using ProductPrice for variants)
+	GetVariantPrices(variantID uint) ([]entity.ProductPrice, error)
+	// SetVariantPrices(variantID uint, prices []entity.ProductPrice) error
+	// SetVariantPrice(prices *entity.ProductPrice) error
 	DeleteVariantPrice(variantID uint, currencyCode string) error
 }

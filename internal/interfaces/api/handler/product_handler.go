@@ -590,14 +590,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attributesDTO := make([]entity.VariantAttribute, len(request.Attributes))
-	for i, a := range request.Attributes {
-		attributesDTO[i] = entity.VariantAttribute{
-			Name:  a.Name,
-			Value: a.Value,
-		}
-
-	}
+	var attributes entity.VariantAttributes = request.Attributes
 
 	// Convert DTO to usecase input
 	input := usecase.AddVariantInput{
@@ -605,7 +598,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 		SKU:        request.SKU,
 		Price:      request.Price,
 		Stock:      request.Stock,
-		Attributes: attributesDTO,
+		Attributes: attributes,
 		Images:     request.Images,
 		IsDefault:  request.IsDefault,
 	}
@@ -692,18 +685,12 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attributesDTO := make([]entity.VariantAttribute, len(request.Attributes))
-	for i, a := range request.Attributes {
-		attributesDTO[i] = entity.VariantAttribute{
-			Name:  a.Name,
-			Value: a.Value,
-		}
-	}
+	var attributes entity.VariantAttributes = request.Attributes
 
 	// Convert DTO to usecase input
 	input := usecase.UpdateVariantInput{
 		SKU:        request.SKU,
-		Attributes: attributesDTO,
+		Attributes: attributes,
 		Images:     request.Images,
 	}
 

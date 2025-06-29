@@ -36,6 +36,7 @@ type DatabaseConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
+	Debug    string // Debug mode for database queries
 }
 
 // AuthConfig holds authentication-specific configuration
@@ -177,6 +178,7 @@ func LoadConfig() (*Config, error) {
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			DBName:   getEnv("DB_NAME", "commercify"),
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			Debug:    getEnv("DB_DEBUG", "false"),
 		},
 		Auth: AuthConfig{
 			JWTSecret:     getEnv("AUTH_JWT_SECRET", "your-secret-key"),

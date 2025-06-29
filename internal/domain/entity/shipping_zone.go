@@ -7,15 +7,15 @@ import (
 
 // ShippingZone represents a geographical shipping zone
 type ShippingZone struct {
-	ID          uint      `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Countries   []string  `json:"countries"` // Country codes like "US", "CA"
-	States      []string  `json:"states"`    // State/province codes like "CA", "NY"
-	ZipCodes    []string  `json:"zip_codes"` // Zip/postal codes or patterns
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uint
+	Name        string
+	Description string
+	Countries   []string
+	States      []string
+	ZipCodes    []string
+	Active      bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // NewShippingZone creates a new shipping zone

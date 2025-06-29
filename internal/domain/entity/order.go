@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/zenfulcode/commercify/internal/dto"
 )
 
 // OrderStatus represents the status of an order
@@ -53,14 +55,14 @@ type Order struct {
 	CheckoutSessionID string // Tracks which checkout session created this order
 
 	// Guest information (only used for guest orders where UserID is 0)
-	CustomerDetails *CustomerDetails `json:"customer_details"`
-	IsGuestOrder    bool             `json:"is_guest_order"`
+	CustomerDetails *CustomerDetails
+	IsGuestOrder    bool
 
 	// Shipping information
-	ShippingMethodID uint            `json:"shipping_method_id,omitempty"`
-	ShippingOption   *ShippingOption `json:"shipping_option,omitempty"`
-	ShippingCost     int64           `json:"shipping_cost"` // stored in cents
-	TotalWeight      float64         `json:"total_weight"`
+	ShippingMethodID uint
+	ShippingOption   *ShippingOption
+	ShippingCost     int64
+	TotalWeight      float64
 
 	// Discount-related fields
 	DiscountAmount  int64 // stored in cents
@@ -70,33 +72,33 @@ type Order struct {
 
 // OrderItem represents an item in an order
 type OrderItem struct {
-	ID               uint    `json:"id"`
-	OrderID          uint    `json:"order_id"`
-	ProductID        uint    `json:"product_id"`
-	ProductVariantID uint    `json:"product_variant_id,omitempty"`
-	Quantity         int     `json:"quantity"`
-	Price            int64   `json:"price"`    // stored in cents
-	Subtotal         int64   `json:"subtotal"` // stored in cents
-	Weight           float64 `json:"weight"`   // Weight per item
+	ID               uint
+	OrderID          uint
+	ProductID        uint
+	ProductVariantID uint
+	Quantity         int
+	Price            int64
+	Subtotal         int64
+	Weight           float64
 
-	ProductName string `json:"product_name"`
-	SKU         string `json:"sku"`
-	ImageURL    string `json:"image_url,omitempty"`
+	ProductName string
+	SKU         string
+	ImageURL    string
 }
 
 // Address represents a shipping or billing address
 type Address struct {
-	Street     string `json:"street"`
-	City       string `json:"city"`
-	State      string `json:"state"`
-	PostalCode string `json:"postal_code"`
-	Country    string `json:"country"`
+	Street     string
+	City       string
+	State      string
+	PostalCode string
+	Country    string
 }
 
 type CustomerDetails struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	FullName string `json:"full_name"`
+	Email    string
+	Phone    string
+	FullName string
 }
 
 // NewOrder creates a new order
@@ -422,4 +424,11 @@ func isValidPaymentStatusTransition(from, to PaymentStatus) bool {
 	}
 
 	return slices.Contains(validTransitions[from], to)
+}
+
+func (o *Order) ToOrderSummaryDTO() dto.OrderSummaryDTO {
+	panic("unimplemented")
+}
+func (o *Order) ToOrderDetailsDTO() dto.OrderDTO {
+	panic("unimplemented")
 }

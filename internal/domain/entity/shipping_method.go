@@ -7,13 +7,13 @@ import (
 
 // ShippingMethod represents a shipping method option (e.g., standard, express)
 type ShippingMethod struct {
-	ID                    uint      `json:"id"`
-	Name                  string    `json:"name"`
-	Description           string    `json:"description"`
-	EstimatedDeliveryDays int       `json:"estimated_delivery_days"`
-	Active                bool      `json:"active"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID                    uint
+	Name                  string
+	Description           string
+	EstimatedDeliveryDays int
+	Active                bool
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // NewShippingMethod creates a new shipping method

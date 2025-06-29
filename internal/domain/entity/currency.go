@@ -4,38 +4,33 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Currency represents a currency in the system
 type Currency struct {
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	Symbol       string    `json:"symbol"`
-	ExchangeRate float64   `json:"exchange_rate"`
-	IsEnabled    bool      `json:"is_enabled"`
-	IsDefault    bool      `json:"is_default"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	gorm.Model           // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	Code         string  `gorm:"primaryKey;size:3"`
+	Name         string  `gorm:"size:100;not null"`
+	Symbol       string  `gorm:"size:10;not null"`
+	ExchangeRate float64 `gorm:"not null;default:1.0"`
+	IsEnabled    bool    `gorm:"not null;default:true"`
+	IsDefault    bool    ` gorm:"not null;default:false"`
 }
 
-// ProductPrice represents a price for a product in a specific currency
+// ProductPrice represents a price for a product variant in a specific currency
+// This maps to the product_prices table which is linked to variants, not products directly
 type ProductPrice struct {
-	ID           uint      `json:"id"`
-	ProductID    uint      `json:"product_id"`
-	CurrencyCode string    `json:"currency_code"`
-	Price        int64     `json:"price"` // Price in cents
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
+	gorm.Model          // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	VariantID    uint   `gorm:"uniqueIndex:idx_variantprice"`
+	CurrencyCode string `gorm:"uniqueIndex:idx_variantprice;size:3;not null"`
+	Price        int64  `gorm:"not null"` // Price in cents
+} // Unique constraint: UNIQUE(variant_id, currency_code)
 
-// ProductVariantPrice represents a price for a product variant in a specific currency
-type ProductVariantPrice struct {
-	ID           uint      `json:"id"`
-	VariantID    uint      `json:"variant_id"`
-	CurrencyCode string    `json:"currency_code"`
-	Price        int64     `json:"price"` // Price in cents
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+// TableName returns the table name for ProductPrice
+func (ProductPrice) TableName() string {
+	return "product_prices"
 }
 
 // NewCurrency creates a new Currency
@@ -57,7 +52,6 @@ func NewCurrency(code, name, symbol string, exchangeRate float64, isEnabled bool
 		return nil, errors.New("exchange rate must be positive")
 	}
 
-	now := time.Now()
 	return &Currency{
 		Code:         strings.ToUpper(code),
 		Name:         name,
@@ -65,8 +59,6 @@ func NewCurrency(code, name, symbol string, exchangeRate float64, isEnabled bool
 		ExchangeRate: exchangeRate,
 		IsEnabled:    isEnabled,
 		IsDefault:    isDefault,
-		CreatedAt:    now,
-		UpdatedAt:    now,
 	}, nil
 }
 

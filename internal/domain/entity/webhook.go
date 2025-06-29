@@ -7,15 +7,15 @@ import (
 
 // Webhook represents a registered webhook for receiving event notifications
 type Webhook struct {
-	ID         uint      `json:"id"`
-	Provider   string    `json:"provider"` // e.g., "mobilepay", "stripe"
-	ExternalID string    `json:"external_id,omitempty"`
-	URL        string    `json:"url"`
-	Events     []string  `json:"events"`
-	Secret     string    `json:"secret,omitempty"`
-	IsActive   bool      `json:"is_active"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID         uint
+	Provider   string
+	ExternalID string
+	URL        string
+	Events     []string
+	Secret     string
+	IsActive   bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // Validate validates the webhook data

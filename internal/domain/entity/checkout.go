@@ -21,31 +21,31 @@ const (
 
 // Checkout represents a user's checkout session
 type Checkout struct {
-	ID               uint             `json:"id"`
-	UserID           uint             `json:"user_id,omitempty"`
-	SessionID        string           `json:"session_id,omitempty"`
-	Items            []CheckoutItem   `json:"items"`
-	Status           CheckoutStatus   `json:"status"`
-	ShippingAddr     Address          `json:"shipping_address"`
-	BillingAddr      Address          `json:"billing_address"`
-	ShippingMethodID uint             `json:"shipping_method_id,omitempty"`
-	ShippingOption   *ShippingOption  `json:"shipping_option,omitempty"`
-	PaymentProvider  string           `json:"payment_provider,omitempty"`
-	TotalAmount      int64            `json:"total_amount"`  // stored in cents
-	ShippingCost     int64            `json:"shipping_cost"` // stored in cents
-	TotalWeight      float64          `json:"total_weight"`
-	CustomerDetails  CustomerDetails  `json:"customer_details"`
-	Currency         string           `json:"currency"`
-	DiscountCode     string           `json:"discount_code,omitempty"`
-	DiscountAmount   int64            `json:"discount_amount"` // stored in cents
-	FinalAmount      int64            `json:"final_amount"`    // stored in cents
-	AppliedDiscount  *AppliedDiscount `json:"applied_discount,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
-	LastActivityAt   time.Time        `json:"last_activity_at"`
-	ExpiresAt        time.Time        `json:"expires_at"`
-	CompletedAt      *time.Time       `json:"completed_at,omitempty"`
-	ConvertedOrderID uint             `json:"converted_order_id,omitempty"`
+	ID               uint
+	UserID           uint
+	SessionID        string
+	Items            []CheckoutItem
+	Status           CheckoutStatus
+	ShippingAddr     Address
+	BillingAddr      Address
+	ShippingMethodID uint
+	ShippingOption   *ShippingOption
+	PaymentProvider  string
+	TotalAmount      int64
+	ShippingCost     int64
+	TotalWeight      float64
+	CustomerDetails  CustomerDetails
+	Currency         string
+	DiscountCode     string
+	DiscountAmount   int64
+	FinalAmount      int64
+	AppliedDiscount  *AppliedDiscount
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	LastActivityAt   time.Time
+	ExpiresAt        time.Time
+	CompletedAt      *time.Time
+	ConvertedOrderID uint
 }
 
 func (c *Checkout) CalculateTotals() {
@@ -54,26 +54,26 @@ func (c *Checkout) CalculateTotals() {
 
 // CheckoutItem represents an item in a checkout
 type CheckoutItem struct {
-	ID               uint      `json:"id"`
-	CheckoutID       uint      `json:"checkout_id"`
-	ProductID        uint      `json:"product_id"`
-	ProductVariantID uint      `json:"product_variant_id,omitempty"`
-	ImageURL         string    `json:"image_url,omitempty"`
-	Quantity         int       `json:"quantity"`
-	Price            int64     `json:"price"` // stored in cents
-	Weight           float64   `json:"weight"`
-	ProductName      string    `json:"product_name"`
-	VariantName      string    `json:"variant_name,omitempty"`
-	SKU              string    `json:"sku,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               uint
+	CheckoutID       uint
+	ProductID        uint
+	ProductVariantID uint
+	ImageURL         string
+	Quantity         int
+	Price            int64
+	Weight           float64
+	ProductName      string
+	VariantName      string
+	SKU              string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // AppliedDiscount represents a discount applied to a checkout
 type AppliedDiscount struct {
-	DiscountID     uint   `json:"discount_id"`
-	DiscountCode   string `json:"discount_code"`
-	DiscountAmount int64  `json:"discount_amount"` // stored in cents
+	DiscountID     uint
+	DiscountCode   string
+	DiscountAmount int64
 }
 
 // NewCheckout creates a new checkout for a guest user

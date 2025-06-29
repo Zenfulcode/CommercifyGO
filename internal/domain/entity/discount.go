@@ -30,22 +30,22 @@ const (
 
 // Discount represents a discount in the system
 type Discount struct {
-	ID               uint           `json:"id"`
-	Code             string         `json:"code"`
-	Type             DiscountType   `json:"type"`
-	Method           DiscountMethod `json:"method"`
-	Value            float64        `json:"value"`              // Still using float64 for percentage value
-	MinOrderValue    int64          `json:"min_order_value"`    // stored in cents
-	MaxDiscountValue int64          `json:"max_discount_value"` // stored in cents
-	ProductIDs       []uint         `json:"product_ids,omitempty"`
-	CategoryIDs      []uint         `json:"category_ids,omitempty"`
-	StartDate        time.Time      `json:"start_date"`
-	EndDate          time.Time      `json:"end_date"`
-	UsageLimit       int            `json:"usage_limit"`
-	CurrentUsage     int            `json:"current_usage"`
-	Active           bool           `json:"active"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID               uint
+	Code             string
+	Type             DiscountType
+	Method           DiscountMethod
+	Value            float64
+	MinOrderValue    int64
+	MaxDiscountValue int64
+	ProductIDs       []uint
+	CategoryIDs      []uint
+	StartDate        time.Time
+	EndDate          time.Time
+	UsageLimit       int
+	CurrentUsage     int
+	Active           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // NewDiscount creates a new discount

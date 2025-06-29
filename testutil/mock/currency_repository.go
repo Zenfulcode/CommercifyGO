@@ -129,13 +129,13 @@ func (r *MockCurrencyRepository) DeleteProductPrice(productID uint, currencyCode
 // SetProductPrice(price *entity.ProductPrice) error
 
 // Product variant price operations
-func (r *MockCurrencyRepository) GetVariantPrices(variantID uint) ([]entity.ProductVariantPrice, error) {
+func (r *MockCurrencyRepository) GetVariantPrices(variantID uint) ([]entity.ProductPrice, error) {
 	if variantID == 0 {
 		return nil, fmt.Errorf("variant ID cannot be zero")
 	}
-	var prices []entity.ProductVariantPrice
+	var prices []entity.ProductPrice
 	for _, currency := range r.currencies {
-		price := entity.ProductVariantPrice{
+		price := entity.ProductPrice{
 			VariantID:    variantID,
 			CurrencyCode: currency.Code,
 			Price:        money.ToCents(100.0),
@@ -145,8 +145,8 @@ func (r *MockCurrencyRepository) GetVariantPrices(variantID uint) ([]entity.Prod
 	return prices, nil
 }
 
-// SetVariantPrices(variantID uint, prices []entity.ProductVariantPrice) error
-// SetVariantPrice(prices *entity.ProductVariantPrice) error
+// SetVariantPrices(variantID uint, prices []entity.ProductPrice) error
+// SetVariantPrice(prices *entity.ProductPrice) error
 func (r *MockCurrencyRepository) DeleteVariantPrice(variantID uint, currencyCode string) error {
 	if variantID == 0 {
 		return fmt.Errorf("variant ID cannot be zero")

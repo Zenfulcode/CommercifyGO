@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/handler"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
+	"gorm.io/gorm"
 )
 
 // Server represents the API server
@@ -27,7 +27,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server
-func NewServer(cfg *config.Config, db *sql.DB, logger logger.Logger) *Server {
+func NewServer(cfg *config.Config, db *gorm.DB, logger logger.Logger) *Server {
 	// Initialize dependency container
 	diContainer := container.NewContainer(cfg, db, logger)
 
