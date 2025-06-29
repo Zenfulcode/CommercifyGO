@@ -46,16 +46,19 @@ type ProductVariant struct {
 	Images     []string          `gorm:"type:jsonb"`
 	IsDefault  bool              `gorm:"default:false"`
 	Weight     float64           `gorm:"default:0"`
-	Prices     []ProductPrice    `gorm:"foreignKey:VariantID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE;"`
+	Price      int64             `gorm:"not null"`
 }
 
 // NewProductVariant creates a new product variant
-func NewProductVariant(sku string, stock int, weight float64, attributes VariantAttributes, prices map[string]int64, images []string, isDefault bool) (*ProductVariant, error) {
+func NewProductVariant(sku string, stock int, price int64, weight float64, attributes VariantAttributes, images []string, isDefault bool) (*ProductVariant, error) {
 	if sku == "" {
 		return nil, errors.New("SKU cannot be empty")
 	}
 	if stock < 0 {
 		return nil, errors.New("stock cannot be negative")
+	}
+	if price < 0 {
+		return nil, errors.New("price cannot be negative")
 	}
 	if weight < 0 {
 		return nil, errors.New("weight cannot be negative")
@@ -65,23 +68,6 @@ func NewProductVariant(sku string, stock int, weight float64, attributes Variant
 		attributes = make(VariantAttributes)
 	}
 
-	if len(prices) == 0 {
-		return nil, errors.New("at least one price must be provided")
-	}
-
-	// Convert prices from float64 to ProductPrice
-	var pricesList []ProductPrice
-	for currency, price := range prices {
-		if price < 0 {
-			return nil, errors.New("price cannot be negative")
-		}
-
-		pricesList = append(pricesList, ProductPrice{
-			CurrencyCode: currency,
-			Price:        price, // Convert to cents
-		})
-	}
-
 	return &ProductVariant{
 		SKU:        sku,
 		Stock:      stock,
@@ -89,11 +75,11 @@ func NewProductVariant(sku string, stock int, weight float64, attributes Variant
 		Images:     images,
 		IsDefault:  isDefault,
 		Weight:     weight,
-		Prices:     pricesList,
+		Price:      price,
 	}, nil
 }
 
-func (v *ProductVariant) Update(SKU string, stock int, images []string, attributes VariantAttributes, prices map[string]int64) (bool, error) {
+func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float64, images []string, attributes VariantAttributes) (bool, error) {
 	updated := false
 	if SKU != "" && v.SKU != SKU {
 		v.SKU = SKU
@@ -101,6 +87,14 @@ func (v *ProductVariant) Update(SKU string, stock int, images []string, attribut
 	}
 	if stock >= 0 && v.Stock != stock {
 		v.Stock = stock
+		updated = true
+	}
+	if price >= 0 && v.Price != price {
+		v.Price = price
+		updated = true
+	}
+	if weight >= 0 && v.Weight != weight {
+		v.Weight = weight
 		updated = true
 	}
 
@@ -116,14 +110,6 @@ func (v *ProductVariant) Update(SKU string, stock int, images []string, attribut
 			v.Attributes = newAttributes
 			updated = true
 		}
-	}
-	if len(prices) > 0 {
-		for currency, price := range prices {
-			if err := v.SetPriceInCurrency(currency, price); err != nil {
-				return false, err
-			}
-		}
-		updated = true
 	}
 
 	return updated, nil
@@ -145,85 +131,6 @@ func (v *ProductVariant) IsAvailable(quantity int) bool {
 	return v.Stock >= quantity
 }
 
-// GetPriceInCurrency returns the price in the specified currency
-func (v *ProductVariant) GetPriceInCurrency(currencyCode string) (int64, bool) {
-	for _, price := range v.Prices {
-		if price.CurrencyCode == currencyCode {
-			return price.Price, true
-		}
-	}
-	return 0, false
-}
-
-// SetPriceInCurrency sets or updates the price for a specific currency
-func (v *ProductVariant) SetPriceInCurrency(currencyCode string, priceInCents int64) error {
-	if currencyCode == "" {
-		return errors.New("currency code cannot be empty")
-	}
-	if priceInCents < 0 {
-		return errors.New("price cannot be negative")
-	}
-
-	// Check if price already exists for this currency
-	for i, existingPrice := range v.Prices {
-		if existingPrice.CurrencyCode == currencyCode {
-			v.Prices[i].Price = priceInCents
-			return nil
-		}
-	}
-
-	newPrice := ProductPrice{
-		VariantID:    v.ID,
-		CurrencyCode: currencyCode,
-		Price:        priceInCents,
-	}
-
-	v.Prices = append(v.Prices, newPrice)
-	return nil
-}
-
-// RemovePriceInCurrency removes the price for a specific currency
-func (v *ProductVariant) RemovePriceInCurrency(currencyCode string) error {
-	if currencyCode == "" {
-		return errors.New("currency code cannot be empty")
-	}
-
-	for i, price := range v.Prices {
-		if price.CurrencyCode == currencyCode {
-			// Remove the price by slicing
-			v.Prices = append(v.Prices[:i], v.Prices[i+1:]...)
-
-			return nil
-		}
-	}
-
-	return errors.New("price not found for the specified currency")
-}
-
-// GetAllPrices returns all prices for this variant
-func (v *ProductVariant) GetAllPrices() map[string]int64 {
-	prices := make(map[string]int64)
-
-	// Add all currency prices
-	for _, price := range v.Prices {
-		prices[price.CurrencyCode] = price.Price
-	}
-
-	return prices
-}
-
-// HasPriceInCurrency checks if the variant has a price set for the specified currency
-func (v *ProductVariant) HasPriceInCurrency(currencyCode string) bool {
-	// Check currency prices
-	for _, price := range v.Prices {
-		if price.CurrencyCode == currencyCode {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (v *ProductVariant) Name() string {
 	// Combine all attribute values to form a name
 	name := ""
@@ -243,24 +150,19 @@ func (variant *ProductVariant) ToVariantDTO() *dto.VariantDTO {
 		return nil
 	}
 
-	// Get all prices and convert from cents to float
-	allPricesInCents := variant.GetAllPrices()
-	allPrices := make(map[string]float64)
-	for currency, priceInCents := range allPricesInCents {
-		allPrices[currency] = money.FromCents(priceInCents)
-	}
-
 	return &dto.VariantDTO{
-		ID:         variant.ID,
-		ProductID:  variant.ProductID,
-		SKU:        variant.SKU,
-		Stock:      variant.Stock,
-		Attributes: variant.Attributes,
-		Images:     variant.Images,
-		IsDefault:  variant.IsDefault,
-		Weight:     variant.Weight,
-		Prices:     allPrices,
-		CreatedAt:  variant.CreatedAt,
-		UpdatedAt:  variant.UpdatedAt,
+		ID:          variant.ID,
+		ProductID:   variant.ProductID,
+		VariantName: variant.Name(),
+		SKU:         variant.SKU,
+		Stock:       variant.Stock,
+		Attributes:  variant.Attributes,
+		Images:      variant.Images,
+		IsDefault:   variant.IsDefault,
+		Weight:      variant.Weight,
+		Price:       money.FromCents(variant.Price),
+		Currency:    variant.Product.Currency,
+		CreatedAt:   variant.CreatedAt,
+		UpdatedAt:   variant.UpdatedAt,
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
@@ -15,6 +16,7 @@ type Product struct {
 	gorm.Model
 	Name        string            `gorm:"not null;size:255"`
 	Description string            `gorm:"type:text"`
+	Currency    string            `gorm:"not null;size:3"`
 	CategoryID  uint              `gorm:"not null;index"`
 	Category    Category          `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
 	Images      []string          `gorm:"type:jsonb;default:'[]'"`
@@ -24,7 +26,7 @@ type Product struct {
 
 // NewProduct creates a new product with the given details
 // Note: At least one variant must be added before the product can be considered complete
-func NewProduct(name, description string, categoryID uint, images []string, variants []*ProductVariant, isActive bool) (*Product, error) {
+func NewProduct(name, description, currency string, categoryID uint, images []string, variants []*ProductVariant, isActive bool) (*Product, error) {
 	if name == "" {
 		return nil, errors.New("product name cannot be empty")
 	}
@@ -40,6 +42,7 @@ func NewProduct(name, description string, categoryID uint, images []string, vari
 	return &Product{
 		Name:        name,
 		Description: description,
+		Currency:    currency,
 		CategoryID:  categoryID,
 		Images:      images,
 		Variants:    make([]*ProductVariant, 0, len(variants)),
@@ -153,16 +156,6 @@ func (p *Product) GetTotalWeight(quantity int) float64 {
 	return defaultVariant.Weight * float64(quantity)
 }
 
-// GetPriceInCurrency returns the price for a specific currency from the default variant
-func (p *Product) GetPriceInCurrency(currencyCode string) (int64, bool) {
-	variant := p.GetDefaultVariant()
-	if variant != nil {
-		return variant.GetPriceInCurrency(currencyCode)
-	}
-
-	return 0, false
-}
-
 func (p *Product) GetStockForVariant(variantID uint) (int, error) {
 	if len(p.Variants) == 0 {
 		return 0, errors.New("no variants available for this product")
@@ -190,29 +183,29 @@ func (p *Product) HasVariants() bool {
 	return len(p.Variants) > 0
 }
 
-func (p *Product) Update(name string, description string, images []string, active bool) bool {
+func (p *Product) Update(name *string, description *string, images *[]string, active *bool) bool {
 	updated := false
-	if name != "" && p.Name != name {
-		p.Name = name
+	if name != nil && *name != "" && p.Name != *name {
+		p.Name = *name
 		updated = true
 	}
-	if description != "" && p.Description != description {
-		p.Description = description
+	if description != nil && *description != "" && p.Description != *description {
+		p.Description = *description
 		updated = true
 	}
-	if len(images) > 0 && !slices.Equal(p.Images, images) {
-		p.Images = images
+	if images != nil && len(*images) > 0 && !slices.Equal(p.Images, *images) {
+		p.Images = *images
 		updated = true
 	}
-	if p.Active != active {
-		p.Active = active
+	if active != nil && p.Active != *active {
+		p.Active = *active
 		updated = true
 	}
 
 	return updated
 }
 
-func (product *Product) ToProductDTO(variantId *uint) *dto.ProductDTO {
+func (product *Product) ToProductDTO() *dto.ProductDTO {
 	if product == nil {
 		return nil
 	}
@@ -226,6 +219,10 @@ func (product *Product) ToProductDTO(variantId *uint) *dto.ProductDTO {
 		ID:          product.ID,
 		Name:        product.Name,
 		Description: product.Description,
+		Currency:    product.Currency,
+		TotalStock:  product.GetTotalStock(),
+		Price:       money.FromCents(product.GetDefaultVariant().Price),
+		Category:    product.Category.Name,
 		CategoryID:  product.CategoryID,
 		Images:      product.Images,
 		HasVariants: product.HasVariants(),

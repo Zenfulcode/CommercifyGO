@@ -51,7 +51,7 @@ type VariantInput struct {
 	Weight     float64
 	Images     []string
 	Attributes entity.VariantAttributes
-	Prices     map[string]int64
+	Price      int64
 }
 
 // CreateProductInput contains the data needed to create a product
@@ -118,9 +118,9 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 			variant, err := entity.NewProductVariant(
 				variantInput.SKU,
 				variantInput.Stock,
+				variantInput.Price,
 				weight,
 				variantInput.Attributes,
-				variantInput.Prices,
 				variantInput.Images,
 				variantInput.IsDefault,
 			)
@@ -136,6 +136,7 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 	product, err := entity.NewProduct(
 		input.Name,
 		input.Description,
+		input.Currency,
 		input.CategoryID,
 		input.Images,
 		variants,
@@ -178,11 +179,11 @@ func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.
 
 // UpdateProductInput contains the data needed to update a product (prices in dollars)
 type UpdateProductInput struct {
-	Name        string
-	Description string
-	CategoryID  uint
-	Images      []string
-	Active      bool
+	Name        *string
+	Description *string
+	CategoryID  *uint
+	Images      *[]string
+	Active      *bool
 }
 
 // UpdateProduct updates a product
@@ -194,12 +195,12 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 	}
 
 	// Validate category exists if changing
-	if input.CategoryID != 0 && input.CategoryID != product.CategoryID {
-		_, err := uc.categoryRepo.GetByID(input.CategoryID)
+	if input.CategoryID != nil && *input.CategoryID != product.CategoryID {
+		_, err := uc.categoryRepo.GetByID(*input.CategoryID)
 		if err != nil {
 			return nil, errors.New("category not found")
 		}
-		product.CategoryID = input.CategoryID
+		product.CategoryID = *input.CategoryID
 	}
 
 	updated := product.Update(input.Name, input.Description, input.Images, input.Active)
@@ -238,9 +239,10 @@ func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateV
 	variant.Update(
 		input.SKU,
 		input.Stock,
+		input.Price,
+		input.Weight,
 		input.Images,
 		input.Attributes,
-		input.Prices,
 	)
 
 	// Handle default status
@@ -282,9 +284,9 @@ func (uc *ProductUseCase) AddVariant(productID uint, input AddVariantInput) (*en
 	variant, err := entity.NewProductVariant(
 		input.SKU,
 		input.Stock,
+		input.Price,
 		input.Weight,
 		input.Attributes,
-		input.Prices,
 		input.Images,
 		input.IsDefault,
 	)
@@ -412,168 +414,4 @@ func (uc *ProductUseCase) ListProducts(input SearchProductsInput) ([]*entity.Pro
 // ListCategories lists all product categories
 func (uc *ProductUseCase) ListCategories() ([]*entity.Category, error) {
 	return uc.categoryRepo.List()
-}
-
-// SetVariantPriceInput contains the data needed to set a price for a variant in a specific currency
-type SetVariantPriceInput struct {
-	VariantID    uint    `json:"variant_id"`
-	CurrencyCode string  `json:"currency_code"`
-	Price        float64 `json:"price"`
-}
-
-// SetVariantPriceInCurrency sets or updates the price for a variant in a specific currency
-func (uc *ProductUseCase) SetVariantPriceInCurrency(input SetVariantPriceInput) (*entity.ProductVariant, error) {
-	// Validate input
-	if input.VariantID == 0 {
-		return nil, errors.New("variant ID is required")
-	}
-	if input.CurrencyCode == "" {
-		return nil, errors.New("currency code is required")
-	}
-	if input.Price <= 0 {
-		return nil, errors.New("price must be greater than zero")
-	}
-
-	// Get the variant
-	variant, err := uc.productVariantRepo.GetByID(input.VariantID)
-	if err != nil {
-		return nil, fmt.Errorf("variant not found: %w", err)
-	}
-
-	// Validate currency exists and is enabled
-	currency, err := uc.currencyRepo.GetByCode(input.CurrencyCode)
-	if err != nil {
-		return nil, fmt.Errorf("currency %s not found: %w", input.CurrencyCode, err)
-	}
-	if !currency.IsEnabled {
-		return nil, fmt.Errorf("currency %s is not enabled", input.CurrencyCode)
-	}
-
-	// Set the price in the variant
-	err = variant.SetPriceInCurrency(input.CurrencyCode, money.ToCents(input.Price))
-	if err != nil {
-		return nil, fmt.Errorf("failed to set price: %w", err)
-	}
-
-	// Update the variant in the repository
-	err = uc.productVariantRepo.Update(variant)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update variant: %w", err)
-	}
-
-	return variant, nil
-}
-
-// RemoveVariantPriceInCurrency removes the price for a variant in a specific currency
-func (uc *ProductUseCase) RemoveVariantPriceInCurrency(variantID uint, currencyCode string) (*entity.ProductVariant, error) {
-	// Validate input
-	if variantID == 0 {
-		return nil, errors.New("variant ID is required")
-	}
-	if currencyCode == "" {
-		return nil, errors.New("currency code is required")
-	}
-
-	// Get the variant
-	variant, err := uc.productVariantRepo.GetByID(variantID)
-	if err != nil {
-		return nil, fmt.Errorf("variant not found: %w", err)
-	}
-
-	// Remove the price
-	err = variant.RemovePriceInCurrency(currencyCode)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove price: %w", err)
-	}
-
-	// Update the variant in the repository
-	err = uc.productVariantRepo.Update(variant)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update variant: %w", err)
-	}
-
-	return variant, nil
-}
-
-// GetVariantPrices returns all prices for a variant across all currencies
-func (uc *ProductUseCase) GetVariantPrices(variantID uint) (map[string]float64, error) {
-	// Validate input
-	if variantID == 0 {
-		return nil, errors.New("variant ID is required")
-	}
-
-	// Get the variant
-	variant, err := uc.productVariantRepo.GetByID(variantID)
-	if err != nil {
-		return nil, fmt.Errorf("variant not found: %w", err)
-	}
-
-	// Get all prices in cents
-	pricesInCents := variant.GetAllPrices()
-
-	// Convert to float64 (dollars/euros/etc.)
-	prices := make(map[string]float64)
-	for currency, priceInCents := range pricesInCents {
-		prices[currency] = money.FromCents(priceInCents)
-	}
-
-	return prices, nil
-}
-
-// SetMultipleVariantPricesInput contains the data needed to set multiple prices for a variant
-type SetMultipleVariantPricesInput struct {
-	VariantID uint               `json:"variant_id"`
-	Prices    map[string]float64 `json:"prices"` // currency_code -> price
-}
-
-// SetMultipleVariantPrices sets multiple prices for a variant at once
-func (uc *ProductUseCase) SetMultipleVariantPrices(input SetMultipleVariantPricesInput) (*entity.ProductVariant, error) {
-	// Validate input
-	if input.VariantID == 0 {
-		return nil, errors.New("variant ID is required")
-	}
-	if len(input.Prices) == 0 {
-		return nil, errors.New("at least one price must be provided")
-	}
-
-	// Get the variant
-	variant, err := uc.productVariantRepo.GetByID(input.VariantID)
-	if err != nil {
-		return nil, fmt.Errorf("variant not found: %w", err)
-	}
-
-	// Validate all currencies and prices
-	for currencyCode, price := range input.Prices {
-		if currencyCode == "" {
-			return nil, errors.New("currency code cannot be empty")
-		}
-		if price <= 0 {
-			return nil, fmt.Errorf("price for %s must be greater than zero", currencyCode)
-		}
-
-		// Validate currency exists and is enabled
-		currency, err := uc.currencyRepo.GetByCode(currencyCode)
-		if err != nil {
-			return nil, fmt.Errorf("currency %s not found: %w", currencyCode, err)
-		}
-		if !currency.IsEnabled {
-			return nil, fmt.Errorf("currency %s is not enabled", currencyCode)
-		}
-	}
-
-	// Set all prices
-	for currencyCode, price := range input.Prices {
-		err = variant.SetPriceInCurrency(currencyCode, money.ToCents(price))
-		if err != nil {
-			return nil, fmt.Errorf("failed to set price for %s: %w", currencyCode, err)
-		}
-	}
-
-	// Update the variant in the repository
-	err = uc.productVariantRepo.Update(variant)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update variant: %w", err)
-	}
-
-	return variant, nil
 }

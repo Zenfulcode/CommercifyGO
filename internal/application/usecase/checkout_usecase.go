@@ -813,7 +813,7 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 	}
 
 	// Get the parent product
-	product, err := uc.productRepo.GetByID(variant.ProductID)
+	product, err := uc.productRepo.GetByIDAndCurrency(variant.ProductID, checkout.Currency)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product for variant: %w", err)
 	}
@@ -823,18 +823,12 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("product is not available")
 	}
 
-	// Get the price in the checkout's currency
-	price, found := variant.GetPriceInCurrency(checkout.Currency)
-	if !found {
-		return nil, fmt.Errorf("failed to get price in checkout currency: %w", err)
-	}
-
 	// Populate input with variant details
 	input.ProductID = variant.ProductID
 	input.VariantID = variant.ID
 	input.ProductName = product.Name
 	input.VariantName = variant.Name()
-	input.Price = price
+	input.Price = variant.Price
 	input.Weight = variant.Weight
 
 	// Add the item to the checkout

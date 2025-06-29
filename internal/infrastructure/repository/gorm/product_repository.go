@@ -32,14 +32,6 @@ func (r *ProductRepository) Create(product *entity.Product) error {
 			if err := tx.Create(variant).Error; err != nil {
 				return err
 			}
-
-			// Create prices for this variant
-			for i := range variant.Prices {
-				variant.Prices[i].VariantID = variant.ID
-				if err := tx.Create(&variant.Prices[i]).Error; err != nil {
-					return err
-				}
-			}
 		}
 
 		return nil
@@ -49,7 +41,7 @@ func (r *ProductRepository) Create(product *entity.Product) error {
 // GetByID retrieves a product by ID without variants
 func (r *ProductRepository) GetByID(productID uint) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants.Prices").First(&product, productID).Error; err != nil {
+	if err := r.db.Preload("Variants").First(&product, productID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("product not found")
 		}
@@ -61,7 +53,7 @@ func (r *ProductRepository) GetByID(productID uint) (*entity.Product, error) {
 // GetBySKU implements repository.ProductRepository.
 func (r *ProductRepository) GetBySKU(sku string) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants.Prices").Joins("JOIN product_variants ON products.id = product_variants.product_id").
+	if err := r.db.Preload("Variants").Joins("JOIN product_variants ON products.id = product_variants.product_id").
 		Where("product_variants.sku = ?", sku).First(&product).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("product not found")
@@ -77,9 +69,9 @@ func (r *ProductRepository) GetBySKU(sku string) (*entity.Product, error) {
 
 func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants.Prices", func(db *gorm.DB) *gorm.DB {
+	if err := r.db.Preload("Variants", func(db *gorm.DB) *gorm.DB {
 		if currency != "" {
-			return db.Where("currency_code = ?", currency)
+			return db.Where("currency = ?", currency)
 		}
 		return db
 	}).First(&product, productID).Error; err != nil {
@@ -92,17 +84,7 @@ func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) 
 	if len(product.Variants) == 0 {
 		return nil, errors.New("product has no variants")
 	}
-	// Ensure at least one variant has prices
-	hasPrices := false
-	for _, variant := range product.Variants {
-		if len(variant.Prices) > 0 {
-			hasPrices = true
-			break
-		}
-	}
-	if !hasPrices {
-		return nil, errors.New("product has no prices for its variants")
-	}
+
 	return &product, nil
 }
 
@@ -118,14 +100,6 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 		for _, variant := range product.Variants {
 			if err := tx.Save(variant).Error; err != nil {
 				return err
-			}
-
-			// Update prices for this variant
-			for i := range variant.Prices {
-				variant.Prices[i].VariantID = variant.ID // Ensure the foreign key is set
-				if err := tx.Save(&variant.Prices[i]).Error; err != nil {
-					return err
-				}
 			}
 		}
 
@@ -170,26 +144,25 @@ func (r *ProductRepository) List(query, currency string, categoryID, offset, lim
 
 	// Price filtering requires joining with variants and prices
 	if minPriceCents > 0 || maxPriceCents > 0 || currency != "" {
-		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id").
-			Joins("JOIN product_prices ON product_variants.id = product_prices.variant_id")
+		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id")
 
 		if currency != "" {
-			tx = tx.Where("product_prices.currency_code = ?", currency)
+			tx = tx.Where("products.currency = ?", currency)
 		}
 
 		if minPriceCents > 0 {
-			tx = tx.Where("product_prices.price >= ?", minPriceCents)
+			tx = tx.Where("product_variants.price >= ?", minPriceCents)
 		}
 
 		if maxPriceCents > 0 {
-			tx = tx.Where("product_prices.price <= ?", maxPriceCents)
+			tx = tx.Where("product_variants.price <= ?", maxPriceCents)
 		}
 
 		tx = tx.Distinct()
 	}
 
 	// Apply pagination
-	if err := tx.Offset(int(offset)).Limit(int(limit)).Preload("Variants.Prices").Find(&products).Error; err != nil {
+	if err := tx.Offset(int(offset)).Limit(int(limit)).Preload("Variants").Find(&products).Error; err != nil {
 		return nil, err
 	}
 
@@ -215,19 +188,18 @@ func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint,
 
 	// Price filtering requires joining with variants and prices
 	if minPriceCents > 0 || maxPriceCents > 0 || currency != "" {
-		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id").
-			Joins("JOIN product_prices ON product_variants.id = product_prices.variant_id")
+		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id")
 
 		if currency != "" {
-			tx = tx.Where("product_prices.currency_code = ?", currency)
+			tx = tx.Where("products.currency = ?", currency)
 		}
 
 		if minPriceCents > 0 {
-			tx = tx.Where("product_prices.price >= ?", minPriceCents)
+			tx = tx.Where("product_variants.price >= ?", minPriceCents)
 		}
 
 		if maxPriceCents > 0 {
-			tx = tx.Where("product_prices.price <= ?", maxPriceCents)
+			tx = tx.Where("product_variants.price <= ?", maxPriceCents)
 		}
 
 		tx = tx.Distinct()

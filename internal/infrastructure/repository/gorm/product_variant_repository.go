@@ -26,14 +26,6 @@ func (r *ProductVariantRepository) Create(variant *entity.ProductVariant) error 
 			return err
 		}
 
-		// Create prices for this variant
-		for i := range variant.Prices {
-			variant.Prices[i].VariantID = variant.ID
-			if err := tx.Create(&variant.Prices[i]).Error; err != nil {
-				return err
-			}
-		}
-
 		return nil
 	})
 }
@@ -44,14 +36,6 @@ func (r *ProductVariantRepository) BatchCreate(variants []*entity.ProductVariant
 		for _, variant := range variants {
 			if err := tx.Create(variant).Error; err != nil {
 				return err
-			}
-
-			// Create prices for this variant
-			for i := range variant.Prices {
-				variant.Prices[i].VariantID = variant.ID
-				if err := tx.Create(&variant.Prices[i]).Error; err != nil {
-					return err
-				}
 			}
 		}
 		return nil
@@ -112,35 +96,6 @@ func (r *ProductVariantRepository) Delete(variantID uint) error {
 // UpdateStock updates the stock for a variant
 func (r *ProductVariantRepository) UpdateStock(variantID uint, quantity int) error {
 	return r.db.Model(&entity.ProductVariant{}).Where("id = ?", variantID).Update("stock", quantity).Error
-}
-
-// AddPrice adds or updates a price for a variant in a specific currency
-func (r *ProductVariantRepository) AddPrice(variantID uint, currencyCode string, priceInCents int64) error {
-	price := entity.ProductPrice{
-		VariantID:    variantID,
-		CurrencyCode: currencyCode,
-		Price:        priceInCents,
-	}
-
-	// Use ON CONFLICT to update if exists, insert if not
-	return r.db.Where("variant_id = ? AND currency_code = ?", variantID, currencyCode).
-		Assign(entity.ProductPrice{Price: priceInCents}).
-		FirstOrCreate(&price).Error
-}
-
-// RemovePrice removes a price for a variant in a specific currency
-func (r *ProductVariantRepository) RemovePrice(variantID uint, currencyCode string) error {
-	return r.db.Where("variant_id = ? AND currency_code = ?", variantID, currencyCode).
-		Delete(&entity.ProductPrice{}).Error
-}
-
-// GetPrices retrieves all prices for a variant
-func (r *ProductVariantRepository) GetPrices(variantID uint) ([]entity.ProductPrice, error) {
-	var prices []entity.ProductPrice
-	if err := r.db.Where("variant_id = ?", variantID).Find(&prices).Error; err != nil {
-		return nil, err
-	}
-	return prices, nil
 }
 
 // List retrieves variants with filtering and pagination
