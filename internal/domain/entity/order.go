@@ -139,9 +139,9 @@ func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, bil
 
 	now := time.Now()
 
-	// Generate a friendly order number (will be replaced with actual ID after creation)
-	// Format: ORD-YYYYMMDD-TEMP
-	orderNumber := fmt.Sprintf("ORD-%s-TEMP", now.Format("20060102"))
+	// Generate a unique temporary order number using nanoseconds to avoid collisions
+	// Format: ORD-YYYYMMDD-TEMP-NNNNNNNNN
+	orderNumber := fmt.Sprintf("ORD-%s-TEMP-%d", now.Format("20060102"), now.UnixNano())
 
 	order := &Order{
 		UserID:          userID,
@@ -188,8 +188,9 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 
 	now := time.Now()
 
-	// Format: GS-YYYYMMDD-TEMP (GS prefix for guest orders)
-	orderNumber := fmt.Sprintf("GS-%s-TEMP", now.Format("20060102"))
+	// Generate a unique temporary order number using nanoseconds to avoid collisions
+	// Format: GS-YYYYMMDD-TEMP-NNNNNNNNN (GS prefix for guest orders)
+	orderNumber := fmt.Sprintf("GS-%s-TEMP-%d", now.Format("20060102"), now.UnixNano())
 
 	order := &Order{
 		UserID:         0, // Using 0 to indicate it should be NULL in the database
