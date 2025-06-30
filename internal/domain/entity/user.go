@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/dto"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -98,4 +99,14 @@ func (u *User) FullName() string {
 // IsAdmin checks if the user has admin role
 func (u *User) IsAdmin() bool {
 	return u.Role == string(RoleAdmin)
+}
+
+func (u *User) ToUserDTO() *dto.UserDTO {
+	return &dto.UserDTO{
+		ID:        u.ID,
+		Email:     u.Email,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		Role:      u.Role,
+	}
 }

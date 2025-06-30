@@ -16,3 +16,8 @@ type CustomerDetailsDTO struct {
 	Phone    string `json:"phone"`
 	FullName string `json:"full_name"`
 }
+
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error string `json:"error"`
+}

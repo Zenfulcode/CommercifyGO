@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
 
@@ -18,18 +19,33 @@ type UpdateCategoryRequest struct {
 	ParentID    *uint  `json:"parent_id,omitempty"`
 }
 
-func CreateCategoryResponse(category dto.CategoryDTO) ResponseDTO[dto.CategoryDTO] {
-	return SuccessResponse(category)
+func CreateCategoryResponse(category *dto.CategoryDTO) ResponseDTO[dto.CategoryDTO] {
+	return SuccessResponse(*category)
 }
 
-func CreateCategoryListResponse(categories []dto.CategoryDTO, totalCount, page, pageSize int) ListResponseDTO[dto.CategoryDTO] {
+func CreateCategoryListResponse(categories []*entity.Category, totalCount, page, pageSize int) ListResponseDTO[dto.CategoryDTO] {
+	var categoryDTOs []dto.CategoryDTO
+	for _, category := range categories {
+		categoryDTOs = append(categoryDTOs, *category.ToCategoryDTO())
+	}
+
+	if len(categoryDTOs) == 0 {
+		return ListResponseDTO[dto.CategoryDTO]{
+			Success:    true,
+			Data:       []dto.CategoryDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No categories found",
+		}
+	}
+
 	return ListResponseDTO[dto.CategoryDTO]{
 		Success: true,
-		Data:    categories,
+		Data:    categoryDTOs,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    totalCount,
 		},
+		Message: "Categories retrieved successfully",
 	}
 }

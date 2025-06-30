@@ -3,6 +3,8 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -158,5 +160,66 @@ func (r *ShippingRate) Deactivate() {
 	if r.Active {
 		r.Active = false
 
+	}
+}
+
+func (s *ShippingOption) ToShippingOptionDTO() *dto.ShippingOptionDTO {
+	return &dto.ShippingOptionDTO{
+		Name:                  s.Name,
+		Description:           s.Description,
+		EstimatedDeliveryDays: s.EstimatedDeliveryDays,
+		Cost:                  money.FromCents(s.Cost),
+		FreeShipping:          s.FreeShipping,
+	}
+}
+
+func (r *ShippingRate) ToShippingRateDTO() *dto.ShippingRateDTO {
+	var shippingRateDto = dto.ShippingRateDTO{
+		ID:               r.ID,
+		ShippingMethodID: r.ShippingMethodID,
+		ShippingZoneID:   r.ShippingZoneID,
+		BaseRate:         money.FromCents(r.BaseRate),
+		MinOrderValue:    money.FromCents(r.MinOrderValue),
+		Active:           r.Active,
+	}
+
+	if r.FreeShippingThreshold != nil {
+		shippingRateDto.FreeShippingThreshold = money.FromCents(*r.FreeShippingThreshold)
+	}
+	if r.ShippingMethod != nil {
+		shippingRateDto.ShippingMethod = r.ShippingMethod.ToShippingMethodDTO()
+	}
+	if r.ShippingZone != nil {
+		shippingRateDto.ShippingZone = r.ShippingZone.ToShippingZoneDTO()
+	}
+	if len(r.WeightBasedRates) > 0 {
+		shippingRateDto.WeightBasedRates = make([]dto.WeightBasedRateDTO, len(r.WeightBasedRates))
+		for i, wbr := range r.WeightBasedRates {
+			shippingRateDto.WeightBasedRates[i] = dto.WeightBasedRateDTO{
+				ID:        wbr.ID,
+				MinWeight: wbr.MinWeight,
+				MaxWeight: wbr.MaxWeight,
+				Rate:      money.FromCents(wbr.Rate),
+			}
+		}
+	}
+	return &shippingRateDto
+}
+
+func (w *WeightBasedRate) ToWeightBasedRateDTO() *dto.WeightBasedRateDTO {
+	return &dto.WeightBasedRateDTO{
+		ID:        w.ID,
+		MinWeight: w.MinWeight,
+		MaxWeight: w.MaxWeight,
+		Rate:      money.FromCents(w.Rate),
+	}
+}
+
+func (v *ValueBasedRate) ToValueBasedRateDTO() *dto.ValueBasedRateDTO {
+	return &dto.ValueBasedRateDTO{
+		ID:            v.ID,
+		MinOrderValue: money.FromCents(v.MinOrderValue),
+		MaxOrderValue: money.FromCents(v.MaxOrderValue),
+		Rate:          money.FromCents(v.Rate),
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -514,4 +516,38 @@ func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem 
 // generateOrderNumber generates a temporary order number
 func generateOrderNumber() string {
 	return "ORD-" + time.Now().Format("20060102") + "-TEMP"
+}
+
+func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
+	return &dto.CheckoutDTO{
+		ID:               c.ID,
+		SessionID:        c.SessionID,
+		UserID:           c.UserID,
+		Status:           string(c.Status),
+		ShippingAddress:  c.ShippingAddr.ToAddressDTO(),
+		BillingAddress:   c.BillingAddr.ToAddressDTO(),
+		ShippingMethodID: c.ShippingMethod.ID,
+		ShippingOption:   c.ShippingOption.ToShippingOptionDTO(),
+		PaymentProvider:  c.PaymentProvider,
+		TotalAmount:      money.FromCents(c.TotalAmount),
+		ShippingCost:     money.FromCents(c.ShippingCost),
+		TotalWeight:      c.TotalWeight,
+		Currency:         c.Currency,
+		DiscountCode:     c.DiscountCode,
+		DiscountAmount:   money.FromCents(c.DiscountAmount),
+		FinalAmount:      money.FromCents(c.FinalAmount),
+		LastActivityAt:   c.LastActivityAt,
+		ExpiresAt:        c.ExpiresAt,
+	}
+}
+
+func (a *AppliedDiscount) ToAppliedDiscountDTO() *dto.AppliedDiscountDTO {
+	return &dto.AppliedDiscountDTO{
+		ID:     a.DiscountID,
+		Code:   a.DiscountCode,
+		Type:   string(a.Discount.Type),   // Assuming percentage discount for simplicity
+		Method: string(a.Discount.Method), // Assuming fixed method for simplicity
+		Value:  a.Discount.Value,
+		Amount: money.FromCents(a.DiscountAmount),
+	}
 }

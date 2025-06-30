@@ -72,16 +72,15 @@ type CheckoutSearchRequest struct {
 }
 
 type CheckoutCompleteResponse struct {
-	Order          dto.OrderSummaryDTO `json:"order"`
-	ActionRequired bool                `json:"action_required,omitempty"`
-	ActionURL      string              `json:"redirect_url,omitempty"`
+	Order          dto.OrderDTO `json:"order"`
+	ActionRequired bool         `json:"action_required,omitempty"`
+	ActionURL      string       `json:"redirect_url,omitempty"`
 }
 
 // CompleteCheckoutRequest represents the data needed to convert a checkout to an order
 type CompleteCheckoutRequest struct {
 	PaymentProvider string      `json:"payment_provider"`
 	PaymentData     PaymentData `json:"payment_data"`
-	// RedirectURL     string      `json:"redirect_url"`
 }
 
 type PaymentData struct {
@@ -89,26 +88,40 @@ type PaymentData struct {
 	PhoneNumber string              `json:"phone_number,omitempty"`
 }
 
-func CreateCheckoutsListResponse(checkouts []dto.CheckoutDTO, totalCount, page, pageSize int) ListResponseDTO[dto.CheckoutDTO] {
+func CreateCheckoutsListResponse(checkouts []*entity.Checkout, totalCount, page, pageSize int) ListResponseDTO[dto.CheckoutDTO] {
+	var checkoutDTOs []dto.CheckoutDTO
+	for _, checkout := range checkouts {
+		checkoutDTOs = append(checkoutDTOs, *checkout.ToCheckoutDTO())
+	}
+	if len(checkoutDTOs) == 0 {
+		return ListResponseDTO[dto.CheckoutDTO]{
+			Success:    true,
+			Data:       []dto.CheckoutDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No checkouts found",
+		}
+	}
+
 	return ListResponseDTO[dto.CheckoutDTO]{
 		Success: true,
-		Data:    checkouts,
+		Data:    checkoutDTOs,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    totalCount,
 		},
+		Message: "Checkouts retrieved successfully",
 	}
 }
 
-func CreateCheckoutResponse(checkout dto.CheckoutDTO) ResponseDTO[dto.CheckoutDTO] {
-	return SuccessResponse(checkout)
+func CreateCheckoutResponse(checkout *dto.CheckoutDTO) ResponseDTO[dto.CheckoutDTO] {
+	return SuccessResponse(*checkout)
 }
 
-func CreateCompleteCheckoutResponse(order *entity.Order) ResponseDTO[CheckoutCompleteResponse] {
+func CreateCompleteCheckoutResponse(order *dto.OrderDTO) ResponseDTO[CheckoutCompleteResponse] {
 	response := CheckoutCompleteResponse{
-		Order:          order.ToOrderSummaryDTO(),
-		ActionRequired: order.Status == entity.OrderStatusPending && order.PaymentStatus == entity.PaymentStatusPending && order.ActionURL != "",
+		Order:          *order,
+		ActionRequired: order.ActionRequired,
 		ActionURL:      order.ActionURL,
 	}
 	return SuccessResponse(response)

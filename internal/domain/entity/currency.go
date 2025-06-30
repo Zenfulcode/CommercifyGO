@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -101,4 +102,15 @@ func (c *Currency) ConvertAmount(amount int64, targetCurrency *Currency) int64 {
 
 	// Round to nearest cent instead of truncating
 	return int64(targetAmount)
+}
+
+func (c Currency) ToCurrencyDTO() *dto.CurrencyDTO {
+	return &dto.CurrencyDTO{
+		Code:         c.Code,
+		Name:         c.Name,
+		Symbol:       c.Symbol,
+		ExchangeRate: c.ExchangeRate,
+		IsEnabled:    c.IsEnabled,
+		IsDefault:    c.IsDefault,
+	}
 }

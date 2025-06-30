@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
 
@@ -111,26 +112,40 @@ func (r *UpdateDiscountRequest) ToUseCaseInput() usecase.UpdateDiscountInput {
 	}
 }
 
-func DiscountCreateResponse(discount dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
-	return SuccessResponseWithMessage(discount, "Discount created successfully")
+func DiscountCreateResponse(discount *dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
+	return SuccessResponseWithMessage(*discount, "Discount created successfully")
 }
 
-func DiscountRetrieveResponse(discount dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
-	return SuccessResponse(discount)
+func DiscountRetrieveResponse(discount *dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
+	return SuccessResponse(*discount)
 }
 
-func DiscountUpdateResponse(discount dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
-	return SuccessResponseWithMessage(discount, "Discount updated successfully")
+func DiscountUpdateResponse(discount *dto.DiscountDTO) ResponseDTO[dto.DiscountDTO] {
+	return SuccessResponseWithMessage(*discount, "Discount updated successfully")
 }
 
 func DiscountDeleteResponse() ResponseDTO[any] {
 	return SuccessResponseMessage("Discount deleted successfully")
 }
 
-func DiscountListResponse(discounts []dto.DiscountDTO, totalCount, page, pageSize int) ListResponseDTO[dto.DiscountDTO] {
+func DiscountListResponse(discounts []*entity.Discount, totalCount, page, pageSize int) ListResponseDTO[dto.DiscountDTO] {
+	var discountDTOs []dto.DiscountDTO
+	for _, discount := range discounts {
+		discountDTOs = append(discountDTOs, *discount.ToDiscountDTO())
+	}
+
+	if len(discountDTOs) == 0 {
+		return ListResponseDTO[dto.DiscountDTO]{
+			Success:    true,
+			Data:       []dto.DiscountDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No discounts found",
+		}
+	}
+
 	return ListResponseDTO[dto.DiscountDTO]{
 		Success: true,
-		Data:    discounts,
+		Data:    discountDTOs,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,

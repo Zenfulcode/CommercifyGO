@@ -2,6 +2,8 @@ package contracts
 
 import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
 
@@ -80,6 +82,20 @@ type CalculateShippingOptionsRequest struct {
 	OrderWeight float64        `json:"order_weight"`
 }
 
+func (c CalculateShippingOptionsRequest) ToUseCaseInput() usecase.CalculateShippingOptionsInput {
+	return usecase.CalculateShippingOptionsInput{
+		Address: entity.Address{
+			Street:     c.Address.AddressLine1,
+			City:       c.Address.City,
+			State:      c.Address.State,
+			Country:    c.Address.Country,
+			PostalCode: c.Address.PostalCode,
+		},
+		OrderValue:  money.ToCents(c.OrderValue),
+		OrderWeight: c.OrderWeight,
+	}
+}
+
 // CalculateShippingOptionsResponse represents the response with available shipping options
 type CalculateShippingOptionsResponse struct {
 	Options []dto.ShippingOptionDTO `json:"options"`
@@ -122,8 +138,6 @@ func (req CreateShippingZoneRequest) ToCreateShippingZoneInput() usecase.CreateS
 		Name:        req.Name,
 		Description: req.Description,
 		Countries:   req.Countries,
-		States:      req.States,
-		ZipCodes:    req.ZipCodes,
 	}
 }
 
@@ -180,5 +194,30 @@ func (req CreateValueBasedRateRequest) ToCreateValueBasedRateInput() usecase.Cre
 		MinOrderValue:  req.MinOrderValue,
 		MaxOrderValue:  req.MaxOrderValue,
 		Rate:           req.Rate,
+	}
+}
+
+func CreateShippingOptionsListResponse(options []*entity.ShippingOption, totalCount, page, pageSize int) ListResponseDTO[dto.ShippingOptionDTO] {
+	var response []dto.ShippingOptionDTO
+	for _, option := range options {
+		response = append(response, *option.ToShippingOptionDTO())
+	}
+	if len(response) == 0 {
+		return ListResponseDTO[dto.ShippingOptionDTO]{
+			Success:    true,
+			Data:       []dto.ShippingOptionDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No shipping options found",
+		}
+	}
+	return ListResponseDTO[dto.ShippingOptionDTO]{
+		Success: true,
+		Data:    response,
+		Pagination: PaginationDTO{
+			Page:     page,
+			PageSize: pageSize,
+			Total:    totalCount,
+		},
+		Message: "Shipping options retrieved successfully",
 	}
 }

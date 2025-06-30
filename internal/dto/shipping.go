@@ -21,8 +21,6 @@ type ShippingZoneDTO struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Countries   []string  `json:"countries"`
-	States      []string  `json:"states"`
-	ZipCodes    []string  `json:"zip_codes"`
 	Active      bool      `json:"active"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -37,7 +35,7 @@ type ShippingRateDTO struct {
 	ShippingZone          *ShippingZoneDTO         `json:"shipping_zone,omitempty"`
 	BaseRate              float64                  `json:"base_rate"`
 	MinOrderValue         float64                  `json:"min_order_value"`
-	FreeShippingThreshold *float64                 `json:"free_shipping_threshold"`
+	FreeShippingThreshold float64                  `json:"free_shipping_threshold"`
 	WeightBasedRates      []WeightBasedRateDTO     `json:"weight_based_rates,omitempty"`
 	ValueBasedRates       []ValueBasedRateDTO      `json:"value_based_rates,omitempty"`
 	Active                bool                     `json:"active"`
@@ -69,8 +67,8 @@ type ValueBasedRateDTO struct {
 
 // ShippingOptionDTO represents a shipping option with calculated cost
 type ShippingOptionDTO struct {
-	ShippingRateID        uint    `json:"shipping_rate_id"`
-	ShippingMethodID      uint    `json:"shipping_method_id"`
+	ShippingRateID        uint    `json:"shipping_rate_id,omitempty"`
+	ShippingMethodID      uint    `json:"shipping_method_id,omitempty"`
 	Name                  string  `json:"name"`
 	Description           string  `json:"description"`
 	EstimatedDeliveryDays int     `json:"estimated_delivery_days"`

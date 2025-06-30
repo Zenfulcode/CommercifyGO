@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -200,5 +201,25 @@ func (d *Discount) CalculateDiscount(order *Order) int64 {
 // IncrementUsage increments the usage count of the discount
 func (d *Discount) IncrementUsage() {
 	d.CurrentUsage++
+}
 
+func (d *Discount) ToDiscountDTO() *dto.DiscountDTO {
+	return &dto.DiscountDTO{
+		ID:               d.ID,
+		Code:             d.Code,
+		Type:             string(d.Type),
+		Method:           string(d.Method),
+		Value:            d.Value,
+		MinOrderValue:    money.FromCents(d.MinOrderValue),
+		MaxDiscountValue: money.FromCents(d.MaxDiscountValue),
+		ProductIDs:       d.ProductIDs,
+		CategoryIDs:      d.CategoryIDs,
+		StartDate:        d.StartDate,
+		EndDate:          d.EndDate,
+		UsageLimit:       d.UsageLimit,
+		CurrentUsage:     d.CurrentUsage,
+		Active:           d.Active,
+		CreatedAt:        d.CreatedAt,
+		UpdatedAt:        d.UpdatedAt,
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"gorm.io/gorm"
 )
 
 // EmailTestHandler handles email testing endpoints
@@ -33,17 +34,18 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Create a mock user (but we'll send emails to admin address)
 	mockUser := &entity.User{
-		ID:        1,
 		Email:     "customer@example.com", // This is just for the mock data
 		FirstName: "John",
 		LastName:  "Doe",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
 	// Create a mock order
 	mockOrder := &entity.Order{
-		ID:                12345,
+		Model: gorm.Model{
+			ID:        12345, // Mock order ID
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
 		OrderNumber:       "ORD-12345",
 		UserID:            mockUser.ID,
 		Status:            entity.OrderStatusCompleted,
@@ -83,7 +85,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		},
 		Items: []entity.OrderItem{
 			{
-				ID:          1,
 				ProductID:   1,
 				Quantity:    2,
 				Price:       2500, // $25.00 in cents
@@ -92,7 +93,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 				SKU:         "TEST-001",
 			},
 			{
-				ID:          2,
 				ProductID:   2,
 				Quantity:    1,
 				Price:       4950, // $49.50 in cents
@@ -101,20 +101,15 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 				SKU:         "TEST-002",
 			},
 		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
 	var errors []string
 
 	// Override email addresses to send both emails to admin for testing
 	adminUser := &entity.User{
-		ID:        mockUser.ID,
 		Email:     h.config.AdminEmail, // Send to admin email
 		FirstName: mockUser.FirstName,
 		LastName:  mockUser.LastName,
-		CreatedAt: mockUser.CreatedAt,
-		UpdatedAt: mockUser.UpdatedAt,
 	}
 
 	// Also update the order's customer details to use admin email for testing

@@ -52,6 +52,7 @@ type VariantInput struct {
 	Images     []string
 	Attributes entity.VariantAttributes
 	Price      int64
+	IsDefault  bool
 }
 
 // CreateProductInput contains the data needed to create a product
@@ -68,7 +69,6 @@ type CreateProductInput struct {
 // CreateVariantInput contains the data needed to create a product variant
 type CreateVariantInput struct {
 	VariantInput
-	IsDefault bool
 }
 
 // CreateProduct creates a new product
@@ -219,7 +219,6 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 // UpdateVariantInput contains the data needed to update a product variant (prices in dollars)
 type UpdateVariantInput struct {
 	VariantInput
-	IsDefault bool
 }
 
 // UpdateVariant updates a product variant
@@ -267,14 +266,8 @@ func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateV
 	return variant, nil
 }
 
-// AddVariantInput contains the data needed to add a variant to a product
-type AddVariantInput struct {
-	VariantInput
-	IsDefault bool
-}
-
 // AddVariant adds a new variant to a product
-func (uc *ProductUseCase) AddVariant(productID uint, input AddVariantInput) (*entity.ProductVariant, error) {
+func (uc *ProductUseCase) AddVariant(productID uint, input CreateVariantInput) (*entity.ProductVariant, error) {
 	product, err := uc.productRepo.GetByID(productID)
 	if err != nil {
 		return nil, err

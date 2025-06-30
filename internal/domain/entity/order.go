@@ -1,11 +1,13 @@
 package entity
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
@@ -36,21 +38,21 @@ const (
 // Order represents an order entity
 type Order struct {
 	gorm.Model
-	OrderNumber       string        `gorm:"uniqueIndex;not null;size:100"`
-	Currency          string        `gorm:"not null;size:3"` // e.g., "USD", "EUR"
-	UserID            uint          `gorm:"index"`           // 0 for guest orders
-	User              *User         `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
-	Items             []OrderItem   `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	TotalAmount       int64         `gorm:"not null"` // stored in cents
-	Status            OrderStatus   `gorm:"not null;size:50;default:'pending'"`
-	PaymentStatus     PaymentStatus `gorm:"not null;size:50;default:'pending'"` // New field for payment status
-	ShippingAddr      Address       `gorm:"embedded;embeddedPrefix:shipping_"`
-	BillingAddr       Address       `gorm:"embedded;embeddedPrefix:billing_"`
-	PaymentID         string        `gorm:"size:255"`
-	PaymentProvider   string        `gorm:"size:100"`
-	PaymentMethod     string        `gorm:"size:100"`
-	TrackingCode      string        `gorm:"size:255"`
-	ActionURL         string        `gorm:"size:500"` // URL for redirect to payment provider
+	OrderNumber       string         `gorm:"uniqueIndex;not null;size:100"`
+	Currency          string         `gorm:"not null;size:3"` // e.g., "USD", "EUR"
+	UserID            uint           `gorm:"index"`           // 0 for guest orders
+	User              *User          `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	Items             []OrderItem    `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	TotalAmount       int64          `gorm:"not null"` // stored in cents
+	Status            OrderStatus    `gorm:"not null;size:50;default:'pending'"`
+	PaymentStatus     PaymentStatus  `gorm:"not null;size:50;default:'pending'"` // New field for payment status
+	ShippingAddr      Address        `gorm:"embedded;embeddedPrefix:shipping_"`
+	BillingAddr       Address        `gorm:"embedded;embeddedPrefix:billing_"`
+	PaymentID         string         `gorm:"size:255"`
+	PaymentProvider   string         `gorm:"size:100"`
+	PaymentMethod     string         `gorm:"size:100"`
+	TrackingCode      sql.NullString `gorm:"size:255"`
+	ActionURL         sql.NullString `gorm:"size:500"` // URL for redirect to payment provider
 	CompletedAt       *time.Time
 	CheckoutSessionID string `gorm:"size:255"` // Tracks which checkout session created this order
 
@@ -62,12 +64,12 @@ type Order struct {
 	ShippingMethodID uint            `gorm:"index"`
 	ShippingMethod   *ShippingMethod `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
 	ShippingOption   *ShippingOption `gorm:"embedded;embeddedPrefix:shipping_option_"`
-	ShippingCost     int64           `gorm:"default:0"`
-	TotalWeight      float64         `gorm:"default:0"`
+	ShippingCost     int64
+	TotalWeight      float64
 
 	// Discount-related fields
-	DiscountAmount  int64            `gorm:"default:0"` // stored in cents
-	FinalAmount     int64            `gorm:"not null"`  // stored in cents
+	DiscountAmount  int64
+	FinalAmount     int64            `gorm:"not null"` // stored in cents
 	AppliedDiscount *AppliedDiscount `gorm:"embedded;embeddedPrefix:discount_"`
 
 	// Payment transactions
@@ -273,7 +275,10 @@ func (o *Order) SetTrackingCode(trackingCode string) error {
 		return errors.New("tracking code cannot be empty")
 	}
 
-	o.TrackingCode = trackingCode
+	o.TrackingCode = sql.NullString{
+		String: trackingCode,
+		Valid:  true,
+	}
 
 	return nil
 }
@@ -329,7 +334,10 @@ func (o *Order) SetActionURL(actionURL string) error {
 		return errors.New("action URL cannot be empty")
 	}
 
-	o.ActionURL = actionURL
+	o.ActionURL = sql.NullString{
+		String: actionURL,
+		Valid:  true,
+	}
 
 	return nil
 }
@@ -425,9 +433,82 @@ func isValidPaymentStatusTransition(from, to PaymentStatus) bool {
 	return slices.Contains(validTransitions[from], to)
 }
 
-func (o *Order) ToOrderSummaryDTO() dto.OrderSummaryDTO {
-	panic("unimplemented")
+func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
+	return &dto.OrderSummaryDTO{
+		ID:               o.ID,
+		OrderNumber:      o.OrderNumber,
+		CheckoutID:       o.CheckoutSessionID,
+		UserID:           o.UserID,
+		Customer:         o.CustomerDetails.ToCustomerDetailsDTO(),
+		Status:           dto.OrderStatus(o.Status),
+		PaymentStatus:    dto.PaymentStatus(o.PaymentStatus),
+		TotalAmount:      money.FromCents(o.TotalAmount),
+		OrderLinesAmount: len(o.Items),
+		Currency:         o.Currency,
+		CreatedAt:        o.CreatedAt,
+		UpdatedAt:        o.UpdatedAt,
+	}
 }
-func (o *Order) ToOrderDetailsDTO() dto.OrderDTO {
-	panic("unimplemented")
+func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
+	return &dto.OrderDTO{
+		ID:              o.ID,
+		OrderNumber:     o.OrderNumber,
+		UserID:          o.UserID,
+		CheckoutID:      o.CheckoutSessionID,
+		CustomerDetails: o.CustomerDetails.ToCustomerDetailsDTO(),
+		ShippingDetails: o.ShippingOption.ToShippingOptionDTO(),
+		DiscountDetails: o.AppliedDiscount.ToAppliedDiscountDTO(),
+		Status:          dto.OrderStatus(o.Status),
+		PaymentStatus:   dto.PaymentStatus(o.PaymentStatus),
+		Currency:        o.Currency,
+		TotalAmount:     money.FromCents(o.TotalAmount),
+		ShippingCost:    money.FromCents(o.ShippingCost),
+		DiscountAmount:  money.FromCents(o.DiscountAmount),
+		FinalAmount:     money.FromCents(o.FinalAmount),
+		Items:           o.ToOrderItemsDTO(),
+		ShippingAddress: o.ShippingAddr.ToAddressDTO(),
+		BillingAddress:  o.BillingAddr.ToAddressDTO(),
+		ActionRequired:  o.ActionURL.Valid && o.ActionURL.String != "",
+		ActionURL:       o.ActionURL.String,
+		CreatedAt:       o.CreatedAt,
+		UpdatedAt:       o.UpdatedAt,
+	}
+}
+
+func (o *Order) ToOrderItemsDTO() []*dto.OrderItemDTO {
+	itemsDTO := make([]*dto.OrderItemDTO, len(o.Items))
+	for i, item := range o.Items {
+		itemsDTO[i] = &dto.OrderItemDTO{
+			ID:          item.ID,
+			OrderID:     item.OrderID,
+			ProductID:   item.ProductID,
+			VariantID:   item.ProductVariantID,
+			SKU:         item.SKU,
+			ProductName: item.ProductName,
+			VariantName: item.ProductVariant.Name(),
+			ImageURL:    item.ImageURL,
+			Quantity:    item.Quantity,
+			UnitPrice:   money.FromCents(item.Price),
+			TotalPrice:  money.FromCents(item.Subtotal),
+		}
+	}
+	return itemsDTO
+}
+
+func (a *Address) ToAddressDTO() *dto.AddressDTO {
+	return &dto.AddressDTO{
+		AddressLine1: a.Street,
+		City:         a.City,
+		State:        a.State,
+		PostalCode:   a.PostalCode,
+		Country:      a.Country,
+	}
+}
+
+func (c *CustomerDetails) ToCustomerDetailsDTO() *dto.CustomerDetailsDTO {
+	return &dto.CustomerDetailsDTO{
+		Email:    c.Email,
+		Phone:    c.Phone,
+		FullName: c.FullName,
+	}
 }

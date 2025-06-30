@@ -6,42 +6,45 @@ import (
 
 // OrderDTO represents an order in the system
 type OrderDTO struct {
-	ID              uint               `json:"id"`
-	UserID          uint               `json:"user_id"`
-	OrderNumber     string             `json:"order_number"`
-	Items           []OrderItemDTO     `json:"items"`
-	Status          OrderStatus        `json:"status"`
-	PaymentStatus   PaymentStatus      `json:"payment_status"`
-	TotalAmount     float64            `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost    float64            `json:"shipping_cost"` // Shipping cost
-	FinalAmount     float64            `json:"final_amount"`  // Total including shipping and discounts
-	Currency        string             `json:"currency"`
-	ShippingAddress AddressDTO         `json:"shipping_address"`
-	BillingAddress  AddressDTO         `json:"billing_address"`
-	PaymentDetails  PaymentDetails     `json:"payment_details"`
-	ShippingDetails ShippingOptionDTO  `json:"shipping_details"`
-	DiscountDetails AppliedDiscountDTO `json:"discount_details"`
-	Customer        CustomerDetailsDTO `json:"customer"`
-	CheckoutID      string             `json:"checkout_id"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+	ID              uint                `json:"id"`
+	OrderNumber     string              `json:"order_number"`
+	UserID          uint                `json:"user_id"`
+	CheckoutID      string              `json:"checkout_id"`
+	Items           []*OrderItemDTO     `json:"items"`
+	Status          OrderStatus         `json:"status"`
+	PaymentStatus   PaymentStatus       `json:"payment_status"`
+	TotalAmount     float64             `json:"total_amount"`    // Subtotal (items only)
+	ShippingCost    float64             `json:"shipping_cost"`   // Shipping cost
+	DiscountAmount  float64             `json:"discount_amount"` // Discount applied amount
+	FinalAmount     float64             `json:"final_amount"`    // Total including shipping and discounts
+	Currency        string              `json:"currency"`
+	ShippingAddress *AddressDTO         `json:"shipping_address"`
+	BillingAddress  *AddressDTO         `json:"billing_address"`
+	PaymentDetails  PaymentDetails      `json:"payment_details"`
+	ShippingDetails *ShippingOptionDTO  `json:"shipping_details"`
+	DiscountDetails *AppliedDiscountDTO `json:"discount_details"`
+	CustomerDetails *CustomerDetailsDTO `json:"customer"`
+	ActionRequired  bool                `json:"action_required"`      // Indicates if action is needed (e.g., payment)
+	ActionURL       string              `json:"action_url,omitempty"` // URL for payment or order actions
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
 }
 
 type OrderSummaryDTO struct {
-	ID               uint               `json:"id"`
-	OrderNumber      string             `json:"order_number"`
-	CheckoutID       string             `json:"checkout_id"`
-	UserID           uint               `json:"user_id"`
-	Customer         CustomerDetailsDTO `json:"customer"`
-	Status           OrderStatus        `json:"status"`
-	PaymentStatus    PaymentStatus      `json:"payment_status"`
-	TotalAmount      float64            `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost     float64            `json:"shipping_cost"` // Shipping cost
-	FinalAmount      float64            `json:"final_amount"`  // Total including shipping and discounts
-	OrderLinesAmount int                `json:"order_lines_amount"`
-	Currency         string             `json:"currency"`
-	CreatedAt        time.Time          `json:"created_at"`
-	UpdatedAt        time.Time          `json:"updated_at"`
+	ID               uint                `json:"id"`
+	OrderNumber      string              `json:"order_number"`
+	CheckoutID       string              `json:"checkout_id"`
+	UserID           uint                `json:"user_id"`
+	Customer         *CustomerDetailsDTO `json:"customer"`
+	Status           OrderStatus         `json:"status"`
+	PaymentStatus    PaymentStatus       `json:"payment_status"`
+	TotalAmount      float64             `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64             `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64             `json:"final_amount"`  // Total including shipping and discounts
+	OrderLinesAmount int                 `json:"order_lines_amount"`
+	Currency         string              `json:"currency"`
+	CreatedAt        time.Time           `json:"created_at"`
+	UpdatedAt        time.Time           `json:"updated_at"`
 }
 
 type PaymentDetails struct {

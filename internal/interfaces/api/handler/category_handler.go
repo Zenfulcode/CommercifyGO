@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 )
 
 // CategoryHandler handles category-related HTTP requests
@@ -28,10 +28,10 @@ func NewCategoryHandler(categoryUseCase *usecase.CategoryUseCase, logger logger.
 
 // CreateCategory handles creating a new category (admin only)
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	var req dto.CreateCategoryRequest
+	var req contracts.CreateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode create category request: %v", err)
-		response := dto.ErrorResponse("Invalid request body")
+		response := contracts.ErrorResponse("Invalid request body")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -63,14 +63,14 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 			errorMessage = err.Error()
 		}
 
-		response := dto.ErrorResponse(errorMessage)
+		response := contracts.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.CreateCategoryResponse(category)
+	response := contracts.CreateCategoryResponse(category.ToCategoryDTO())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -83,7 +83,7 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	categoryID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid category ID: %v", err)
-		response := dto.ErrorResponse("Invalid category ID")
+		response := contracts.ErrorResponse("Invalid category ID")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -103,14 +103,14 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 			errorMessage = "Category not found"
 		}
 
-		response := dto.ErrorResponse(errorMessage)
+		response := contracts.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.CreateCategoryResponse(category)
+	response := contracts.CreateCategoryResponse(category.ToCategoryDTO())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -123,17 +123,17 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 	categoryID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid category ID: %v", err)
-		response := dto.ErrorResponse("Invalid category ID")
+		response := contracts.ErrorResponse("Invalid category ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	var req dto.UpdateCategoryRequest
+	var req contracts.UpdateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode update category request: %v", err)
-		response := dto.ErrorResponse("Invalid request body")
+		response := contracts.ErrorResponse("Invalid request body")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -164,14 +164,14 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 			errorMessage = err.Error()
 		}
 
-		response := dto.ErrorResponse(errorMessage)
+		response := contracts.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.CreateCategoryResponse(category)
+	response := contracts.CreateCategoryResponse(category.ToCategoryDTO())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -184,7 +184,7 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 	categoryID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid category ID: %v", err)
-		response := dto.ErrorResponse("Invalid category ID")
+		response := contracts.ErrorResponse("Invalid category ID")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -207,14 +207,14 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 			errorMessage = "Cannot delete category with child categories"
 		}
 
-		response := dto.ErrorResponse(errorMessage)
+		response := contracts.ErrorResponse(errorMessage)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	response := dto.ResponseDTO[any]{
+	response := contracts.ResponseDTO[any]{
 		Success: true,
 		Message: "Category deleted successfully",
 	}
@@ -229,7 +229,7 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 	categories, err := h.categoryUseCase.ListCategories()
 	if err != nil {
 		h.logger.Error("Failed to list categories: %v", err)
-		response := dto.ErrorResponse("Failed to retrieve categories")
+		response := contracts.ErrorResponse("Failed to retrieve categories")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -237,7 +237,7 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response := dto.CreateCategoryListResponse(categories, len(categories), 1, len(categories))
+	response := contracts.CreateCategoryListResponse(categories, len(categories), 1, len(categories))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -250,7 +250,7 @@ func (h *CategoryHandler) GetChildCategories(w http.ResponseWriter, r *http.Requ
 	parentID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid parent category ID: %v", err)
-		response := dto.ErrorResponse(err.Error())
+		response := contracts.ErrorResponse(err.Error())
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -270,7 +270,7 @@ func (h *CategoryHandler) GetChildCategories(w http.ResponseWriter, r *http.Requ
 			errorMessage = "Parent category not found"
 		}
 
-		response := dto.ErrorResponse(errorMessage)
+		response := contracts.ErrorResponse(errorMessage)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
@@ -278,7 +278,7 @@ func (h *CategoryHandler) GetChildCategories(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response := dto.CreateCategoryListResponse(categories, len(categories), 1, len(categories))
+	response := contracts.CreateCategoryListResponse(categories, len(categories), 1, len(categories))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

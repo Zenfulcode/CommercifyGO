@@ -114,10 +114,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/currencies/convert", currencyHandler.ConvertAmount).Methods(http.MethodPost)
 
 	// Public shipping routes
-	api.HandleFunc("/shipping/methods", shippingHandler.ListShippingMethods).Methods(http.MethodGet)
-	api.HandleFunc("/shipping/methods/{shippingMethodId:[0-9]+}", shippingHandler.GetShippingMethodByID).Methods(http.MethodGet)
 	api.HandleFunc("/shipping/options", shippingHandler.CalculateShippingOptions).Methods(http.MethodPost)
-	api.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}/cost", shippingHandler.GetShippingCost).Methods(http.MethodPost)
+	// api.HandleFunc("/shipping/methods", shippingHandler.ListShippingMethods).Methods(http.MethodGet)
+	// api.HandleFunc("/shipping/methods/{shippingMethodId:[0-9]+}", shippingHandler.GetShippingMethodByID).Methods(http.MethodGet)
+	// api.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}/cost", shippingHandler.GetShippingCost).Methods(http.MethodPost)
 
 	// Guest checkout routes (no authentication required)
 	api.HandleFunc("/checkout", checkoutHandler.GetCheckout).Methods(http.MethodGet)
@@ -185,14 +185,14 @@ func (s *Server) setupRoutes() {
 
 	// Shipping management routes (admin only)
 	admin.HandleFunc("/shipping/methods", shippingHandler.CreateShippingMethod).Methods(http.MethodPost)
-	admin.HandleFunc("/shipping/methods/{shippingMethodId:[0-9]+}", shippingHandler.UpdateShippingMethod).Methods(http.MethodPut)
+	// admin.HandleFunc("/shipping/methods/{shippingMethodId:[0-9]+}", shippingHandler.UpdateShippingMethod).Methods(http.MethodPut)
 	admin.HandleFunc("/shipping/zones", shippingHandler.CreateShippingZone).Methods(http.MethodPost)
-	admin.HandleFunc("/shipping/zones", shippingHandler.ListShippingZones).Methods(http.MethodGet)
-	admin.HandleFunc("/shipping/zones/{shippingZoneId:[0-9]+}", shippingHandler.GetShippingZoneByID).Methods(http.MethodGet)
-	admin.HandleFunc("/shipping/zones/{shippingZoneId:[0-9]+}", shippingHandler.UpdateShippingZone).Methods(http.MethodPut)
+	// admin.HandleFunc("/shipping/zones", shippingHandler.ListShippingZones).Methods(http.MethodGet)
+	// admin.HandleFunc("/shipping/zones/{shippingZoneId:[0-9]+}", shippingHandler.GetShippingZoneByID).Methods(http.MethodGet)
+	// admin.HandleFunc("/shipping/zones/{shippingZoneId:[0-9]+}", shippingHandler.UpdateShippingZone).Methods(http.MethodPut)
 	admin.HandleFunc("/shipping/rates", shippingHandler.CreateShippingRate).Methods(http.MethodPost)
-	admin.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}", shippingHandler.GetShippingRateByID).Methods(http.MethodGet)
-	admin.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}", shippingHandler.UpdateShippingRate).Methods(http.MethodPut)
+	// admin.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}", shippingHandler.GetShippingRateByID).Methods(http.MethodGet)
+	// admin.HandleFunc("/shipping/rates/{shippingRateId:[0-9]+}", shippingHandler.UpdateShippingRate).Methods(http.MethodPut)
 	admin.HandleFunc("/shipping/rates/weight", shippingHandler.CreateWeightBasedRate).Methods(http.MethodPost)
 	admin.HandleFunc("/shipping/rates/value", shippingHandler.CreateValueBasedRate).Methods(http.MethodPost)
 
@@ -229,12 +229,6 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants", productHandler.AddVariant).Methods(http.MethodPost)
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants/{variantId:[0-9]+}", productHandler.UpdateVariant).Methods(http.MethodPut)
 	admin.HandleFunc("/products/{productId:[0-9]+}/variants/{variantId:[0-9]+}", productHandler.DeleteVariant).Methods(http.MethodDelete)
-
-	// Variant price management routes
-	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.SetVariantPrice).Methods(http.MethodPost)
-	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.SetMultipleVariantPrices).Methods(http.MethodPut)
-	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.GetVariantPrices).Methods(http.MethodGet)
-	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices/{currency}", productHandler.RemoveVariantPrice).Methods(http.MethodDelete)
 }
 
 // GetContainer returns the dependency injection container

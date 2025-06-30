@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -40,4 +41,15 @@ func NewCategory(name, description string, parentID *uint) (*Category, error) {
 		Description: description,
 		ParentID:    parentID,
 	}, nil
+}
+
+func (c *Category) ToCategoryDTO() *dto.CategoryDTO {
+	return &dto.CategoryDTO{
+		ID:          c.ID,
+		Name:        c.Name,
+		Description: c.Description,
+		ParentID:    c.ParentID,
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+	}
 }

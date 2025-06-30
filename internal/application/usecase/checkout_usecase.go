@@ -402,8 +402,14 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 		return nil, errors.New("shipping method is not available")
 	}
 
+	calculateOptionsInput := CalculateShippingOptionsInput{
+		Address:     checkout.ShippingAddr,
+		OrderValue:  checkout.TotalAmount,
+		OrderWeight: checkout.TotalWeight,
+	}
+
 	// Calculate shipping options
-	options, err := uc.shippingUsecase.CalculateShippingOptions(checkout.ShippingAddr, checkout.TotalAmount, checkout.TotalWeight)
+	options, err := uc.shippingUsecase.CalculateShippingOptions(calculateOptionsInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate shipping options: %w", err)
 	}

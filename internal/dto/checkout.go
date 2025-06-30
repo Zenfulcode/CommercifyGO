@@ -9,17 +9,17 @@ type CheckoutDTO struct {
 	ID               uint                `json:"id"`
 	UserID           uint                `json:"user_id,omitempty"`
 	SessionID        string              `json:"session_id,omitempty"`
-	Items            []CheckoutItemDTO   `json:"items"`
+	Items            []*CheckoutItemDTO  `json:"items"`
 	Status           string              `json:"status"`
-	ShippingAddress  AddressDTO          `json:"shipping_address"`
-	BillingAddress   AddressDTO          `json:"billing_address"`
+	ShippingAddress  *AddressDTO         `json:"shipping_address"`
+	BillingAddress   *AddressDTO         `json:"billing_address"`
 	ShippingMethodID uint                `json:"shipping_method_id,omitempty"`
 	ShippingOption   *ShippingOptionDTO  `json:"shipping_option,omitempty"`
 	PaymentProvider  string              `json:"payment_provider,omitempty"`
 	TotalAmount      float64             `json:"total_amount"`
 	ShippingCost     float64             `json:"shipping_cost"`
 	TotalWeight      float64             `json:"total_weight"`
-	CustomerDetails  CustomerDetailsDTO  `json:"customer_details"`
+	CustomerDetails  *CustomerDetailsDTO `json:"customer_details"`
 	Currency         string              `json:"currency"`
 	DiscountCode     string              `json:"discount_code,omitempty"`
 	DiscountAmount   float64             `json:"discount_amount"`

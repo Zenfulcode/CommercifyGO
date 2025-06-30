@@ -3,6 +3,7 @@ package contracts
 import (
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
 
@@ -46,19 +47,33 @@ func OrderUpdateStatusResponse(orderSummary dto.OrderSummaryDTO) ResponseDTO[dto
 	return SuccessResponseWithMessage(orderSummary, "Order status updated successfully")
 }
 
-func OrderSummaryListResponse(orderSummaries []dto.OrderSummaryDTO, page, pageSize, total int) ListResponseDTO[dto.OrderSummaryDTO] {
+func OrderSummaryListResponse(orderSummaries []*entity.Order, page, pageSize, total int) ListResponseDTO[dto.OrderSummaryDTO] {
+	var orderSummaryDTOs []dto.OrderSummaryDTO
+	for _, order := range orderSummaries {
+		orderSummaryDTOs = append(orderSummaryDTOs, *order.ToOrderSummaryDTO())
+	}
+
+	if len(orderSummaryDTOs) == 0 {
+		return ListResponseDTO[dto.OrderSummaryDTO]{
+			Success:    true,
+			Data:       []dto.OrderSummaryDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No orders found",
+		}
+	}
+
 	return ListResponseDTO[dto.OrderSummaryDTO]{
 		Success: true,
-		Message: "Order summaries retrieved successfully",
-		Data:    orderSummaries,
+		Data:    orderSummaryDTOs,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    total,
 		},
+		Message: "Order summaries retrieved successfully",
 	}
 }
 
-func OrderDetailResponse(order dto.OrderDTO) ResponseDTO[dto.OrderDTO] {
-	return SuccessResponse(order)
+func OrderDetailResponse(order *dto.OrderDTO) ResponseDTO[dto.OrderDTO] {
+	return SuccessResponse(*order)
 }

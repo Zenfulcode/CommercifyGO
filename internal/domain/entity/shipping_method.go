@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -63,5 +64,15 @@ func (s *ShippingMethod) Deactivate() {
 	if s.Active {
 		s.Active = false
 
+	}
+}
+
+func (s *ShippingMethod) ToShippingMethodDTO() *dto.ShippingMethodDetailDTO {
+	return &dto.ShippingMethodDetailDTO{
+		ID:                    s.ID,
+		Name:                  s.Name,
+		Description:           s.Description,
+		EstimatedDeliveryDays: s.EstimatedDeliveryDays,
+		Active:                s.Active,
 	}
 }

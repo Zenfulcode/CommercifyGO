@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/dto"
 )
@@ -98,20 +99,35 @@ func CreateConvertAmountResponse(fromCurrency string, fromAmount float64, toCurr
 }
 
 // CreateListCurrenciesResponse creates a response for listing currencies
-func CreateCurrenciesListResponse(currencies []dto.CurrencyDTO, page, pageSize, total int) ListResponseDTO[dto.CurrencyDTO] {
+func CreateCurrenciesListResponse(currencies []*entity.Currency, page, pageSize, total int) ListResponseDTO[dto.CurrencyDTO] {
+	var currencyDTOs []dto.CurrencyDTO
+	for _, currency := range currencies {
+		currencyDTOs = append(currencyDTOs, *currency.ToCurrencyDTO())
+	}
+
+	if len(currencyDTOs) == 0 {
+		return ListResponseDTO[dto.CurrencyDTO]{
+			Success:    true,
+			Data:       []dto.CurrencyDTO{},
+			Pagination: PaginationDTO{Page: page, PageSize: pageSize, Total: 0},
+			Message:    "No currencies found",
+		}
+	}
+
 	return ListResponseDTO[dto.CurrencyDTO]{
 		Success: true,
-		Data:    currencies,
+		Data:    currencyDTOs,
 		Pagination: PaginationDTO{
 			Page:     page,
 			PageSize: pageSize,
 			Total:    total,
 		},
+		Message: "Currencies retrieved successfully",
 	}
 }
 
-func CreateCurrencyResponse(currency dto.CurrencyDTO) ResponseDTO[dto.CurrencyDTO] {
-	return SuccessResponse(currency)
+func CreateCurrencyResponse(currency *dto.CurrencyDTO) ResponseDTO[dto.CurrencyDTO] {
+	return SuccessResponse(*currency)
 }
 
 // CreateDeleteCurrencyResponse creates a standard delete response
