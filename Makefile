@@ -6,8 +6,12 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Development environment setup
-dev-postgres: db-start ## Run the application locally with database
+dev-postgres: ## Run the application locally with database
+	@echo "Setting up PostgreSQL development environment..."
+	@cp .env.production .env 2>/dev/null || true
+	@echo "Environment configured for PostgreSQL. Starting application..."
 	@echo "Starting database and waiting for it to be ready..."
+	make db-start
 	@sleep 3
 	go run ./cmd/api
 
