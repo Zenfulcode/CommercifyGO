@@ -152,7 +152,7 @@ func (p *repositoryProvider) PaymentTransactionRepository() repository.PaymentTr
 	defer p.mu.Unlock()
 
 	if p.paymentTrxRepo == nil {
-		p.paymentTrxRepo = gorm.NewPaymentTransactionRepository(p.container.DB())
+		p.paymentTrxRepo = gorm.NewTransactionRepository(p.container.DB())
 	}
 	return p.paymentTrxRepo
 }

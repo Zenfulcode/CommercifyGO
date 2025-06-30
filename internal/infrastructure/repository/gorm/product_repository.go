@@ -2,6 +2,7 @@ package gorm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -18,106 +19,83 @@ func NewProductRepository(db *gorm.DB) repository.ProductRepository {
 	return &ProductRepository{db: db}
 }
 
-// Create creates a new product with its variants and prices
+// Create creates a new product with its variants
 func (r *ProductRepository) Create(product *entity.Product) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Create the product
-		if err := tx.Create(product).Error; err != nil {
-			return err
-		}
-
-		// Create variants if any
-		for _, variant := range product.Variants {
-			variant.ProductID = product.ID
-			if err := tx.Create(variant).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	// GORM will automatically create associated variants due to the relationship definition
+	return r.db.Create(product).Error
 }
 
-// GetByID retrieves a product by ID without variants
+// GetByID retrieves a product by ID with all related data
 func (r *ProductRepository) GetByID(productID uint) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants").First(&product, productID).Error; err != nil {
+	if err := r.db.Preload("Variants").Preload("Category").First(&product, productID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("product not found")
+			return nil, fmt.Errorf("product with ID %d not found", productID)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch product: %w", err)
 	}
 	return &product, nil
 }
 
-// GetBySKU implements repository.ProductRepository.
+// GetBySKU retrieves a product by variant SKU
 func (r *ProductRepository) GetBySKU(sku string) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants").Joins("JOIN product_variants ON products.id = product_variants.product_id").
+	if err := r.db.Preload("Variants").Preload("Category").
+		Joins("JOIN product_variants ON products.id = product_variants.product_id").
 		Where("product_variants.sku = ?", sku).First(&product).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("product not found")
+			return nil, fmt.Errorf("product with SKU %s not found", sku)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch product by SKU: %w", err)
 	}
+
 	// Ensure product has variants loaded
 	if len(product.Variants) == 0 {
-		return nil, errors.New("product has no variants")
+		return nil, fmt.Errorf("product with SKU %s has no variants", sku)
 	}
 	return &product, nil
 }
 
+// GetByIDAndCurrency retrieves a product by ID, filtering for the specified currency
 func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) (*entity.Product, error) {
 	var product entity.Product
-	if err := r.db.Preload("Variants", func(db *gorm.DB) *gorm.DB {
-		if currency != "" {
-			return db.Where("currency = ?", currency)
-		}
-		return db
-	}).First(&product, productID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("product not found")
-		}
-		return nil, err
+
+	// Build the query
+	query := r.db.Preload("Category")
+
+	// Filter variants by currency if specified, otherwise load all variants
+	if currency != "" {
+		query = query.Preload("Variants", "price IS NOT NULL") // Basic validation that variant has a price
+		query = query.Where("currency = ?", currency)
+	} else {
+		query = query.Preload("Variants")
 	}
+
+	if err := query.First(&product, productID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("product with ID %d not found", productID)
+		}
+		return nil, fmt.Errorf("failed to fetch product: %w", err)
+	}
+
 	// Ensure product has variants loaded
 	if len(product.Variants) == 0 {
-		return nil, errors.New("product has no variants")
+		return nil, fmt.Errorf("product with ID %d has no variants for currency %s", productID, currency)
 	}
 
 	return &product, nil
 }
 
-// Update updates an existing product
+// Update updates an existing product and its variants
 func (r *ProductRepository) Update(product *entity.Product) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Update the product itself
-		if err := tx.Save(product).Error; err != nil {
-			return err
-		}
-
-		// Update variants
-		for _, variant := range product.Variants {
-			if err := tx.Save(variant).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	// Use FullSaveAssociations to handle variant updates properly
+	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(product).Error
 }
 
-// Delete deletes a product by ID
+// Delete deletes a product by ID (cascade will handle variants)
 func (r *ProductRepository) Delete(productID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Delete all variants (cascade should handle this)
-		if err := tx.Where("product_id = ?", productID).Delete(&entity.ProductVariant{}).Error; err != nil {
-			return err
-		}
-
-		// Delete the product
-		return tx.Delete(&entity.Product{}, productID).Error
-	})
+	// GORM cascade will automatically delete associated variants
+	return r.db.Delete(&entity.Product{}, productID).Error
 }
 
 // List retrieves products with filtering and pagination
@@ -135,15 +113,15 @@ func (r *ProductRepository) List(query, currency string, categoryID, offset, lim
 		tx = tx.Where("category_id = ?", categoryID)
 	}
 
+	if currency != "" {
+		tx = tx.Where("currency = ?", currency)
+	}
+
 	tx = tx.Where("active = ?", active)
 
-	// Price filtering requires joining with variants and prices
-	if minPriceCents > 0 || maxPriceCents > 0 || currency != "" {
+	// Price filtering requires joining with variants
+	if minPriceCents > 0 || maxPriceCents > 0 {
 		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id")
-
-		if currency != "" {
-			tx = tx.Where("products.currency = ?", currency)
-		}
 
 		if minPriceCents > 0 {
 			tx = tx.Where("product_variants.price >= ?", minPriceCents)
@@ -156,9 +134,11 @@ func (r *ProductRepository) List(query, currency string, categoryID, offset, lim
 		tx = tx.Distinct()
 	}
 
-	// Apply pagination
-	if err := tx.Offset(int(offset)).Limit(int(limit)).Preload("Variants").Find(&products).Error; err != nil {
-		return nil, err
+	// Apply pagination and load relationships
+	if err := tx.Offset(int(offset)).Limit(int(limit)).
+		Preload("Variants").Preload("Category").
+		Find(&products).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch products: %w", err)
 	}
 
 	return products, nil
@@ -179,15 +159,15 @@ func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint,
 		tx = tx.Where("category_id = ?", categoryID)
 	}
 
+	if currency != "" {
+		tx = tx.Where("currency = ?", currency)
+	}
+
 	tx = tx.Where("active = ?", active)
 
-	// Price filtering requires joining with variants and prices
-	if minPriceCents > 0 || maxPriceCents > 0 || currency != "" {
+	// Price filtering requires joining with variants
+	if minPriceCents > 0 || maxPriceCents > 0 {
 		tx = tx.Joins("JOIN product_variants ON products.id = product_variants.product_id")
-
-		if currency != "" {
-			tx = tx.Where("products.currency = ?", currency)
-		}
 
 		if minPriceCents > 0 {
 			tx = tx.Where("product_variants.price >= ?", minPriceCents)
@@ -201,7 +181,7 @@ func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint,
 	}
 
 	if err := tx.Count(&count).Error; err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to count products: %w", err)
 	}
 
 	return int(count), nil
