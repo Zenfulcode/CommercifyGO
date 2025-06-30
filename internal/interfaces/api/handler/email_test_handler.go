@@ -142,7 +142,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	if len(errors) > 0 {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"success": false,
 			"errors":  errors,
 		})
@@ -150,7 +150,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
 		"message": "Both order confirmation and notification emails sent successfully",
 		"details": map[string]string{

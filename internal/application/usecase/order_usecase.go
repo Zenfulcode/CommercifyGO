@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -168,7 +169,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		return errors.New("capture amount cannot exceed the original payment amount")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	// Call payment service to capture payment
 	_, err = uc.paymentSvc.CapturePayment(transactionID, order.Currency, amount, providerType)
@@ -261,7 +262,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		return errors.New("transaction ID is required")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	_, err = uc.paymentSvc.CancelPayment(transactionID, providerType)
 	if err != nil {
@@ -345,7 +346,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return errors.New("refund amount cannot exceed the original payment amount")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	// Get total refunded amount so far (if any)
 	var totalRefundedSoFar int64 = 0
@@ -450,7 +451,7 @@ func (uc *OrderUseCase) ForceApproveMobilePayPayment(paymentID string, phoneNumb
 	}
 
 	// Force approve the payment
-	return paymentSvc.ForceApprovePayment(paymentID, phoneNumber, service.PaymentProviderMobilePay)
+	return paymentSvc.ForceApprovePayment(paymentID, phoneNumber, common.PaymentProviderMobilePay)
 }
 
 // GetUserByID retrieves a user by ID

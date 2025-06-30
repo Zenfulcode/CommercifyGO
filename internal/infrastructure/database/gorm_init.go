@@ -116,9 +116,7 @@ func autoMigrate(db *gorm.DB) error {
 
 		// Payment entities
 		&entity.PaymentTransaction{},
-
-		// Webhook entities
-		&entity.Webhook{},
+		&entity.PaymentProvider{},
 	)
 }
 

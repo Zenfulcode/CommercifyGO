@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"github.com/zenfulcode/commercify/internal/domain/service"
@@ -50,8 +51,8 @@ type CheckoutUseCase struct {
 }
 
 type ProcessPaymentInput struct {
-	PaymentProvider service.PaymentProviderType
-	PaymentMethod   service.PaymentMethod
+	PaymentProvider common.PaymentProviderType
+	PaymentMethod   common.PaymentMethod
 	CardDetails     *service.CardDetails `json:"card_details,omitempty"`
 	PhoneNumber     string               `json:"phone_number,omitempty"`
 }

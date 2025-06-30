@@ -101,7 +101,7 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 	s.logger.Info("Sending order confirmation email for Order ID: %d to User: %s", order.ID, user.Email)
 
 	// Prepare data for the template
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Order":        order,
 		"User":         user,
 		"StoreName":    s.config.FromName,
@@ -123,7 +123,7 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	s.logger.Info("Sending order notification email for Order ID: %d to Admin: %s", order.ID, s.config.AdminEmail)
 
 	// Prepare data for the template
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Order":     order,
 		"User":      user,
 		"StoreName": s.config.FromName,
@@ -140,7 +140,7 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 }
 
 // renderTemplate renders an HTML template with the given data
-func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]interface{}) (string, error) {
+func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]any) (string, error) {
 	// Get template path
 	templatePath := filepath.Join("templates", "emails", templateName)
 

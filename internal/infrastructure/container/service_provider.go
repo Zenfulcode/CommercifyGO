@@ -3,6 +3,7 @@ package container
 import (
 	"sync"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/auth"
 	"github.com/zenfulcode/commercify/internal/infrastructure/email"
@@ -13,7 +14,7 @@ import (
 type ServiceProvider interface {
 	JWTService() *auth.JWTService
 	PaymentService() service.PaymentService
-	WebhookService() *payment.WebhookService
+	PaymentProviderService() service.PaymentProviderService
 	EmailService() service.EmailService
 	MobilePayService() *payment.MobilePayPaymentService
 	InitializeMobilePay() *payment.MobilePayPaymentService
@@ -24,11 +25,11 @@ type serviceProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	jwtService       *auth.JWTService
-	paymentService   service.PaymentService
-	webhookService   *payment.WebhookService
-	emailService     service.EmailService
-	mobilePayService *payment.MobilePayPaymentService
+	jwtService             *auth.JWTService
+	paymentService         service.PaymentService
+	paymentProviderService service.PaymentProviderService
+	emailService           service.EmailService
+	mobilePayService       *payment.MobilePayPaymentService
 }
 
 // NewServiceProvider creates a new service provider
@@ -55,14 +56,18 @@ func (p *serviceProvider) PaymentService() service.PaymentService {
 	defer p.mu.Unlock()
 
 	if p.paymentService == nil {
-		multiProviderService := payment.NewMultiProviderPaymentService(p.container.Config(), p.container.Logger())
+		multiProviderService := payment.NewMultiProviderPaymentService(
+			p.container.Config(),
+			p.container.Repositories().PaymentProviderRepository(),
+			p.container.Logger(),
+		)
 		p.paymentService = multiProviderService
 
 		// Extract MobilePay service for webhook registration if it exists
 		// We need to access the actual MultiProviderPaymentService concrete type
 		// to access its GetProviders method
 		for _, providerWithService := range multiProviderService.GetProviders() {
-			if providerWithService.Type == service.PaymentProviderMobilePay {
+			if providerWithService.Type == common.PaymentProviderMobilePay {
 				// Cast the generic service to the concrete MobilePayPaymentService type
 				if mobilePayService, ok := providerWithService.Service.(*payment.MobilePayPaymentService); ok {
 					p.mobilePayService = mobilePayService
@@ -72,6 +77,20 @@ func (p *serviceProvider) PaymentService() service.PaymentService {
 		}
 	}
 	return p.paymentService
+}
+
+// PaymentProviderService returns the payment provider service
+func (p *serviceProvider) PaymentProviderService() service.PaymentProviderService {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.paymentProviderService == nil {
+		p.paymentProviderService = payment.NewPaymentProviderService(
+			p.container.Repositories().PaymentProviderRepository(),
+			p.container.Logger(),
+		)
+	}
+	return p.paymentProviderService
 }
 
 // InitializeMobilePay directly initializes the MobilePay service to break circular dependency
@@ -94,24 +113,6 @@ func (p *serviceProvider) MobilePayService() *payment.MobilePayPaymentService {
 		p.mobilePayService = p.InitializeMobilePay()
 	}
 	return p.mobilePayService
-}
-
-// WebhookService returns the webhook service
-func (p *serviceProvider) WebhookService() *payment.WebhookService {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.webhookService == nil {
-		// Break circular dependency - don't use MobilePayService() here
-		// The webhook service can work without MobilePay initially
-		p.webhookService = payment.NewWebhookService(
-			p.container.Config(),
-			p.container.Repositories().WebhookRepository(),
-			p.container.Logger(),
-			nil, // Pass nil initially - can be set later if needed
-		)
-	}
-	return p.webhookService
 }
 
 // EmailService returns the email service

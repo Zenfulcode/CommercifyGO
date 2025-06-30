@@ -10,6 +10,7 @@ import (
 	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
 	"github.com/google/uuid"
 	"github.com/zenfulcode/commercify/config"
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -48,11 +49,11 @@ func NewMobilePayPaymentService(config config.MobilePayConfig, logger logger.Log
 func (s *MobilePayPaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:                service.PaymentProviderMobilePay,
+			Type:                common.PaymentProviderMobilePay,
 			Name:                "MobilePay",
 			Description:         "Pay with MobilePay app",
 			IconURL:             "/assets/images/mobilepay-logo.png",
-			Methods:             []service.PaymentMethod{service.PaymentMethodWallet},
+			Methods:             []common.PaymentMethod{common.PaymentMethodWallet},
 			Enabled:             true,
 			SupportedCurrencies: []string{"NOK", "DKK", "EUR"},
 		},
@@ -125,13 +126,13 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 		Message:        "payment requires user action",
 		RequiresAction: true,
 		ActionURL:      res.RedirectURL,
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // VerifyPayment verifies a payment
-func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider service.PaymentProviderType) (bool, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider common.PaymentProviderType) (bool, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return false, errors.New("invalid payment provider")
 	}
 
@@ -149,8 +150,8 @@ func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider s
 }
 
 // RefundPayment refunds a payment
-func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -178,13 +179,13 @@ func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, 
 		Message:        "payment refunded successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for refunds
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // CapturePayment captures an authorized payment
-func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -215,13 +216,13 @@ func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string,
 		Message:        "payment captured successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for captures
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -243,12 +244,12 @@ func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider s
 		Message:        "payment cancelled successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for cancellations
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
-func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider common.PaymentProviderType) error {
+	if provider != common.PaymentProviderMobilePay {
 		return errors.New("invalid payment provider")
 	}
 

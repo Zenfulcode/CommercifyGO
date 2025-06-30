@@ -681,13 +681,13 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Determine the payment method based on provided data
-	paymentMethod := service.PaymentMethodWallet
+	paymentMethod := common.PaymentMethodWallet
 	if paymentInput.PaymentData.CardDetails != nil {
-		paymentMethod = service.PaymentMethodCreditCard
+		paymentMethod = common.PaymentMethodCreditCard
 	}
 
 	processInput := usecase.ProcessPaymentInput{
-		PaymentProvider: service.PaymentProviderType(paymentInput.PaymentProvider),
+		PaymentProvider: common.PaymentProviderType(paymentInput.PaymentProvider),
 		PaymentMethod:   paymentMethod,
 		PhoneNumber:     paymentInput.PaymentData.PhoneNumber,
 	}

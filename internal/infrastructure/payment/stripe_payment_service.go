@@ -10,6 +10,7 @@ import (
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"github.com/stripe/stripe-go/v82/refund"
 	"github.com/zenfulcode/commercify/config"
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -35,11 +36,11 @@ func NewStripePaymentService(config config.StripeConfig, logger logger.Logger) *
 func (s *StripePaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:        service.PaymentProviderStripe,
+			Type:        common.PaymentProviderStripe,
 			Name:        "Stripe",
 			Description: "Pay with credit or debit card",
 			IconURL:     "/assets/images/stripe-logo.png",
-			Methods:     []service.PaymentMethod{service.PaymentMethodCreditCard},
+			Methods:     []common.PaymentMethod{common.PaymentMethodCreditCard},
 			Enabled:     true,
 			SupportedCurrencies: []string{
 				"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "SEK", "NOK", "DKK",
@@ -134,12 +135,12 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 	var err error
 
 	switch request.PaymentMethod {
-	case service.PaymentMethodCreditCard:
+	case common.PaymentMethodCreditCard:
 		if request.CardDetails == nil {
 			return &service.PaymentResult{
 				Success:  false,
 				Message:  "card details are required for credit card payment",
-				Provider: service.PaymentProviderStripe,
+				Provider: common.PaymentProviderStripe,
 			}, nil
 		}
 		paymentMethodType = "card"
@@ -151,7 +152,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 			return &service.PaymentResult{
 				Success:  false,
 				Message:  "failed to create payment method: " + err.Error(),
-				Provider: service.PaymentProviderStripe,
+				Provider: common.PaymentProviderStripe,
 			}, nil
 		}
 
@@ -159,7 +160,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:  false,
 			Message:  "unsupported payment method for Stripe",
-			Provider: service.PaymentProviderStripe,
+			Provider: common.PaymentProviderStripe,
 		}, nil
 	}
 
@@ -168,7 +169,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:  false,
 			Message:  "payment method token is required",
-			Provider: service.PaymentProviderStripe,
+			Provider: common.PaymentProviderStripe,
 		}, nil
 	}
 
@@ -221,7 +222,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:  false,
 			Message:  "failed to process payment: " + err.Error(),
-			Provider: service.PaymentProviderStripe,
+			Provider: common.PaymentProviderStripe,
 		}, nil
 	}
 
@@ -232,7 +233,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 		return &service.PaymentResult{
 			Success:       true,
 			TransactionID: paymentIntent.ID,
-			Provider:      service.PaymentProviderStripe,
+			Provider:      common.PaymentProviderStripe,
 		}, nil
 
 	case stripe.PaymentIntentStatusRequiresAction:
@@ -244,7 +245,7 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 			Message:        "payment requires additional action",
 			RequiresAction: true,
 			ActionURL:      paymentIntent.NextAction.RedirectToURL.URL,
-			Provider:       service.PaymentProviderStripe,
+			Provider:       common.PaymentProviderStripe,
 		}, nil
 
 	default:
@@ -253,13 +254,13 @@ func (s *StripePaymentService) ProcessPayment(request service.PaymentRequest) (*
 			Success:       false,
 			TransactionID: paymentIntent.ID,
 			Message:       fmt.Sprintf("payment status: %s", paymentIntent.Status),
-			Provider:      service.PaymentProviderStripe,
+			Provider:      common.PaymentProviderStripe,
 		}, nil
 	}
 }
 
 // VerifyPayment verifies a payment
-func (s *StripePaymentService) VerifyPayment(transactionID string, provider service.PaymentProviderType) (bool, error) {
+func (s *StripePaymentService) VerifyPayment(transactionID string, provider common.PaymentProviderType) (bool, error) {
 	if transactionID == "" {
 		return false, errors.New("transaction ID is required")
 	}
@@ -284,7 +285,7 @@ func (s *StripePaymentService) VerifyPayment(transactionID string, provider serv
 }
 
 // RefundPayment refunds a payment
-func (s *StripePaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *StripePaymentService) RefundPayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -314,12 +315,12 @@ func (s *StripePaymentService) RefundPayment(transactionID, currency string, amo
 		Success:       refundResult.Status == stripe.RefundStatusSucceeded,
 		TransactionID: refundResult.ID,
 		Message:       fmt.Sprintf("refund status: %s", refundResult.Status),
-		Provider:      service.PaymentProviderStripe,
+		Provider:      common.PaymentProviderStripe,
 	}, nil
 }
 
 // CapturePayment captures a payment
-func (s *StripePaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *StripePaymentService) CapturePayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -347,12 +348,12 @@ func (s *StripePaymentService) CapturePayment(transactionID, currency string, am
 		Success:       true,
 		TransactionID: captureResult.ID,
 		Message:       "payment captured successfully",
-		Provider:      service.PaymentProviderStripe,
+		Provider:      common.PaymentProviderStripe,
 	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *StripePaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *StripePaymentService) CancelPayment(transactionID string, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -375,11 +376,11 @@ func (s *StripePaymentService) CancelPayment(transactionID string, provider serv
 		Success:       true,
 		TransactionID: cancelResult.ID,
 		Message:       "payment canceled successfully",
-		Provider:      service.PaymentProviderStripe,
+		Provider:      common.PaymentProviderStripe,
 	}, nil
 }
 
-func (s *StripePaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {
+func (s *StripePaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider common.PaymentProviderType) error {
 	return errors.New("not implemented")
 }
 

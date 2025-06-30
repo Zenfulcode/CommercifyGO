@@ -14,7 +14,6 @@ type HandlerProvider interface {
 	CheckoutHandler() *handler.CheckoutHandler
 	OrderHandler() *handler.OrderHandler
 	PaymentHandler() *handler.PaymentHandler
-	WebhookHandler() *handler.WebhookHandler
 	DiscountHandler() *handler.DiscountHandler
 	ShippingHandler() *handler.ShippingHandler
 	CurrencyHandler() *handler.CurrencyHandler
@@ -33,7 +32,6 @@ type handlerProvider struct {
 	checkoutHandler  *handler.CheckoutHandler
 	orderHandler     *handler.OrderHandler
 	paymentHandler   *handler.PaymentHandler
-	webhookHandler   *handler.WebhookHandler
 	discountHandler  *handler.DiscountHandler
 	shippingHandler  *handler.ShippingHandler
 	currencyHandler  *handler.CurrencyHandler
@@ -118,22 +116,6 @@ func (p *handlerProvider) PaymentHandler() *handler.PaymentHandler {
 		)
 	}
 	return p.paymentHandler
-}
-
-// WebhookHandler returns the webhook handler
-func (p *handlerProvider) WebhookHandler() *handler.WebhookHandler {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.webhookHandler == nil {
-		p.webhookHandler = handler.NewWebhookHandler(
-			p.container.Config(),
-			p.container.UseCases().OrderUseCase(),
-			p.container.UseCases().WebhookUseCase(),
-			p.container.Logger(),
-		)
-	}
-	return p.webhookHandler
 }
 
 // CheckoutHandler returns the checkout handler
