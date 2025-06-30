@@ -56,13 +56,13 @@ func (r *CreateUserRequest) ToUseCaseInput() usecase.RegisterInput {
 	}
 }
 
-func CreateUserLoginResponse(user *dto.UserDTO, accessToken, refreshToken string, expiresIn int) UserLoginResponse {
-	return UserLoginResponse{
+func CreateUserLoginResponse(user *dto.UserDTO, accessToken, refreshToken string, expiresIn int) ResponseDTO[UserLoginResponse] {
+	return SuccessResponse(UserLoginResponse{
 		User:         *user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
-	}
+	})
 }
 
 func CreateUserListResponse(users []*entity.User, totalCount, page, pageSize int) ListResponseDTO[dto.UserDTO] {

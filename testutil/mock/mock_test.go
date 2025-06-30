@@ -279,7 +279,7 @@ func TestProductRepository(t *testing.T) {
 		IsDefault:  true,
 		Weight:     1.5,
 		Attributes: entity.VariantAttributes{"color": "red", "size": "large"},
-		Images:     []string{"variant1.jpg"},
+		Images:     entity.StringSlice{"variant1.jpg"},
 	}
 
 	// Create a test product
@@ -288,7 +288,7 @@ func TestProductRepository(t *testing.T) {
 		Description: "A test product description",
 		Currency:    "USD",
 		CategoryID:  1,
-		Images:      []string{"product1.jpg", "product2.jpg"},
+		Images:      entity.StringSlice{"product1.jpg", "product2.jpg"},
 		Active:      true,
 		Variants:    []*entity.ProductVariant{variant},
 	}

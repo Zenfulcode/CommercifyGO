@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -9,6 +11,46 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"gorm.io/gorm"
 )
+
+// StringSlice is a custom type for handling JSON arrays in database
+type StringSlice []string
+
+// Scan implements the sql.Scanner interface
+func (s *StringSlice) Scan(value interface{}) error {
+	if value == nil {
+		*s = []string{}
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		if v == "" || v == "[]" {
+			*s = []string{}
+			return nil
+		}
+		return json.Unmarshal([]byte(v), s)
+	case []byte:
+		if len(v) == 0 || string(v) == "[]" {
+			*s = []string{}
+			return nil
+		}
+		return json.Unmarshal(v, s)
+	default:
+		return fmt.Errorf("cannot scan %T into StringSlice", value)
+	}
+}
+
+// Value implements the driver.Valuer interface
+func (s StringSlice) Value() (driver.Value, error) {
+	if len(s) == 0 {
+		return "[]", nil
+	}
+	jsonBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(jsonBytes), nil
+}
 
 // Product represents a product in the system
 // All products must have at least one variant as per the database schema
@@ -19,7 +61,7 @@ type Product struct {
 	Currency    string            `gorm:"not null;size:3"`
 	CategoryID  uint              `gorm:"not null;index"`
 	Category    Category          `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
-	Images      []string          `gorm:"type:jsonb;default:'[]'"`
+	Images      StringSlice       `gorm:"type:json;default:'[]'"`
 	Active      bool              `gorm:"default:true"`
 	Variants    []*ProductVariant `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
@@ -48,7 +90,7 @@ func NewProduct(name, description, currency string, categoryID uint, images []st
 		Description: description,
 		Currency:    currency,
 		CategoryID:  categoryID,
-		Images:      images,
+		Images:      StringSlice(images),
 		Variants:    productVariants,
 		Active:      isActive,
 	}, nil

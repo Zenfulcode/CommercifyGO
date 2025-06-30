@@ -29,20 +29,24 @@ func NewProductUseCase(
 	orderRepo repository.OrderRepository,
 	checkoutRepo repository.CheckoutRepository,
 ) *ProductUseCase {
-	defaultCurrency, err := currencyRepo.GetDefault()
-	if err != nil {
-		return nil
-	}
-
-	return &ProductUseCase{
+	uc := &ProductUseCase{
 		productRepo:        productRepo,
 		categoryRepo:       categoryRepo,
 		productVariantRepo: productVariantRepo,
 		currencyRepo:       currencyRepo,
 		orderRepo:          orderRepo,
 		checkoutRepo:       checkoutRepo,
-		defaultCurrency:    defaultCurrency,
 	}
+
+	// Try to get default currency but don't fail if it doesn't exist
+	defaultCurrency, err := currencyRepo.GetDefault()
+	if err == nil {
+		uc.defaultCurrency = defaultCurrency
+	}
+	// If no default currency exists, defaultCurrency will be nil
+	// This should be handled in methods that need it
+
+	return uc
 }
 
 type VariantInput struct {

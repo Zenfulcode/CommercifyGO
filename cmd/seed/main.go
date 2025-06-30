@@ -26,6 +26,7 @@ func main() {
 	checkoutsFlag := flag.Bool("checkouts", false, "Seed checkouts data")
 	paymentTransactionsFlag := flag.Bool("payment-transactions", false, "Seed payment transactions data")
 	shippingFlag := flag.Bool("shipping", false, "Seed shipping data (methods, zones, rates)")
+	currenciesFlag := flag.Bool("currencies", false, "Seed currencies data")
 	clearFlag := flag.Bool("clear", false, "Clear all data before seeding")
 	flag.Parse()
 
@@ -56,6 +57,13 @@ func main() {
 	}
 
 	// Seed data based on flags
+	if *allFlag || *currenciesFlag {
+		if err := seedCurrencies(db); err != nil {
+			log.Fatalf("Failed to seed currencies: %v", err)
+		}
+		fmt.Println("Currencies seeded successfully")
+	}
+
 	if *allFlag || *usersFlag {
 		if err := seedUsers(db); err != nil {
 			log.Fatalf("Failed to seed users: %v", err)
@@ -131,7 +139,7 @@ func main() {
 
 	if !*allFlag && !*usersFlag && !*categoriesFlag && !*productsFlag && !*productVariantsFlag &&
 		!*ordersFlag && !*checkoutsFlag && !*clearFlag && !*discountsFlag &&
-		!*paymentTransactionsFlag && !*shippingFlag {
+		!*paymentTransactionsFlag && !*shippingFlag && !*currenciesFlag {
 		fmt.Println("No action specified")
 		fmt.Println("\nUsage:")
 		flag.PrintDefaults()
@@ -152,6 +160,7 @@ func clearData(db *gorm.DB) error {
 		"products",
 		"categories",
 		"users",
+		"currencies",
 	}
 
 	// For SQLite, use DELETE instead of TRUNCATE
@@ -173,7 +182,7 @@ func seedUsers(db *gorm.DB) error {
 		lastName  string
 		role      string
 	}{
-		{"admin@commercify.com", "admin123", "Admin", "User", "admin"},
+		{"admin@example.com", "password123", "Admin", "User", "admin"},
 		{"john.doe@example.com", "password123", "John", "Doe", "user"},
 		{"jane.smith@example.com", "password123", "Jane", "Smith", "user"},
 		{"customer@example.com", "password123", "Test", "Customer", "user"},
@@ -194,6 +203,59 @@ func seedUsers(db *gorm.DB) error {
 
 		if err := db.Create(user).Error; err != nil {
 			return fmt.Errorf("failed to save user %s: %w", userData.email, err)
+		}
+	}
+
+	return nil
+}
+
+// seedCurrencies seeds currency data
+func seedCurrencies(db *gorm.DB) error {
+	currencies := []struct {
+		code         string
+		name         string
+		symbol       string
+		exchangeRate float64
+		isEnabled    bool
+		isDefault    bool
+	}{
+		{"USD", "US Dollar", "$", 1.0, true, true},       // USD as default base currency
+		{"EUR", "Euro", "€", 0.85, true, false},          // Approximate exchange rate
+		{"DKK", "Danish Krone", "kr", 6.80, true, false}, // Approximate exchange rate
+	}
+
+	for _, currData := range currencies {
+		// Check if currency already exists
+		var existingCurrency entity.Currency
+		if err := db.Where("code = ?", currData.code).First(&existingCurrency).Error; err == nil {
+			// Currency exists, update it with our seed data
+			existingCurrency.Name = currData.name
+			existingCurrency.Symbol = currData.symbol
+			existingCurrency.ExchangeRate = currData.exchangeRate
+			existingCurrency.IsEnabled = currData.isEnabled
+			existingCurrency.IsDefault = currData.isDefault
+
+			if err := db.Save(&existingCurrency).Error; err != nil {
+				return fmt.Errorf("failed to update currency %s: %w", currData.code, err)
+			}
+			continue
+		}
+
+		// Create new currency using entity constructor
+		currency, err := entity.NewCurrency(
+			currData.code,
+			currData.name,
+			currData.symbol,
+			currData.exchangeRate,
+			currData.isEnabled,
+			currData.isDefault,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create currency %s: %w", currData.code, err)
+		}
+
+		if err := db.Create(currency).Error; err != nil {
+			return fmt.Errorf("failed to save currency %s: %w", currData.code, err)
 		}
 	}
 
@@ -390,7 +452,7 @@ func seedProducts(db *gorm.DB) error {
 			Currency:    prodData.currency,
 			CategoryID:  prodData.categoryID,
 			Active:      prodData.active,
-			Images:      []string{}, // Always use empty slice to avoid nil issues
+			Images:      entity.StringSlice(prodData.images),
 		}
 
 		if err := db.Create(product).Error; err != nil {
@@ -411,7 +473,7 @@ func seedProducts(db *gorm.DB) error {
 				varData.price,
 				varData.weight,
 				varData.attributes,
-				[]string{}, // Use empty slice for now
+				varData.images,
 				varData.isDefault,
 			)
 			if err != nil {
@@ -1116,13 +1178,6 @@ func seedPaymentTransactions(db *gorm.DB) error {
 
 // seedCheckouts seeds checkout data for testing expiry and cleanup logic
 func seedCheckouts(db *gorm.DB) error {
-	// Temporarily disable foreign key checks for SQLite
-	if err := db.Exec("PRAGMA foreign_keys = OFF").Error; err != nil {
-		return fmt.Errorf("failed to disable foreign keys: %w", err)
-	}
-	defer func() {
-		db.Exec("PRAGMA foreign_keys = ON")
-	}()
 	// Get users for checkout assignments
 	var users []struct {
 		ID    uint
@@ -1276,7 +1331,7 @@ func seedCheckouts(db *gorm.DB) error {
 		checkout.UpdatedAt = checkoutData.createdAt
 		checkout.LastActivityAt = checkoutData.lastActivityAt
 		checkout.ExpiresAt = checkoutData.expiresAt
-		checkout.ConvertedOrderID = 0 // Explicitly set to 0
+		// Don't set ConvertedOrderID for new checkouts
 
 		if err := db.Create(checkout).Error; err != nil {
 			return fmt.Errorf("failed to save checkout %s: %w", checkoutData.sessionID, err)

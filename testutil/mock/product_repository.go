@@ -278,7 +278,7 @@ func (m *ProductRepository) copyProduct(product *entity.Product) *entity.Product
 
 	// Deep copy images slice
 	if product.Images != nil {
-		productCopy.Images = make([]string, len(product.Images))
+		productCopy.Images = make(entity.StringSlice, len(product.Images))
 		copy(productCopy.Images, product.Images)
 	}
 

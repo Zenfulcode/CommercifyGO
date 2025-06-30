@@ -43,7 +43,7 @@ type ProductVariant struct {
 	SKU        string            `gorm:"uniqueIndex;size:100;not null"`
 	Stock      int               `gorm:"default:0"`
 	Attributes VariantAttributes `gorm:"type:jsonb;not null"`
-	Images     []string          `gorm:"type:jsonb"`
+	Images     StringSlice       `gorm:"type:json;default:'[]'"`
 	IsDefault  bool              `gorm:"default:false"`
 	Weight     float64           `gorm:"default:0"`
 	Price      int64             `gorm:"not null"`
@@ -72,7 +72,7 @@ func NewProductVariant(sku string, stock int, price int64, weight float64, attri
 		SKU:        sku,
 		Stock:      stock,
 		Attributes: attributes,
-		Images:     images,
+		Images:     StringSlice(images),
 		IsDefault:  isDefault,
 		Weight:     weight,
 		Price:      price,
@@ -98,8 +98,8 @@ func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float
 		updated = true
 	}
 
-	if len(images) > 0 && !slices.Equal(v.Images, images) {
-		v.Images = images
+	if len(images) > 0 && !slices.Equal([]string(v.Images), images) {
+		v.Images = StringSlice(images)
 		updated = true
 	}
 	if len(attributes) > 0 {

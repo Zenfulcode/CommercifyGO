@@ -15,18 +15,24 @@ type CreateProductRequest struct {
 	CategoryID  uint                   `json:"category_id"`
 	Images      []string               `json:"images"`
 	Active      bool                   `json:"active"`
-	Variants    []CreateVariantRequest `json:"variants,omitempty"`
+	Variants    []CreateVariantRequest `json:"variants"`
+}
+
+// AttributeKeyValue represents a key-value pair for product attributes
+type AttributeKeyValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // CreateVariantRequest represents the data needed to create a new product variant
 type CreateVariantRequest struct {
-	SKU        string            `json:"sku"`
-	Stock      int               `json:"stock"`
-	Attributes map[string]string `json:"attributes"`
-	Images     []string          `json:"images"`
-	IsDefault  bool              `json:"is_default"`
-	Weight     float64           `json:"weight"`
-	Price      float64           `json:"price"`
+	SKU        string              `json:"sku"`
+	Stock      int                 `json:"stock"`
+	Attributes []AttributeKeyValue `json:"attributes"`
+	Images     []string            `json:"images"`
+	IsDefault  bool                `json:"is_default"`
+	Weight     float64             `json:"weight"`
+	Price      float64             `json:"price"`
 }
 
 // UpdateProductRequest represents the data needed to update an existing product
@@ -41,13 +47,13 @@ type UpdateProductRequest struct {
 
 // UpdateVariantRequest represents the data needed to update an existing product variant
 type UpdateVariantRequest struct {
-	SKU        *string            `json:"sku,omitempty"`
-	Stock      *int               `json:"stock,omitempty"`
-	Attributes *map[string]string `json:"attributes,omitempty"`
-	Images     *[]string          `json:"images,omitempty"`
-	IsDefault  *bool              `json:"is_default,omitempty"`
-	Weight     *float64           `json:"weight,omitempty"`
-	Price      *float64           `json:"price,omitempty"`
+	SKU        *string              `json:"sku,omitempty"`
+	Stock      *int                 `json:"stock,omitempty"`
+	Attributes *[]AttributeKeyValue `json:"attributes,omitempty"`
+	Images     *[]string            `json:"images,omitempty"`
+	IsDefault  *bool                `json:"is_default,omitempty"`
+	Weight     *float64             `json:"weight,omitempty"`
+	Price      *float64             `json:"price,omitempty"`
 }
 
 func CreateProductListResponse(products []*entity.Product, totalCount, page, pageSize int) ListResponseDTO[dto.ProductDTO] {
@@ -85,6 +91,7 @@ func (cp *CreateProductRequest) ToUseCaseInput() usecase.CreateProductInput {
 	return usecase.CreateProductInput{
 		Name:        cp.Name,
 		Description: cp.Description,
+		Currency:    cp.Currency,
 		CategoryID:  cp.CategoryID,
 		Images:      cp.Images,
 		Active:      cp.Active,
@@ -93,13 +100,19 @@ func (cp *CreateProductRequest) ToUseCaseInput() usecase.CreateProductInput {
 }
 
 func (cv *CreateVariantRequest) ToUseCaseInput() usecase.CreateVariantInput {
+	// Convert attributes array to map
+	attributesMap := make(map[string]string)
+	for _, attr := range cv.Attributes {
+		attributesMap[attr.Name] = attr.Value
+	}
+
 	return usecase.CreateVariantInput{
 		VariantInput: usecase.VariantInput{
 			SKU:        cv.SKU,
 			Stock:      cv.Stock,
 			Weight:     cv.Weight,
 			Images:     cv.Images,
-			Attributes: cv.Attributes,
+			Attributes: attributesMap,
 			Price:      money.ToCents(cv.Price),
 			IsDefault:  cv.IsDefault,
 		},
@@ -138,7 +151,12 @@ func (u UpdateVariantRequest) ToUseCaseInput() usecase.UpdateVariantInput {
 		variantInput.IsDefault = *u.IsDefault
 	}
 	if u.Attributes != nil {
-		variantInput.Attributes = *u.Attributes
+		// Convert attributes array to map
+		attributesMap := make(map[string]string)
+		for _, attr := range *u.Attributes {
+			attributesMap[attr.Name] = attr.Value
+		}
+		variantInput.Attributes = attributesMap
 	}
 
 	return usecase.UpdateVariantInput{

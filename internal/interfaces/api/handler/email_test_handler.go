@@ -58,6 +58,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		CheckoutSessionID: "test-checkout-session-12345", // Add checkout session ID for testing
 		ShippingAddr: entity.Address{
 			Street1:    "123 Test Street",
+			Street2:    "street 2",
 			City:       "Test City",
 			State:      "Test State",
 			PostalCode: "12345",
@@ -65,6 +66,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		},
 		BillingAddr: entity.Address{
 			Street1:    "123 Test Street",
+			Street2:    "",
 			City:       "Test City",
 			State:      "Test State",
 			PostalCode: "12345",
