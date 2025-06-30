@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zenfulcode/commercify/internal/dto"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
 )
 
 func TestOrder(t *testing.T) {
@@ -31,7 +31,7 @@ func TestOrder(t *testing.T) {
 		}
 
 		shippingAddr := Address{
-			Street:     "123 Main St",
+			Street1:    "123 Main St",
 			City:       "Anytown",
 			State:      "CA",
 			PostalCode: "12345",
@@ -39,7 +39,7 @@ func TestOrder(t *testing.T) {
 		}
 
 		billingAddr := Address{
-			Street:     "456 Oak Ave",
+			Street1:    "456 Oak Ave",
 			City:       "Another City",
 			State:      "NY",
 			PostalCode: "67890",
@@ -74,7 +74,7 @@ func TestOrder(t *testing.T) {
 		validItems := []OrderItem{
 			{ProductID: 1, ProductName: "Test", SKU: "SKU-001", Quantity: 1, Price: 9999, Weight: 1.0},
 		}
-		validAddr := Address{Street: "123 Main St", City: "City", Country: "US"}
+		validAddr := Address{Street1: "123 Main St", City: "City", Country: "US"}
 		validCustomer := CustomerDetails{Email: "test@example.com", FullName: "John Doe"}
 
 		tests := []struct {
@@ -147,8 +147,8 @@ func TestOrder(t *testing.T) {
 			},
 		}
 
-		shippingAddr := Address{Street: "123 Main St", City: "City", Country: "US"}
-		billingAddr := Address{Street: "456 Oak Ave", City: "City", Country: "US"}
+		shippingAddr := Address{Street1: "123 Main St", City: "City", Country: "US"}
+		billingAddr := Address{Street1: "456 Oak Ave", City: "City", Country: "US"}
 		customerDetails := CustomerDetails{Email: "guest@example.com", FullName: "Guest User"}
 
 		order, err := NewGuestOrder(items, shippingAddr, billingAddr, customerDetails)
@@ -176,7 +176,7 @@ func TestOrderDTOConversions(t *testing.T) {
 		}
 
 		shippingAddr := Address{
-			Street:     "123 Main St",
+			Street1:    "123 Main St",
 			City:       "Test City",
 			State:      "Test State",
 			PostalCode: "12345",
@@ -218,7 +218,7 @@ func TestOrderDTOConversions(t *testing.T) {
 		}
 
 		shippingAddr := Address{
-			Street:     "123 Main St",
+			Street1:    "123 Main St",
 			City:       "Test City",
 			State:      "Test State",
 			PostalCode: "12345",
@@ -251,7 +251,7 @@ func TestOrderDTOConversions(t *testing.T) {
 
 	t.Run("AddressToDTO", func(t *testing.T) {
 		address := Address{
-			Street:     "456 Oak Ave",
+			Street1:    "456 Oak Ave",
 			City:       "Another City",
 			State:      "Another State",
 			PostalCode: "67890",

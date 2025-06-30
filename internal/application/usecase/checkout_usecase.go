@@ -388,7 +388,7 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	// Validate shipping address is set
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	if checkout.ShippingAddr.Street1 == "" || checkout.ShippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required to calculate shipping options")
 	}
 
@@ -581,11 +581,11 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("checkout has no items")
 	}
 
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	if checkout.ShippingAddr.Street1 == "" || checkout.ShippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required")
 	}
 
-	if checkout.BillingAddr.Street == "" || checkout.BillingAddr.Country == "" {
+	if checkout.BillingAddr.Street1 == "" || checkout.BillingAddr.Country == "" {
 		return nil, errors.New("billing address is required")
 	}
 

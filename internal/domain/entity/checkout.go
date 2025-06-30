@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
 	"gorm.io/gorm"
 )
 
@@ -371,9 +371,8 @@ func (c *Checkout) HasCustomerInfo() bool {
 
 // HasShippingInfo returns true if the checkout has shipping address information
 func (c *Checkout) HasShippingInfo() bool {
-	return c.ShippingAddr.Street != "" ||
+	return c.ShippingAddr.Street1 != "" ||
 		c.ShippingAddr.City != "" ||
-		c.ShippingAddr.State != "" ||
 		c.ShippingAddr.PostalCode != "" ||
 		c.ShippingAddr.Country != ""
 }
@@ -524,10 +523,11 @@ func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
 		SessionID:        c.SessionID,
 		UserID:           c.UserID,
 		Status:           string(c.Status),
-		ShippingAddress:  c.ShippingAddr.ToAddressDTO(),
-		BillingAddress:   c.BillingAddr.ToAddressDTO(),
+		ShippingAddress:  *c.ShippingAddr.ToAddressDTO(),
+		BillingAddress:   *c.BillingAddr.ToAddressDTO(),
 		ShippingMethodID: c.ShippingMethod.ID,
 		ShippingOption:   c.ShippingOption.ToShippingOptionDTO(),
+		CustomerDetails:  *c.CustomerDetails.ToCustomerDetailsDTO(),
 		PaymentProvider:  c.PaymentProvider,
 		TotalAmount:      money.FromCents(c.TotalAmount),
 		ShippingCost:     money.FromCents(c.ShippingCost),

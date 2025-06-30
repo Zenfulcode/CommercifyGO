@@ -10,7 +10,7 @@ type OrderDTO struct {
 	OrderNumber     string              `json:"order_number"`
 	UserID          uint                `json:"user_id"`
 	CheckoutID      string              `json:"checkout_id"`
-	Items           []*OrderItemDTO     `json:"items"`
+	Items           []OrderItemDTO      `json:"items"`
 	Status          OrderStatus         `json:"status"`
 	PaymentStatus   PaymentStatus       `json:"payment_status"`
 	TotalAmount     float64             `json:"total_amount"`    // Subtotal (items only)
@@ -20,7 +20,7 @@ type OrderDTO struct {
 	Currency        string              `json:"currency"`
 	ShippingAddress *AddressDTO         `json:"shipping_address"`
 	BillingAddress  *AddressDTO         `json:"billing_address"`
-	PaymentDetails  PaymentDetails      `json:"payment_details"`
+	PaymentDetails  *PaymentDetails     `json:"payment_details"`
 	ShippingDetails *ShippingOptionDTO  `json:"shipping_details"`
 	DiscountDetails *AppliedDiscountDTO `json:"discount_details"`
 	CustomerDetails *CustomerDetailsDTO `json:"customer"`
@@ -31,20 +31,20 @@ type OrderDTO struct {
 }
 
 type OrderSummaryDTO struct {
-	ID               uint                `json:"id"`
-	OrderNumber      string              `json:"order_number"`
-	CheckoutID       string              `json:"checkout_id"`
-	UserID           uint                `json:"user_id"`
-	Customer         *CustomerDetailsDTO `json:"customer"`
-	Status           OrderStatus         `json:"status"`
-	PaymentStatus    PaymentStatus       `json:"payment_status"`
-	TotalAmount      float64             `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost     float64             `json:"shipping_cost"` // Shipping cost
-	FinalAmount      float64             `json:"final_amount"`  // Total including shipping and discounts
-	OrderLinesAmount int                 `json:"order_lines_amount"`
-	Currency         string              `json:"currency"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
+	ID               uint               `json:"id"`
+	OrderNumber      string             `json:"order_number"`
+	CheckoutID       string             `json:"checkout_id"`
+	UserID           uint               `json:"user_id"`
+	Customer         CustomerDetailsDTO `json:"customer"`
+	Status           OrderStatus        `json:"status"`
+	PaymentStatus    PaymentStatus      `json:"payment_status"`
+	TotalAmount      float64            `json:"total_amount"`  // Subtotal (items only)
+	ShippingCost     float64            `json:"shipping_cost"` // Shipping cost
+	FinalAmount      float64            `json:"final_amount"`  // Total including shipping and discounts
+	OrderLinesAmount int                `json:"order_lines_amount"`
+	Currency         string             `json:"currency"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 type PaymentDetails struct {
@@ -68,7 +68,7 @@ type OrderItemDTO struct {
 	Quantity    int       `json:"quantity"`
 	UnitPrice   float64   `json:"unit_price"`
 	TotalPrice  float64   `json:"total_price"`
-	ImageURL    string    `json:"image_url,omitempty"`
+	ImageURL    string    `json:"image_url"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

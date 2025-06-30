@@ -3,7 +3,7 @@ package entity
 import (
 	"errors"
 
-	"github.com/zenfulcode/commercify/internal/dto"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

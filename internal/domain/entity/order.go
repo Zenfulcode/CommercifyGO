@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
 	"gorm.io/gorm"
 )
 
@@ -98,9 +98,10 @@ type OrderItem struct {
 
 // Address represents a shipping or billing address
 type Address struct {
-	Street     string `gorm:"size:255"`
+	Street1    string `gorm:"size:255"`
+	Street2    string `gorm:"size:255"`
 	City       string `gorm:"size:100"`
-	State      string `gorm:"size:100"`
+	State      string `gorm:"size:100"` // Nullable for international addresses
 	PostalCode string `gorm:"size:20"`
 	Country    string `gorm:"size:100"`
 }
@@ -439,7 +440,7 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 		OrderNumber:      o.OrderNumber,
 		CheckoutID:       o.CheckoutSessionID,
 		UserID:           o.UserID,
-		Customer:         o.CustomerDetails.ToCustomerDetailsDTO(),
+		Customer:         *o.CustomerDetails.ToCustomerDetailsDTO(),
 		Status:           dto.OrderStatus(o.Status),
 		PaymentStatus:    dto.PaymentStatus(o.PaymentStatus),
 		TotalAmount:      money.FromCents(o.TotalAmount),
@@ -475,10 +476,10 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 	}
 }
 
-func (o *Order) ToOrderItemsDTO() []*dto.OrderItemDTO {
-	itemsDTO := make([]*dto.OrderItemDTO, len(o.Items))
+func (o *Order) ToOrderItemsDTO() []dto.OrderItemDTO {
+	itemsDTO := make([]dto.OrderItemDTO, len(o.Items))
 	for i, item := range o.Items {
-		itemsDTO[i] = &dto.OrderItemDTO{
+		itemsDTO[i] = dto.OrderItemDTO{
 			ID:          item.ID,
 			OrderID:     item.OrderID,
 			ProductID:   item.ProductID,
@@ -497,7 +498,8 @@ func (o *Order) ToOrderItemsDTO() []*dto.OrderItemDTO {
 
 func (a *Address) ToAddressDTO() *dto.AddressDTO {
 	return &dto.AddressDTO{
-		AddressLine1: a.Street,
+		AddressLine1: a.Street1,
+		AddressLine2: a.Street2,
 		City:         a.City,
 		State:        a.State,
 		PostalCode:   a.PostalCode,

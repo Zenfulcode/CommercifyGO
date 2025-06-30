@@ -319,7 +319,8 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 	}
 
 	address := entity.Address{
-		Street:     request.AddressLine1,
+		Street1:    request.AddressLine1,
+		Street2:    request.AddressLine2,
 		City:       request.City,
 		State:      request.State,
 		PostalCode: request.PostalCode,
@@ -370,7 +371,8 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 
 	// Convert DTO to address entity
 	address := entity.Address{
-		Street:     request.AddressLine1,
+		Street1:    request.AddressLine1,
+		Street2:    request.AddressLine2,
 		City:       request.City,
 		State:      request.State,
 		PostalCode: request.PostalCode,
