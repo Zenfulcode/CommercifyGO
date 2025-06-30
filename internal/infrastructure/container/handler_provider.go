@@ -14,6 +14,7 @@ type HandlerProvider interface {
 	CheckoutHandler() *handler.CheckoutHandler
 	OrderHandler() *handler.OrderHandler
 	PaymentHandler() *handler.PaymentHandler
+	PaymentProviderHandler() *handler.PaymentProviderHandler
 	DiscountHandler() *handler.DiscountHandler
 	ShippingHandler() *handler.ShippingHandler
 	CurrencyHandler() *handler.CurrencyHandler
@@ -26,17 +27,18 @@ type handlerProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	userHandler      *handler.UserHandler
-	productHandler   *handler.ProductHandler
-	categoryHandler  *handler.CategoryHandler
-	checkoutHandler  *handler.CheckoutHandler
-	orderHandler     *handler.OrderHandler
-	paymentHandler   *handler.PaymentHandler
-	discountHandler  *handler.DiscountHandler
-	shippingHandler  *handler.ShippingHandler
-	currencyHandler  *handler.CurrencyHandler
-	healthHandler    *handler.HealthHandler
-	emailTestHandler *handler.EmailTestHandler
+	userHandler            *handler.UserHandler
+	productHandler         *handler.ProductHandler
+	categoryHandler        *handler.CategoryHandler
+	checkoutHandler        *handler.CheckoutHandler
+	orderHandler           *handler.OrderHandler
+	paymentHandler         *handler.PaymentHandler
+	paymentProviderHandler *handler.PaymentProviderHandler
+	discountHandler        *handler.DiscountHandler
+	shippingHandler        *handler.ShippingHandler
+	currencyHandler        *handler.CurrencyHandler
+	healthHandler          *handler.HealthHandler
+	emailTestHandler       *handler.EmailTestHandler
 }
 
 // NewHandlerProvider creates a new handler provider
@@ -116,6 +118,20 @@ func (p *handlerProvider) PaymentHandler() *handler.PaymentHandler {
 		)
 	}
 	return p.paymentHandler
+}
+
+// PaymentProviderHandler returns the payment provider handler
+func (p *handlerProvider) PaymentProviderHandler() *handler.PaymentProviderHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.paymentProviderHandler == nil {
+		p.paymentProviderHandler = handler.NewPaymentProviderHandler(
+			p.container.Services().PaymentProviderService(),
+			p.container.Logger(),
+		)
+	}
+	return p.paymentProviderHandler
 }
 
 // CheckoutHandler returns the checkout handler

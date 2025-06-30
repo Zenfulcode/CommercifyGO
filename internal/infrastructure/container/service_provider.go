@@ -87,6 +87,7 @@ func (p *serviceProvider) PaymentProviderService() service.PaymentProviderServic
 	if p.paymentProviderService == nil {
 		p.paymentProviderService = payment.NewPaymentProviderService(
 			p.container.Repositories().PaymentProviderRepository(),
+			p.container.Config(),
 			p.container.Logger(),
 		)
 	}

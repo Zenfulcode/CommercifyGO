@@ -15,13 +15,13 @@ type PaymentProvider struct {
 	Name                string                     `gorm:"not null;size:100" json:"name"`
 	Description         string                     `gorm:"size:500" json:"description"`
 	IconURL             string                     `gorm:"size:500" json:"icon_url,omitempty"`
-	Methods             []common.PaymentMethod     `gorm:"type:jsonb;not null" json:"methods"`
+	Methods             []common.PaymentMethod     `gorm:"type:json;serializer:json" json:"methods"`
 	Enabled             bool                       `gorm:"default:true" json:"enabled"`
-	SupportedCurrencies []string                   `gorm:"type:jsonb" json:"supported_currencies,omitempty"`
-	Configuration       map[string]any             `gorm:"type:jsonb" json:"configuration,omitempty"`
+	SupportedCurrencies []string                   `gorm:"type:json;serializer:json" json:"supported_currencies,omitempty"`
+	Configuration       common.JSONB               `gorm:"type:json;serializer:json" json:"configuration,omitempty"`
 	WebhookURL          string                     `gorm:"size:500" json:"webhook_url,omitempty"`
 	WebhookSecret       string                     `gorm:"size:255" json:"webhook_secret,omitempty"`
-	WebhookEvents       []string                   `gorm:"type:jsonb" json:"webhook_events,omitempty"`
+	WebhookEvents       []string                   `gorm:"type:json;serializer:json" json:"webhook_events,omitempty"`
 	ExternalWebhookID   string                     `gorm:"size:255" json:"external_webhook_id,omitempty"`
 	IsTestMode          bool                       `gorm:"default:false" json:"is_test_mode"`
 	Priority            int                        `gorm:"default:0" json:"priority"` // Higher priority means higher preference
@@ -110,8 +110,12 @@ func (p *PaymentProvider) SetWebhookEventsFromJSON(eventsJSON []byte) error {
 }
 
 // SetConfiguration sets the configuration for this provider
-func (p *PaymentProvider) SetConfiguration(config map[string]any) {
-	p.Configuration = config
+func (p *PaymentProvider) SetConfiguration(config common.JSONB) {
+	if config == nil {
+		p.Configuration = common.JSONB{}
+	} else {
+		p.Configuration = config
+	}
 }
 
 // GetConfigurationJSON returns the configuration as a JSON string

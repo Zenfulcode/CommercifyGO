@@ -3,6 +3,7 @@ package payment
 import (
 	"fmt"
 
+	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -13,13 +14,15 @@ import (
 // PaymentProviderServiceImpl implements service.PaymentProviderService
 type PaymentProviderServiceImpl struct {
 	repo   repository.PaymentProviderRepository
+	config *config.Config
 	logger logger.Logger
 }
 
 // NewPaymentProviderService creates a new PaymentProviderServiceImpl
-func NewPaymentProviderService(repo repository.PaymentProviderRepository, logger logger.Logger) service.PaymentProviderService {
+func NewPaymentProviderService(repo repository.PaymentProviderRepository, cfg *config.Config, logger logger.Logger) service.PaymentProviderService {
 	return &PaymentProviderServiceImpl{
 		repo:   repo,
+		config: cfg,
 		logger: logger,
 	}
 }
@@ -127,7 +130,7 @@ func (s *PaymentProviderServiceImpl) GetWebhookInfo(providerType common.PaymentP
 }
 
 // UpdateProviderConfiguration implements service.PaymentProviderService.
-func (s *PaymentProviderServiceImpl) UpdateProviderConfiguration(providerType common.PaymentProviderType, config map[string]any) error {
+func (s *PaymentProviderServiceImpl) UpdateProviderConfiguration(providerType common.PaymentProviderType, config common.JSONB) error {
 	if config == nil {
 		return fmt.Errorf("configuration cannot be nil")
 	}
@@ -205,11 +208,19 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			Name:        "Stripe",
 			Description: "Pay with credit or debit card",
 			Methods:     []common.PaymentMethod{common.PaymentMethodCreditCard},
-			Enabled:     false, // Disabled by default until configured
+			Enabled:     s.config.Stripe.Enabled,
 			SupportedCurrencies: []string{
 				"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "SEK", "NOK", "DKK",
 				"PLN", "CZK", "HUF", "BGN", "RON", "HRK", "ISK", "MXN", "BRL", "SGD",
 				"HKD", "INR", "MYR", "PHP", "THB", "TWD", "KRW", "NZD", "ILS", "ZAR",
+			},
+			Configuration: common.JSONB{
+				"SecretKey":          s.config.Stripe.SecretKey,
+				"PublicKey":          s.config.Stripe.PublicKey,
+				"WebhookSecret":      s.config.Stripe.WebhookSecret,
+				"PaymentDescription": s.config.Stripe.PaymentDescription,
+				"ReturnURL":          s.config.Stripe.ReturnURL,
+				"Enabled":            s.config.Stripe.Enabled,
 			},
 			Priority: 100,
 		},
@@ -218,18 +229,36 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			Name:                "MobilePay",
 			Description:         "Pay with MobilePay app",
 			Methods:             []common.PaymentMethod{common.PaymentMethodWallet},
-			Enabled:             false, // Disabled by default until configured
+			Enabled:             s.config.MobilePay.Enabled,
 			SupportedCurrencies: []string{"NOK", "DKK", "EUR"},
-			Priority:            90,
+			Configuration: common.JSONB{
+				"MerchantSerialNumber": s.config.MobilePay.MerchantSerialNumber,
+				"SubscriptionKey":      s.config.MobilePay.SubscriptionKey,
+				"ClientID":             s.config.MobilePay.ClientID,
+				"ClientSecret":         s.config.MobilePay.ClientSecret,
+				"ReturnURL":            s.config.MobilePay.ReturnURL,
+				"WebhookURL":           s.config.MobilePay.WebhookURL,
+				"PaymentDescription":   s.config.MobilePay.PaymentDescription,
+				"Market":               s.config.MobilePay.Market,
+				"Enabled":              s.config.MobilePay.Enabled,
+				"IsTestMode":           s.config.MobilePay.IsTestMode,
+			},
+			Priority: 90,
 		},
 		{
 			Type:                common.PaymentProviderMock,
 			Name:                "Test Payment",
 			Description:         "For testing purposes only",
 			Methods:             []common.PaymentMethod{common.PaymentMethodCreditCard},
-			Enabled:             true, // Enabled by default for testing
+			Enabled:             true, // Always enabled for testing
 			SupportedCurrencies: []string{"USD", "EUR", "GBP", "NOK", "DKK"},
-			Priority:            10,
+			Configuration: common.JSONB{
+				"Enabled":            true,
+				"IsTestMode":         true,
+				"PaymentDescription": "Test payment for development",
+				"AutoConfirm":        true,
+			},
+			Priority: 10,
 		},
 	}
 

@@ -89,7 +89,7 @@ func (h *PaymentProviderHandler) EnablePaymentProvider(w http.ResponseWriter, r 
 
 // UpdateConfigurationRequest represents a request to update provider configuration
 type UpdateConfigurationRequest struct {
-	Configuration map[string]any `json:"configuration"`
+	Configuration common.JSONB `json:"configuration"`
 }
 
 // UpdateProviderConfiguration handles updating a payment provider's configuration

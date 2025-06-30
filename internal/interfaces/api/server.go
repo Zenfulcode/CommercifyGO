@@ -70,6 +70,7 @@ func (s *Server) setupRoutes() {
 	checkoutHandler := s.container.Handlers().CheckoutHandler()
 	orderHandler := s.container.Handlers().OrderHandler()
 	paymentHandler := s.container.Handlers().PaymentHandler()
+	paymentProviderHandler := s.container.Handlers().PaymentProviderHandler()
 	discountHandler := s.container.Handlers().DiscountHandler()
 	shippingHandler := s.container.Handlers().ShippingHandler()
 	currencyHandler := s.container.Handlers().CurrencyHandler()
@@ -200,6 +201,15 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/payments/{paymentId}/cancel", paymentHandler.CancelPayment).Methods(http.MethodPost)
 	admin.HandleFunc("/payments/{paymentId}/refund", paymentHandler.RefundPayment).Methods(http.MethodPost)
 	admin.HandleFunc("/payments/{paymentId}/force-approve", paymentHandler.ForceApproveMobilePayPayment).Methods(http.MethodPost)
+
+	// Payment provider management routes (admin only)
+	admin.HandleFunc("/payment-providers", paymentProviderHandler.GetPaymentProviders).Methods(http.MethodGet)
+	admin.HandleFunc("/payment-providers/enabled", paymentProviderHandler.GetEnabledPaymentProviders).Methods(http.MethodGet)
+	admin.HandleFunc("/payment-providers/{providerType}/enable", paymentProviderHandler.EnablePaymentProvider).Methods(http.MethodPut)
+	admin.HandleFunc("/payment-providers/{providerType}/configuration", paymentProviderHandler.UpdateProviderConfiguration).Methods(http.MethodPut)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.RegisterWebhook).Methods(http.MethodPost)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.DeleteWebhook).Methods(http.MethodDelete)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.GetWebhookInfo).Methods(http.MethodGet)
 
 	admin.HandleFunc("/products", productHandler.ListProducts).Methods(http.MethodGet)
 	admin.HandleFunc("/products", productHandler.CreateProduct).Methods(http.MethodPost)
