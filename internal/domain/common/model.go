@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // JSONB represents a JSON field that can handle any JSON structure
@@ -30,4 +31,44 @@ func (a *JSONB) Scan(value any) error {
 	}
 
 	return json.Unmarshal(b, a)
+}
+
+// StringSlice is a custom type for handling JSON arrays in database
+type StringSlice []string
+
+// Scan implements the sql.Scanner interface
+func (s *StringSlice) Scan(value interface{}) error {
+	if value == nil {
+		*s = []string{}
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		if v == "" || v == "[]" {
+			*s = []string{}
+			return nil
+		}
+		return json.Unmarshal([]byte(v), s)
+	case []byte:
+		if len(v) == 0 || string(v) == "[]" {
+			*s = []string{}
+			return nil
+		}
+		return json.Unmarshal(v, s)
+	default:
+		return fmt.Errorf("cannot scan %T into StringSlice", value)
+	}
+}
+
+// Value implements the driver.Valuer interface
+func (s StringSlice) Value() (driver.Value, error) {
+	if len(s) == 0 {
+		return "[]", nil
+	}
+	jsonBytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(jsonBytes), nil
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 )
@@ -278,7 +279,7 @@ func (m *ProductRepository) copyProduct(product *entity.Product) *entity.Product
 
 	// Deep copy images slice
 	if product.Images != nil {
-		productCopy.Images = make(entity.StringSlice, len(product.Images))
+		productCopy.Images = make(common.StringSlice, len(product.Images))
 		copy(productCopy.Images, product.Images)
 	}
 

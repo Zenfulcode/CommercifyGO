@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/zenfulcode/commercify/config"
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/infrastructure/database"
 	"gorm.io/gorm"
@@ -452,7 +453,7 @@ func seedProducts(db *gorm.DB) error {
 			Currency:    prodData.currency,
 			CategoryID:  prodData.categoryID,
 			Active:      prodData.active,
-			Images:      entity.StringSlice(prodData.images),
+			Images:      common.StringSlice(prodData.images),
 		}
 
 		if err := db.Create(product).Error; err != nil {

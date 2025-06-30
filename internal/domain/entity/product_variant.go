@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"gorm.io/gorm"
@@ -38,15 +39,15 @@ func (va *VariantAttributes) Scan(value any) error {
 // ProductVariant represents a specific variant of a product
 type ProductVariant struct {
 	gorm.Model
-	ProductID  uint              `gorm:"index;not null"`
-	Product    Product           `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	SKU        string            `gorm:"uniqueIndex;size:100;not null"`
-	Stock      int               `gorm:"default:0"`
-	Attributes VariantAttributes `gorm:"type:jsonb;not null"`
-	Images     StringSlice       `gorm:"type:json;default:'[]'"`
-	IsDefault  bool              `gorm:"default:false"`
-	Weight     float64           `gorm:"default:0"`
-	Price      int64             `gorm:"not null"`
+	ProductID  uint               `gorm:"index;not null"`
+	Product    Product            `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	SKU        string             `gorm:"uniqueIndex;size:100;not null"`
+	Stock      int                `gorm:"default:0"`
+	Attributes VariantAttributes  `gorm:"type:jsonb;not null"`
+	Images     common.StringSlice `gorm:"type:json;default:'[]'"`
+	IsDefault  bool               `gorm:"default:false"`
+	Weight     float64            `gorm:"default:0"`
+	Price      int64              `gorm:"not null"`
 }
 
 // NewProductVariant creates a new product variant
@@ -72,7 +73,7 @@ func NewProductVariant(sku string, stock int, price int64, weight float64, attri
 		SKU:        sku,
 		Stock:      stock,
 		Attributes: attributes,
-		Images:     StringSlice(images),
+		Images:     common.StringSlice(images),
 		IsDefault:  isDefault,
 		Weight:     weight,
 		Price:      price,
@@ -99,7 +100,7 @@ func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float
 	}
 
 	if len(images) > 0 && !slices.Equal([]string(v.Images), images) {
-		v.Images = StringSlice(images)
+		v.Images = common.StringSlice(images)
 		updated = true
 	}
 	if len(attributes) > 0 {
