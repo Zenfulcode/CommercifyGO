@@ -2,162 +2,209 @@ package mock
 
 import (
 	"errors"
-	"time"
+	"fmt"
+	"sync"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 )
 
-// MockPaymentTransactionRepository implements a mock payment transaction repository for testing
-type MockPaymentTransactionRepository struct {
-	transactions    map[uint]*entity.PaymentTransaction
-	nextID          uint
-	byOrderID       map[uint][]*entity.PaymentTransaction
-	byTransactionID map[string]*entity.PaymentTransaction
+// PaymentTransactionRepository is a mock implementation of repository.PaymentTransactionRepository
+type PaymentTransactionRepository struct {
+	mu           sync.RWMutex
+	transactions map[uint]*entity.PaymentTransaction
+	nextID       uint
+	// Map transaction ID to entity for quick lookup
+	transactionIDMap map[string]*entity.PaymentTransaction
+	// For testing error scenarios
+	CreateError                          error
+	GetByIDError                         error
+	GetByTransactionIDError              error
+	GetByOrderIDError                    error
+	UpdateError                          error
+	DeleteError                          error
+	GetLatestByOrderIDAndTypeError       error
+	CountSuccessfulByOrderIDAndTypeError error
+	SumAmountByOrderIDAndTypeError       error
 }
 
-// NewMockPaymentTransactionRepository creates a new mock payment transaction repository
-func NewMockPaymentTransactionRepository() repository.PaymentTransactionRepository {
-	return &MockPaymentTransactionRepository{
-		transactions:    make(map[uint]*entity.PaymentTransaction),
-		byOrderID:       make(map[uint][]*entity.PaymentTransaction),
-		byTransactionID: make(map[string]*entity.PaymentTransaction),
-		nextID:          1,
+// NewPaymentTransactionRepository creates a new mock payment transaction repository
+func NewPaymentTransactionRepository() repository.PaymentTransactionRepository {
+	return &PaymentTransactionRepository{
+		transactions:     make(map[uint]*entity.PaymentTransaction),
+		transactionIDMap: make(map[string]*entity.PaymentTransaction),
+		nextID:           1,
 	}
 }
 
-// Create adds a new payment transaction
-func (m *MockPaymentTransactionRepository) Create(tx *entity.PaymentTransaction) error {
-	if tx == nil {
-		return errors.New("payment transaction cannot be nil")
+// Create creates a new payment transaction
+func (m *PaymentTransactionRepository) Create(transaction *entity.PaymentTransaction) error {
+	if m.CreateError != nil {
+		return m.CreateError
 	}
 
-	tx.ID = m.nextID
-	m.nextID++
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	// Store transaction in our maps for quick lookup
-	m.transactions[tx.ID] = tx
-
-	// Store by order ID
-	if _, ok := m.byOrderID[tx.OrderID]; !ok {
-		m.byOrderID[tx.OrderID] = make([]*entity.PaymentTransaction, 0)
+	// Check if transaction ID already exists
+	if _, exists := m.transactionIDMap[transaction.TransactionID]; exists {
+		return errors.New("transaction with this ID already exists")
 	}
-	m.byOrderID[tx.OrderID] = append(m.byOrderID[tx.OrderID], tx)
 
-	// Store by transaction ID
-	m.byTransactionID[tx.TransactionID] = tx
+	// Assign ID if not set
+	if transaction.ID == 0 {
+		transaction.ID = m.nextID
+		m.nextID++
+	}
+
+	// Create a copy to avoid external mutations
+	txnCopy := *transaction
+	m.transactions[txnCopy.ID] = &txnCopy
+	m.transactionIDMap[txnCopy.TransactionID] = &txnCopy
 
 	return nil
 }
 
 // GetByID retrieves a payment transaction by ID
-func (m *MockPaymentTransactionRepository) GetByID(id uint) (*entity.PaymentTransaction, error) {
-	tx, ok := m.transactions[id]
-	if !ok {
-		return nil, errors.New("payment transaction not found")
+func (m *PaymentTransactionRepository) GetByID(id uint) (*entity.PaymentTransaction, error) {
+	if m.GetByIDError != nil {
+		return nil, m.GetByIDError
 	}
-	return tx, nil
-}
 
-// GetByOrderID retrieves all payment transactions for an order
-func (m *MockPaymentTransactionRepository) GetByOrderID(orderID uint) ([]*entity.PaymentTransaction, error) {
-	transactions, ok := m.byOrderID[orderID]
-	if !ok {
-		return []*entity.PaymentTransaction{}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	transaction, exists := m.transactions[id]
+	if !exists {
+		return nil, fmt.Errorf("payment transaction with ID %d not found", id)
 	}
-	return transactions, nil
+
+	// Return a copy
+	txnCopy := *transaction
+	return &txnCopy, nil
 }
 
 // GetByTransactionID retrieves a payment transaction by external transaction ID
-func (m *MockPaymentTransactionRepository) GetByTransactionID(transactionID string) (*entity.PaymentTransaction, error) {
-	tx, ok := m.byTransactionID[transactionID]
-	if !ok {
-		return nil, errors.New("payment transaction not found")
+func (m *PaymentTransactionRepository) GetByTransactionID(transactionID string) (*entity.PaymentTransaction, error) {
+	if m.GetByTransactionIDError != nil {
+		return nil, m.GetByTransactionIDError
 	}
-	return tx, nil
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	transaction, exists := m.transactionIDMap[transactionID]
+	if !exists {
+		return nil, fmt.Errorf("payment transaction with transaction ID %s not found", transactionID)
+	}
+
+	// Return a copy
+	txnCopy := *transaction
+	return &txnCopy, nil
+}
+
+// GetByOrderID retrieves all payment transactions for an order
+func (m *PaymentTransactionRepository) GetByOrderID(orderID uint) ([]*entity.PaymentTransaction, error) {
+	if m.GetByOrderIDError != nil {
+		return nil, m.GetByOrderIDError
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []*entity.PaymentTransaction
+	for _, transaction := range m.transactions {
+		if transaction.OrderID == orderID {
+			txnCopy := *transaction
+			results = append(results, &txnCopy)
+		}
+	}
+
+	return results, nil
 }
 
 // Update updates a payment transaction
-func (m *MockPaymentTransactionRepository) Update(transaction *entity.PaymentTransaction) error {
-	if transaction == nil {
-		return errors.New("payment transaction cannot be nil")
+func (m *PaymentTransactionRepository) Update(transaction *entity.PaymentTransaction) error {
+	if m.UpdateError != nil {
+		return m.UpdateError
 	}
 
-	_, ok := m.transactions[transaction.ID]
-	if !ok {
-		return errors.New("payment transaction not found")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.transactions[transaction.ID]; !exists {
+		return fmt.Errorf("payment transaction with ID %d not found", transaction.ID)
 	}
 
-	transaction.UpdatedAt = time.Now()
-	m.transactions[transaction.ID] = transaction
-	m.byTransactionID[transaction.TransactionID] = transaction
+	// Update both maps
+	txnCopy := *transaction
+	m.transactions[txnCopy.ID] = &txnCopy
+	m.transactionIDMap[txnCopy.TransactionID] = &txnCopy
 
 	return nil
 }
 
 // Delete deletes a payment transaction
-func (m *MockPaymentTransactionRepository) Delete(id uint) error {
-	tx, ok := m.transactions[id]
-	if !ok {
-		return errors.New("payment transaction not found")
+func (m *PaymentTransactionRepository) Delete(id uint) error {
+	if m.DeleteError != nil {
+		return m.DeleteError
 	}
 
-	// Remove from all maps
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	transaction, exists := m.transactions[id]
+	if !exists {
+		return fmt.Errorf("payment transaction with ID %d not found", id)
+	}
+
 	delete(m.transactions, id)
-	delete(m.byTransactionID, tx.TransactionID)
-
-	// Remove from byOrderID map
-	if txs, ok := m.byOrderID[tx.OrderID]; ok {
-		updatedTxs := make([]*entity.PaymentTransaction, 0, len(txs)-1)
-		for _, t := range txs {
-			if t.ID != id {
-				updatedTxs = append(updatedTxs, t)
-			}
-		}
-		if len(updatedTxs) > 0 {
-			m.byOrderID[tx.OrderID] = updatedTxs
-		} else {
-			delete(m.byOrderID, tx.OrderID)
-		}
-	}
+	delete(m.transactionIDMap, transaction.TransactionID)
 
 	return nil
 }
 
 // GetLatestByOrderIDAndType retrieves the latest transaction of a specific type for an order
-func (m *MockPaymentTransactionRepository) GetLatestByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (*entity.PaymentTransaction, error) {
-	transactions, ok := m.byOrderID[orderID]
-	if !ok || len(transactions) == 0 {
-		return nil, nil
+func (m *PaymentTransactionRepository) GetLatestByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (*entity.PaymentTransaction, error) {
+	if m.GetLatestByOrderIDAndTypeError != nil {
+		return nil, m.GetLatestByOrderIDAndTypeError
 	}
 
-	var latestTx *entity.PaymentTransaction
-	var latestTime time.Time
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-	for _, tx := range transactions {
-		if tx.Type == transactionType && (latestTx == nil || tx.CreatedAt.After(latestTime)) {
-			latestTx = tx
-			latestTime = tx.CreatedAt
+	var latest *entity.PaymentTransaction
+	for _, transaction := range m.transactions {
+		if transaction.OrderID == orderID && transaction.Type == transactionType {
+			if latest == nil || transaction.ID > latest.ID {
+				latest = transaction
+			}
 		}
 	}
 
-	if latestTx == nil {
-		return nil, nil
+	if latest == nil {
+		return nil, fmt.Errorf("no payment transaction of type %s found for order %d", transactionType, orderID)
 	}
 
-	return latestTx, nil
+	// Return a copy
+	txnCopy := *latest
+	return &txnCopy, nil
 }
 
 // CountSuccessfulByOrderIDAndType counts successful transactions of a specific type for an order
-func (m *MockPaymentTransactionRepository) CountSuccessfulByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (int, error) {
-	transactions, ok := m.byOrderID[orderID]
-	if !ok {
-		return 0, nil
+func (m *PaymentTransactionRepository) CountSuccessfulByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (int, error) {
+	if m.CountSuccessfulByOrderIDAndTypeError != nil {
+		return 0, m.CountSuccessfulByOrderIDAndTypeError
 	}
 
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	count := 0
-	for _, tx := range transactions {
-		if tx.Type == transactionType && tx.Status == entity.TransactionStatusSuccessful {
+	for _, transaction := range m.transactions {
+		if transaction.OrderID == orderID &&
+			transaction.Type == transactionType &&
+			transaction.Status == entity.TransactionStatusSuccessful {
 			count++
 		}
 	}
@@ -166,28 +213,87 @@ func (m *MockPaymentTransactionRepository) CountSuccessfulByOrderIDAndType(order
 }
 
 // SumAmountByOrderIDAndType sums the amount of transactions of a specific type for an order
-func (m *MockPaymentTransactionRepository) SumAmountByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (int64, error) {
-	transactions, ok := m.byOrderID[orderID]
-	if !ok {
-		return 0, nil
+func (m *PaymentTransactionRepository) SumAmountByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (int64, error) {
+	if m.SumAmountByOrderIDAndTypeError != nil {
+		return 0, m.SumAmountByOrderIDAndTypeError
 	}
 
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	var total int64
-	for _, tx := range transactions {
-		if tx.Type == transactionType && tx.Status == entity.TransactionStatusSuccessful {
-			total += tx.Amount
+	for _, transaction := range m.transactions {
+		if transaction.OrderID == orderID &&
+			transaction.Type == transactionType &&
+			transaction.Status == entity.TransactionStatusSuccessful {
+			total += transaction.Amount
 		}
 	}
 
 	return total, nil
 }
 
-// IsEmpty checks if the repository has any transactions
-func (m *MockPaymentTransactionRepository) IsEmpty() bool {
-	return len(m.transactions) == 0
+// Helper methods for testing
+
+// SetCreateError sets an error to be returned by Create
+func (m *PaymentTransactionRepository) SetCreateError(err error) {
+	m.CreateError = err
 }
 
-// Count returns the total number of transactions in the repository
-func (m *MockPaymentTransactionRepository) Count() int {
-	return len(m.transactions)
+// SetGetByIDError sets an error to be returned by GetByID
+func (m *PaymentTransactionRepository) SetGetByIDError(err error) {
+	m.GetByIDError = err
+}
+
+// SetGetByTransactionIDError sets an error to be returned by GetByTransactionID
+func (m *PaymentTransactionRepository) SetGetByTransactionIDError(err error) {
+	m.GetByTransactionIDError = err
+}
+
+// SetGetByOrderIDError sets an error to be returned by GetByOrderID
+func (m *PaymentTransactionRepository) SetGetByOrderIDError(err error) {
+	m.GetByOrderIDError = err
+}
+
+// SetUpdateError sets an error to be returned by Update
+func (m *PaymentTransactionRepository) SetUpdateError(err error) {
+	m.UpdateError = err
+}
+
+// SetDeleteError sets an error to be returned by Delete
+func (m *PaymentTransactionRepository) SetDeleteError(err error) {
+	m.DeleteError = err
+}
+
+// Reset clears all data and errors
+func (m *PaymentTransactionRepository) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.transactions = make(map[uint]*entity.PaymentTransaction)
+	m.transactionIDMap = make(map[string]*entity.PaymentTransaction)
+	m.nextID = 1
+	m.CreateError = nil
+	m.GetByIDError = nil
+	m.GetByTransactionIDError = nil
+	m.GetByOrderIDError = nil
+	m.UpdateError = nil
+	m.DeleteError = nil
+	m.GetLatestByOrderIDAndTypeError = nil
+	m.CountSuccessfulByOrderIDAndTypeError = nil
+	m.SumAmountByOrderIDAndTypeError = nil
+}
+
+// GetAllTransactions returns all transactions (for testing purposes)
+func (m *PaymentTransactionRepository) GetAllTransactions() []*entity.PaymentTransaction {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []*entity.PaymentTransaction
+	for _, transaction := range m.transactions {
+		txnCopy := *transaction
+		results = append(results, &txnCopy)
+	}
+
+	return results
 }
