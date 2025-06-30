@@ -65,10 +65,6 @@ func TestShippingRateDTOConversions(t *testing.T) {
 	})
 
 	t.Run("ToShippingOptionDTO", func(t *testing.T) {
-		// Note: This test is currently skipped because ToShippingOptionDTO has nil pointer issues
-		// that need to be fixed in the entity implementation first.
-		t.Skip("ToShippingOptionDTO has nil pointer dereference issues when accessing ShippingMethod")
-
 		shippingOption := &ShippingOption{
 			ShippingRateID:        1,
 			ShippingMethodID:      1,

@@ -582,16 +582,40 @@ func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
 	shippingAddr := c.GetShippingAddress()
 	billingAddr := c.GetBillingAddress()
 
+	// Convert addresses - use empty DTO if address is empty
+	var shippingAddressDTO dto.AddressDTO
+	if shippingAddr.Street1 != "" || shippingAddr.City != "" || shippingAddr.Country != "" {
+		shippingAddressDTO = *shippingAddr.ToAddressDTO()
+	}
+
+	var billingAddressDTO dto.AddressDTO
+	if billingAddr.Street1 != "" || billingAddr.City != "" || billingAddr.Country != "" {
+		billingAddressDTO = *billingAddr.ToAddressDTO()
+	}
+
+	// Convert customer details - use empty DTO if customer details is empty
+	var customerDetailsDTO dto.CustomerDetailsDTO
+	if c.CustomerDetails.Email != "" || c.CustomerDetails.FullName != "" {
+		customerDetailsDTO = *c.CustomerDetails.ToCustomerDetailsDTO()
+	}
+
+	// Convert items
+	var itemDTOs []dto.CheckoutItemDTO
+	for _, item := range c.Items {
+		itemDTOs = append(itemDTOs, item.ToCheckoutItemDTO())
+	}
+
 	return &dto.CheckoutDTO{
 		ID:               c.ID,
 		SessionID:        c.SessionID,
 		UserID:           userID,
 		Status:           string(c.Status),
-		ShippingAddress:  *shippingAddr.ToAddressDTO(),
-		BillingAddress:   *billingAddr.ToAddressDTO(),
+		Items:            itemDTOs,
+		ShippingAddress:  shippingAddressDTO,
+		BillingAddress:   billingAddressDTO,
 		ShippingMethodID: shippingMethodID,
 		ShippingOption:   shippingOption,
-		CustomerDetails:  *c.CustomerDetails.ToCustomerDetailsDTO(),
+		CustomerDetails:  customerDetailsDTO,
 		PaymentProvider:  c.PaymentProvider,
 		TotalAmount:      money.FromCents(c.TotalAmount),
 		ShippingCost:     money.FromCents(c.ShippingCost),
@@ -750,4 +774,23 @@ func (c *Checkout) SetBillingAddressJSON(address *Address) {
 
 	jsonStr := string(jsonData)
 	c.BillingAddressJSON = &jsonStr
+}
+
+// ToCheckoutItemDTO converts CheckoutItem to DTO
+func (c *CheckoutItem) ToCheckoutItemDTO() dto.CheckoutItemDTO {
+	return dto.CheckoutItemDTO{
+		ID:          c.ID,
+		ProductID:   c.ProductID,
+		VariantID:   c.ProductVariantID,
+		ProductName: c.ProductName,
+		VariantName: c.VariantName,
+		ImageURL:    c.ImageURL,
+		SKU:         c.SKU,
+		Price:       money.FromCents(c.Price),
+		Quantity:    c.Quantity,
+		Weight:      c.Weight,
+		Subtotal:    money.FromCents(c.Price * int64(c.Quantity)),
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+	}
 }

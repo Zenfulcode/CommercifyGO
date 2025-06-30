@@ -327,10 +327,6 @@ func TestCheckoutStatus(t *testing.T) {
 
 func TestCheckoutDTOConversions(t *testing.T) {
 	t.Run("ToCheckoutDTO", func(t *testing.T) {
-		// Note: This test is currently skipped because ToCheckoutDTO has nil pointer issues
-		// that need to be fixed in the entity implementation first.
-		t.Skip("ToCheckoutDTO has nil pointer dereference issues when ShippingOption and ShippingMethod are nil")
-
 		checkout, err := NewCheckout("session123", "USD")
 		require.NoError(t, err)
 

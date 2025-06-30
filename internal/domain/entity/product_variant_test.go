@@ -32,7 +32,7 @@ func TestProductVariant(t *testing.T) {
 		assert.Equal(t, int64(9999), variant.Price)
 		assert.Equal(t, 1.5, variant.Weight)
 		assert.Equal(t, attributes, variant.Attributes)
-		assert.Equal(t, images, variant.Images)
+		assert.Equal(t, images, []string(variant.Images))
 		assert.True(t, variant.IsDefault)
 	})
 
@@ -142,7 +142,7 @@ func TestProductVariant(t *testing.T) {
 		assert.Equal(t, 20, variant.Stock)
 		assert.Equal(t, int64(19999), variant.Price)
 		assert.Equal(t, 2.5, variant.Weight)
-		assert.Equal(t, []string{"new-image.jpg"}, variant.Images)
+		assert.Equal(t, []string{"new-image.jpg"}, []string(variant.Images))
 		assert.Equal(t, VariantAttributes{"color": "blue"}, variant.Attributes)
 	})
 

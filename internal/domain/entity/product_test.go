@@ -30,7 +30,7 @@ func TestProduct(t *testing.T) {
 		assert.Equal(t, "A test product description", product.Description)
 		assert.Equal(t, "USD", product.Currency)
 		assert.Equal(t, uint(1), product.CategoryID)
-		assert.Equal(t, images, product.Images)
+		assert.Equal(t, images, []string(product.Images))
 		assert.True(t, product.Active)
 		assert.NotNil(t, product.Variants)
 		assert.Len(t, product.Variants, 1) // One variant was provided in constructor
@@ -398,7 +398,7 @@ func TestProduct(t *testing.T) {
 		assert.True(t, updated)
 		assert.Equal(t, "Updated Product", product.Name)
 		assert.Equal(t, "Updated Description", product.Description)
-		assert.Equal(t, []string{"new-image1.jpg", "new-image2.jpg"}, product.Images)
+		assert.Equal(t, []string{"new-image1.jpg", "new-image2.jpg"}, []string(product.Images))
 		assert.False(t, product.Active)
 
 		// Test no update (same values)

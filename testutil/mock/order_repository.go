@@ -211,7 +211,8 @@ func (m *OrderRepository) IsDiscountIdUsed(discountID uint) (bool, error) {
 	defer m.mu.RUnlock()
 
 	for _, order := range m.orders {
-		if order.AppliedDiscount != nil && order.AppliedDiscount.DiscountID == discountID {
+		appliedDiscount := order.GetAppliedDiscount()
+		if appliedDiscount != nil && appliedDiscount.DiscountID == discountID {
 			return true, nil
 		}
 	}

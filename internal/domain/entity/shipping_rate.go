@@ -165,6 +165,8 @@ func (r *ShippingRate) Deactivate() {
 
 func (s *ShippingOption) ToShippingOptionDTO() *dto.ShippingOptionDTO {
 	return &dto.ShippingOptionDTO{
+		ShippingRateID:        s.ShippingRateID,
+		ShippingMethodID:      s.ShippingMethodID,
 		Name:                  s.Name,
 		Description:           s.Description,
 		EstimatedDeliveryDays: s.EstimatedDeliveryDays,
