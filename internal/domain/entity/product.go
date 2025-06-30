@@ -39,13 +39,17 @@ func NewProduct(name, description, currency string, categoryID uint, images []st
 		return nil, errors.New("at least one variant must be provided")
 	}
 
+	// Copy variants to ensure product has its own slice
+	productVariants := make([]*ProductVariant, len(variants))
+	copy(productVariants, variants)
+
 	return &Product{
 		Name:        name,
 		Description: description,
 		Currency:    currency,
 		CategoryID:  categoryID,
 		Images:      images,
-		Variants:    make([]*ProductVariant, 0, len(variants)),
+		Variants:    productVariants,
 		Active:      isActive,
 	}, nil
 }
