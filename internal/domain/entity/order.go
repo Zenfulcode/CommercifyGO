@@ -451,14 +451,24 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 	}
 }
 func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
+	var discountDetails *dto.AppliedDiscountDTO
+	if o.AppliedDiscount != nil {
+		discountDetails = o.AppliedDiscount.ToAppliedDiscountDTO()
+	}
+
+	var shippingDetails *dto.ShippingOptionDTO
+	if o.ShippingOption != nil {
+		shippingDetails = o.ShippingOption.ToShippingOptionDTO()
+	}
+
 	return &dto.OrderDTO{
 		ID:              o.ID,
 		OrderNumber:     o.OrderNumber,
 		UserID:          o.UserID,
 		CheckoutID:      o.CheckoutSessionID,
 		CustomerDetails: o.CustomerDetails.ToCustomerDetailsDTO(),
-		ShippingDetails: o.ShippingOption.ToShippingOptionDTO(),
-		DiscountDetails: o.AppliedDiscount.ToAppliedDiscountDTO(),
+		ShippingDetails: shippingDetails,
+		DiscountDetails: discountDetails,
 		Status:          dto.OrderStatus(o.Status),
 		PaymentStatus:   dto.PaymentStatus(o.PaymentStatus),
 		Currency:        o.Currency,

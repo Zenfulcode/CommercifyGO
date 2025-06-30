@@ -208,7 +208,7 @@ func TestCheckout(t *testing.T) {
 		checkout.MarkAsCompleted(123)
 		assert.Equal(t, CheckoutStatusCompleted, checkout.Status)
 		assert.NotNil(t, checkout.CompletedAt)
-		assert.Equal(t, uint(123), checkout.ConvertedOrderID)
+		assert.Equal(t, uint(123), *checkout.ConvertedOrderID)
 	})
 
 	t.Run("MarkAsAbandoned", func(t *testing.T) {

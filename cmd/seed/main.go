@@ -1188,6 +1188,11 @@ func seedCheckouts(db *gorm.DB) error {
 		return fmt.Errorf("failed to fetch users: %w", err)
 	}
 
+	if len(users) == 0 {
+		fmt.Println("No users found - skipping checkout seeding")
+		return nil
+	}
+
 	// Get some product variants for checkout items
 	var variants []struct {
 		ID        uint
@@ -1325,14 +1330,14 @@ func seedCheckouts(db *gorm.DB) error {
 
 		// Set additional fields
 		if checkoutData.userID > 0 {
-			checkout.UserID = checkoutData.userID
+			checkout.UserID = &checkoutData.userID
 		}
+		// For guest checkouts, UserID remains nil
 		checkout.Status = checkoutData.status
 		checkout.CreatedAt = checkoutData.createdAt
 		checkout.UpdatedAt = checkoutData.createdAt
 		checkout.LastActivityAt = checkoutData.lastActivityAt
 		checkout.ExpiresAt = checkoutData.expiresAt
-		// Don't set ConvertedOrderID for new checkouts
 
 		if err := db.Create(checkout).Error; err != nil {
 			return fmt.Errorf("failed to save checkout %s: %w", checkoutData.sessionID, err)

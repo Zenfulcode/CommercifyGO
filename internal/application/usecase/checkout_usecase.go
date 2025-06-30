@@ -593,7 +593,7 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("customer details are required")
 	}
 
-	if checkout.ShippingMethodID == 0 {
+	if checkout.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required")
 	}
 
@@ -615,8 +615,8 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 	}
 
 	// Increment discount usage if a discount was applied
-	if checkout.AppliedDiscount != nil {
-		discount, err := uc.discountRepo.GetByID(checkout.AppliedDiscount.DiscountID)
+	if appliedDiscount := checkout.GetAppliedDiscount(); appliedDiscount != nil {
+		discount, err := uc.discountRepo.GetByID(appliedDiscount.DiscountID)
 		if err == nil {
 			discount.IncrementUsage()
 			uc.discountRepo.Update(discount)

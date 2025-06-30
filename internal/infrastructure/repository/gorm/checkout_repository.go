@@ -26,7 +26,7 @@ func (c *CheckoutRepository) ConvertGuestCheckoutToUserCheckout(sessionID string
 	}
 
 	// Update the checkout to assign it to the user
-	checkout.UserID = userID
+	checkout.UserID = &userID
 	checkout.LastActivityAt = time.Now()
 
 	err = c.db.Save(&checkout).Error
@@ -52,7 +52,7 @@ func (c *CheckoutRepository) GetActiveCheckoutsByUserID(userID uint) ([]*entity.
 	var checkouts []*entity.Checkout
 
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("user_id = ? AND status = ?", userID, entity.CheckoutStatusActive).
 		Order("created_at DESC").
 		Find(&checkouts).Error
@@ -67,7 +67,7 @@ func (c *CheckoutRepository) GetActiveCheckoutsByUserID(userID uint) ([]*entity.
 func (c *CheckoutRepository) GetByID(checkoutID uint) (*entity.Checkout, error) {
 	var checkout entity.Checkout
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").Preload("ConvertedOrder").
+		Preload("User").Preload("ConvertedOrder").
 		First(&checkout, checkoutID).Error
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (c *CheckoutRepository) GetByID(checkoutID uint) (*entity.Checkout, error) 
 func (c *CheckoutRepository) GetBySessionID(sessionID string) (*entity.Checkout, error) {
 	var checkout entity.Checkout
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("session_id = ? AND status = ?", sessionID, entity.CheckoutStatusActive).
 		First(&checkout).Error
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *CheckoutRepository) GetBySessionID(sessionID string) (*entity.Checkout,
 func (c *CheckoutRepository) GetByUserID(userID uint) (*entity.Checkout, error) {
 	var checkout entity.Checkout
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("user_id = ? AND status = ?", userID, entity.CheckoutStatusActive).
 		First(&checkout).Error
 	if err != nil {
@@ -106,7 +106,7 @@ func (c *CheckoutRepository) GetCheckoutsByStatus(status entity.CheckoutStatus, 
 	var checkouts []*entity.Checkout
 
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("status = ?", status).
 		Offset(offset).Limit(limit).
 		Order("created_at DESC").
@@ -162,7 +162,7 @@ func (c *CheckoutRepository) GetCompletedCheckoutsByUserID(userID uint, offset i
 	var checkouts []*entity.Checkout
 
 	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").Preload("ConvertedOrder").
+		Preload("User").Preload("ConvertedOrder").
 		Where("user_id = ? AND status = ?", userID, entity.CheckoutStatusCompleted).
 		Offset(offset).Limit(limit).
 		Order("completed_at DESC").

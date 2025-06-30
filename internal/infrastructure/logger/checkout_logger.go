@@ -68,8 +68,10 @@ func (l *CheckoutLogger) Close() error {
 // Log logs a checkout event
 func (l *CheckoutLogger) Log(eventType CheckoutEventType, checkout *entity.Checkout, additionalInfo string) error {
 	timestamp := time.Now().Format(time.RFC3339)
-	userIdentifier := fmt.Sprintf("user:%d", checkout.UserID)
-	if checkout.UserID == 0 {
+	var userIdentifier string
+	if checkout.UserID != nil {
+		userIdentifier = fmt.Sprintf("user:%d", *checkout.UserID)
+	} else {
 		userIdentifier = fmt.Sprintf("session:%s", checkout.SessionID)
 	}
 
