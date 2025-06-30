@@ -79,6 +79,19 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentAuthorized(event *models.Webho
 
 	h.logger.Info("Processing authorized MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
+	// Get the order to access payment details
+	order, err := h.orderUseCase.GetOrderByID(orderID)
+	if err != nil {
+		h.logger.Error("Failed to get order %d for payment transaction recording: %v", orderID, err)
+		return err
+	}
+
+	// Record the authorization transaction
+	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, order.FinalAmount, order.Currency, "mobilepay", event); err != nil {
+		h.logger.Error("Failed to record authorization transaction for order %d: %v", orderID, err)
+		// Don't fail the webhook processing if transaction recording fails
+	}
+
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
 		OrderID:       orderID,
 		PaymentStatus: entity.PaymentStatusAuthorized,
@@ -96,6 +109,25 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCaptured(event *models.Webhook
 	}
 
 	h.logger.Info("Processing captured MobilePay payment for order %d, transaction %s", orderID, event.Reference)
+
+	// Get the order to access payment details
+	order, err := h.orderUseCase.GetOrderByID(orderID)
+	if err != nil {
+		h.logger.Error("Failed to get order %d for payment transaction recording: %v", orderID, err)
+		return err
+	}
+
+	// Record the capture transaction
+	// Use the amount from the webhook event if available, otherwise use order amount
+	captureAmount := order.FinalAmount
+	if event.Amount.Value > 0 {
+		captureAmount = int64(event.Amount.Value)
+	}
+
+	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, captureAmount, order.Currency, "mobilepay", event); err != nil {
+		h.logger.Error("Failed to record capture transaction for order %d: %v", orderID, err)
+		// Don't fail the webhook processing if transaction recording fails
+	}
 
 	// Update order payment status to captured
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
@@ -116,6 +148,19 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCancelled(event *models.Webhoo
 
 	h.logger.Info("Processing cancelled MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
+	// Get the order to access payment details
+	order, err := h.orderUseCase.GetOrderByID(orderID)
+	if err != nil {
+		h.logger.Error("Failed to get order %d for payment transaction recording: %v", orderID, err)
+		return err
+	}
+
+	// Record the cancellation transaction
+	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeCancel, entity.TransactionStatusSuccessful, 0, order.Currency, "mobilepay", event); err != nil {
+		h.logger.Error("Failed to record cancellation transaction for order %d: %v", orderID, err)
+		// Don't fail the webhook processing if transaction recording fails
+	}
+
 	// Update order payment status to cancelled
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
 		OrderID:       orderID,
@@ -135,6 +180,19 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentExpired(event *models.WebhookE
 
 	h.logger.Info("Processing expired MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
+	// Get the order to access payment details
+	order, err := h.orderUseCase.GetOrderByID(orderID)
+	if err != nil {
+		h.logger.Error("Failed to get order %d for payment transaction recording: %v", orderID, err)
+		return err
+	}
+
+	// Record the expiration as a failed transaction
+	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeAuthorize, entity.TransactionStatusFailed, 0, order.Currency, "mobilepay", event); err != nil {
+		h.logger.Error("Failed to record expiration transaction for order %d: %v", orderID, err)
+		// Don't fail the webhook processing if transaction recording fails
+	}
+
 	// Update order payment status to failed
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
 		OrderID:       orderID,
@@ -153,6 +211,25 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentRefunded(event *models.Webhook
 	}
 
 	h.logger.Info("Processing refunded MobilePay payment for order %d, transaction %s", orderID, event.Reference)
+
+	// Get the order to access payment details
+	order, err := h.orderUseCase.GetOrderByID(orderID)
+	if err != nil {
+		h.logger.Error("Failed to get order %d for payment transaction recording: %v", orderID, err)
+		return err
+	}
+
+	// Record the refund transaction
+	// Use the amount from the webhook event if available, otherwise use order amount
+	refundAmount := order.FinalAmount
+	if event.Amount.Value > 0 {
+		refundAmount = int64(event.Amount.Value)
+	}
+
+	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeRefund, entity.TransactionStatusSuccessful, refundAmount, order.Currency, "mobilepay", event); err != nil {
+		h.logger.Error("Failed to record refund transaction for order %d: %v", orderID, err)
+		// Don't fail the webhook processing if transaction recording fails
+	}
 
 	// Update order payment status to refunded
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
@@ -198,4 +275,49 @@ func getWebhookSecretFromDatabase(paymentProviderService service.PaymentProvider
 
 	logger.Warn("MobilePay webhook secret not found in provider configuration")
 	return ""
+}
+
+// recordPaymentTransaction creates and saves a payment transaction record
+func (h *MobilePayWebhookHandler) recordPaymentTransaction(orderID uint, transactionID string, txnType entity.TransactionType, status entity.TransactionStatus, amount int64, currency, provider string, event *models.WebhookEvent) error {
+	// Create payment transaction
+	txn, err := entity.NewPaymentTransaction(
+		orderID,
+		transactionID,
+		txnType,
+		status,
+		amount,
+		currency,
+		provider,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create payment transaction: %w", err)
+	}
+
+	// Add webhook event data as raw response
+	if event != nil {
+		eventData := map[string]interface{}{
+			"event_name":    string(event.Name),
+			"reference":     event.Reference,
+			"psp_reference": event.PSPReference,
+			"timestamp":     event.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+			"success":       event.Success,
+			"msn":           event.MSN,
+		}
+
+		// Convert to JSON string for storage
+		eventJSON := fmt.Sprintf("%+v", eventData)
+		txn.SetRawResponse(eventJSON)
+
+		// Add metadata
+		txn.AddMetadata("webhook_event_name", string(event.Name))
+		txn.AddMetadata("webhook_psp_reference", event.PSPReference)
+		txn.AddMetadata("webhook_timestamp", event.Timestamp.Format("2006-01-02T15:04:05Z07:00"))
+		txn.AddMetadata("webhook_success", fmt.Sprintf("%t", event.Success))
+		if event.IdempotencyKey != "" {
+			txn.AddMetadata("idempotency_key", event.IdempotencyKey)
+		}
+	}
+
+	// Save the transaction using the usecase
+	return h.orderUseCase.RecordPaymentTransaction(txn)
 }
