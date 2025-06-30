@@ -368,4 +368,44 @@ func TestDiscount(t *testing.T) {
 		assert.Equal(t, 2, discount.CurrentUsage)
 	})
 
+	t.Run("ToDiscountDTO", func(t *testing.T) {
+		startDate := time.Now()
+		endDate := startDate.Add(30 * 24 * time.Hour)
+
+		discount, err := NewDiscount(
+			"SUMMER2025",
+			DiscountTypeBasket,
+			DiscountMethodPercentage,
+			15.0,
+			5000,  // 50.00 dollars in cents
+			10000, // 100.00 dollars in cents
+			[]uint{1, 2},
+			[]uint{3, 4},
+			startDate,
+			endDate,
+			500,
+		)
+		require.NoError(t, err)
+
+		// Mock ID that would be set by GORM
+		discount.ID = 1
+		discount.CurrentUsage = 25
+
+		dto := discount.ToDiscountDTO()
+		assert.Equal(t, uint(1), dto.ID)
+		assert.Equal(t, "SUMMER2025", dto.Code)
+		assert.Equal(t, string(DiscountTypeBasket), dto.Type)
+		assert.Equal(t, string(DiscountMethodPercentage), dto.Method)
+		assert.Equal(t, 15.0, dto.Value)
+		assert.Equal(t, 50.0, dto.MinOrderValue)     // FromCents(5000) = 50.0
+		assert.Equal(t, 100.0, dto.MaxDiscountValue) // FromCents(10000) = 100.0
+		assert.Equal(t, []uint{1, 2}, dto.ProductIDs)
+		assert.Equal(t, []uint{3, 4}, dto.CategoryIDs)
+		assert.Equal(t, startDate, dto.StartDate)
+		assert.Equal(t, endDate, dto.EndDate)
+		assert.Equal(t, 500, dto.UsageLimit)
+		assert.Equal(t, 25, dto.CurrentUsage)
+		assert.True(t, dto.Active)
+	})
+
 }

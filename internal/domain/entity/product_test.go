@@ -411,4 +411,75 @@ func TestProduct(t *testing.T) {
 		assert.False(t, updated)
 		assert.Equal(t, "Updated Product", product.Name) // unchanged
 	})
+
+	t.Run("ToProductDTO", func(t *testing.T) {
+		variant, err := NewProductVariant("SKU-001", 10, 9999, 1.5, nil, nil, true)
+		require.NoError(t, err)
+
+		product, err := NewProduct(
+			"Test Product",
+			"A test product description",
+			"USD",
+			1,
+			[]string{"image1.jpg", "image2.jpg"},
+			[]*ProductVariant{variant},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Mock ID that would be set by GORM
+		product.ID = 1
+		product.CategoryID = 2
+
+		dto := product.ToProductDTO()
+		assert.Equal(t, uint(1), dto.ID)
+		assert.Equal(t, "Test Product", dto.Name)
+		assert.Equal(t, "A test product description", dto.Description)
+		assert.Equal(t, "USD", dto.Currency)
+		assert.Equal(t, uint(2), dto.CategoryID)
+		assert.Equal(t, []string{"image1.jpg", "image2.jpg"}, dto.Images)
+		assert.True(t, dto.Active)
+		assert.Equal(t, float64(99.99), dto.Price) // Default variant price converted from cents to dollars
+		assert.Equal(t, 10, dto.TotalStock)        // Total stock across all variants
+		assert.NotEmpty(t, dto.Variants)
+		assert.Len(t, dto.Variants, 1)
+		assert.Equal(t, "SKU-001", dto.Variants[0].SKU)
+	})
+
+	t.Run("ToProductDTO_MultipleVariants", func(t *testing.T) {
+		// Test with multiple variants to verify TotalStock calculation
+		variant1, err := NewProductVariant("SKU-001", 10, 9999, 1.5, nil, nil, true) // default variant
+		require.NoError(t, err)
+
+		variant2, err := NewProductVariant("SKU-002", 15, 12999, 2.0, nil, nil, false)
+		require.NoError(t, err)
+
+		product, err := NewProduct(
+			"Multi-Variant Product",
+			"A product with multiple variants",
+			"USD",
+			1,
+			[]string{"image1.jpg"},
+			[]*ProductVariant{variant1, variant2},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Mock ID that would be set by GORM
+		product.ID = 5
+		product.CategoryID = 3
+
+		dto := product.ToProductDTO()
+		assert.Equal(t, uint(5), dto.ID)
+		assert.Equal(t, "Multi-Variant Product", dto.Name)
+		assert.Equal(t, float64(99.99), dto.Price) // Price from default variant (variant1)
+		assert.Equal(t, 25, dto.TotalStock)        // 10 + 15 = 25 total stock
+		assert.True(t, dto.HasVariants)
+		assert.Len(t, dto.Variants, 2)
+
+		// Verify both variants are present
+		skus := []string{dto.Variants[0].SKU, dto.Variants[1].SKU}
+		assert.Contains(t, skus, "SKU-001")
+		assert.Contains(t, skus, "SKU-002")
+	})
 }

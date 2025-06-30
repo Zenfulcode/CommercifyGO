@@ -171,6 +171,66 @@ func TestProductVariant(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, updated)
 	})
+
+	t.Run("ToVariantDTO", func(t *testing.T) {
+		attributes := VariantAttributes{
+			"color": "red",
+			"size":  "large",
+		}
+
+		variant, err := NewProductVariant("SKU-001", 10, 9999, 1.5, attributes, nil, true)
+		require.NoError(t, err)
+
+		// Mock IDs that would be set by GORM
+		variant.ID = 1
+		variant.ProductID = 2
+
+		dto := variant.ToVariantDTO()
+		assert.Equal(t, uint(1), dto.ID)
+		assert.Equal(t, uint(2), dto.ProductID)
+		assert.Equal(t, "SKU-001", dto.SKU)
+		assert.Equal(t, 10, dto.Stock)
+		assert.Equal(t, float64(99.99), dto.Price) // Converted from cents to dollars
+		assert.Equal(t, 1.5, dto.Weight)
+		assert.True(t, dto.IsDefault)
+		assert.NotNil(t, dto.Attributes)
+		assert.Equal(t, "red", dto.Attributes["color"])
+		assert.Equal(t, "large", dto.Attributes["size"])
+		// VariantName is generated from attributes, check it contains both values
+		assert.Contains(t, dto.VariantName, "red")
+		assert.Contains(t, dto.VariantName, "large")
+		assert.Contains(t, dto.VariantName, " / ")
+	})
+
+	t.Run("ToVariantDTO_VariantName", func(t *testing.T) {
+		// Test that VariantName is properly generated from attributes
+		attributes := VariantAttributes{
+			"color": "blue",
+			"size":  "medium",
+		}
+
+		variant, err := NewProductVariant("SKU-002", 5, 1999, 0.8, attributes, nil, false)
+		require.NoError(t, err)
+
+		variant.ID = 10
+		variant.ProductID = 20
+
+		dto := variant.ToVariantDTO()
+
+		// VariantName should contain both attribute values separated by " / "
+		// Order may vary due to map iteration, so check both possibilities
+		expectedName1 := "blue / medium"
+		expectedName2 := "medium / blue"
+
+		actualName := dto.VariantName
+		isValidName := actualName == expectedName1 || actualName == expectedName2
+		assert.True(t, isValidName, "VariantName should be '%s' or '%s', got '%s'", expectedName1, expectedName2, actualName)
+
+		// Also verify it contains the expected components
+		assert.Contains(t, actualName, "blue")
+		assert.Contains(t, actualName, "medium")
+		assert.Contains(t, actualName, " / ")
+	})
 }
 
 func TestVariantAttributes(t *testing.T) {
