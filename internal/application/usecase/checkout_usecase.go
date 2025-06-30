@@ -75,7 +75,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New("customer details are required for payment processing")
 	}
 
-	if order.ShippingMethodID == 0 {
+	if order.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required for payment processing")
 	}
 
@@ -388,7 +388,8 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	// Validate shipping address is set
-	if checkout.ShippingAddr.Street1 == "" || checkout.ShippingAddr.Country == "" {
+	shippingAddr := checkout.GetShippingAddress()
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required to calculate shipping options")
 	}
 
@@ -404,7 +405,7 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	calculateOptionsInput := CalculateShippingOptionsInput{
-		Address:     checkout.ShippingAddr,
+		Address:     shippingAddr,
 		OrderValue:  checkout.TotalAmount,
 		OrderWeight: checkout.TotalWeight,
 	}
@@ -581,11 +582,14 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("checkout has no items")
 	}
 
-	if checkout.ShippingAddr.Street1 == "" || checkout.ShippingAddr.Country == "" {
+	shippingAddr := checkout.GetShippingAddress()
+	billingAddr := checkout.GetBillingAddress()
+
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required")
 	}
 
-	if checkout.BillingAddr.Street1 == "" || checkout.BillingAddr.Country == "" {
+	if billingAddr.Street1 == "" || billingAddr.Country == "" {
 		return nil, errors.New("billing address is required")
 	}
 

@@ -308,22 +308,6 @@ func (s *MobilePayPaymentService) RegisterWebhook(provider *entity.PaymentProvid
 		return fmt.Errorf("failed to get existing webhooks: %w", err)
 	}
 
-	// Check if there's already a webhook for our URL
-	for _, existingWebhook := range existingWebhooks {
-		if existingWebhook.URL == webhookURL {
-			s.logger.Info("Found existing webhook for URL %s (ID: %s), reusing it", webhookURL, existingWebhook.ID)
-
-			// Update provider with existing webhook information
-			provider.WebhookURL = webhookURL
-			provider.WebhookSecret = existingWebhook.Secret
-			provider.WebhookEvents = existingWebhook.Events
-			provider.ExternalWebhookID = existingWebhook.ID
-
-			s.logger.Info("Successfully reused existing MobilePay webhook with ID: %s", existingWebhook.ID)
-			return nil
-		}
-	}
-
 	// Remove any existing webhooks for different URLs to ensure clean state
 	for _, webhook := range existingWebhooks {
 		if err := s.webhookClient.Delete(webhook.ID); err != nil {

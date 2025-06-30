@@ -32,8 +32,8 @@ type Checkout struct {
 	SessionID           string          `gorm:"uniqueIndex;not null;size:255"`
 	Items               []CheckoutItem  `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	Status              CheckoutStatus  `gorm:"not null;size:50;default:'active'"`
-	ShippingAddr        Address         `gorm:"embedded;embeddedPrefix:shipping_"`
-	BillingAddr         Address         `gorm:"embedded;embeddedPrefix:billing_"`
+	ShippingAddressJSON *string         `gorm:"column:shipping_address_json;type:text"`
+	BillingAddressJSON  *string         `gorm:"column:billing_address_json;type:text"`
 	ShippingOptionJSON  *string         `gorm:"column:shipping_option_json;type:text"`
 	PaymentProvider     string          `gorm:"size:100"`
 	TotalAmount         int64           `gorm:"default:0"`
@@ -213,14 +213,14 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 
 // SetShippingAddress sets the shipping address for the checkout
 func (c *Checkout) SetShippingAddress(address Address) {
-	c.ShippingAddr = address
+	c.SetShippingAddressJSON(&address)
 
 	c.LastActivityAt = time.Now()
 }
 
 // SetBillingAddress sets the billing address for the checkout
 func (c *Checkout) SetBillingAddress(address Address) {
-	c.BillingAddr = address
+	c.SetBillingAddressJSON(&address)
 
 	c.LastActivityAt = time.Now()
 }
@@ -324,6 +324,9 @@ func (c *Checkout) Clear() {
 	c.DiscountAmount = 0
 	c.FinalAmount = 0
 	c.SetAppliedDiscountJSON(nil)
+	c.SetShippingAddressJSON(nil)
+	c.SetBillingAddressJSON(nil)
+	c.SetShippingOptionJSON(nil)
 
 	c.LastActivityAt = time.Now()
 }
@@ -382,10 +385,11 @@ func (c *Checkout) HasCustomerInfo() bool {
 
 // HasShippingInfo returns true if the checkout has shipping address information
 func (c *Checkout) HasShippingInfo() bool {
-	return c.ShippingAddr.Street1 != "" ||
-		c.ShippingAddr.City != "" ||
-		c.ShippingAddr.PostalCode != "" ||
-		c.ShippingAddr.Country != ""
+	shippingAddr := c.GetShippingAddress()
+	return shippingAddr.Street1 != "" ||
+		shippingAddr.City != "" ||
+		shippingAddr.PostalCode != "" ||
+		shippingAddr.Country != ""
 }
 
 // HasCustomerOrShippingInfo returns true if the checkout has either customer or shipping information
@@ -481,11 +485,6 @@ func (c *Checkout) ToOrder() *Order {
 	}
 
 	// Create the order
-	var shippingMethodID uint
-	if storedOption := c.GetShippingOption(); storedOption != nil {
-		shippingMethodID = storedOption.ShippingMethodID
-	}
-
 	// Create ShippingOption from JSON if available
 	var shippingOption *ShippingOption
 	if storedOption := c.GetShippingOption(); storedOption != nil {
@@ -509,16 +508,25 @@ func (c *Checkout) ToOrder() *Order {
 		FinalAmount:       c.FinalAmount,
 		Status:            OrderStatusPending,
 		PaymentStatus:     PaymentStatusPending, // Initialize payment status
-		ShippingAddr:      c.ShippingAddr,
-		BillingAddr:       c.BillingAddr,
 		CustomerDetails:   &c.CustomerDetails,
-		ShippingMethodID:  shippingMethodID,
-		ShippingOption:    shippingOption,
 		PaymentProvider:   c.PaymentProvider,
 		IsGuestOrder:      isGuestOrder,
 		PaymentMethod:     "wallet", // Default payment method
-		AppliedDiscount:   appliedDiscount,
 		CheckoutSessionID: c.SessionID,
+	}
+
+	// Set addresses using JSON helper methods
+	shippingAddr := c.GetShippingAddress()
+	billingAddr := c.GetBillingAddress()
+	order.SetShippingAddressJSON(&shippingAddr)
+	order.SetBillingAddressJSON(&billingAddr)
+
+	// Set shipping option and applied discount using JSON helper methods
+	if shippingOption != nil {
+		order.SetShippingOptionJSON(shippingOption)
+	}
+	if appliedDiscount != nil {
+		order.SetAppliedDiscountJSON(appliedDiscount)
 	}
 
 	// Generate a friendly order number (will be replaced with actual ID after creation)
@@ -571,13 +579,16 @@ func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
 		}
 	}
 
+	shippingAddr := c.GetShippingAddress()
+	billingAddr := c.GetBillingAddress()
+
 	return &dto.CheckoutDTO{
 		ID:               c.ID,
 		SessionID:        c.SessionID,
 		UserID:           userID,
 		Status:           string(c.Status),
-		ShippingAddress:  *c.ShippingAddr.ToAddressDTO(),
-		BillingAddress:   *c.BillingAddr.ToAddressDTO(),
+		ShippingAddress:  *shippingAddr.ToAddressDTO(),
+		BillingAddress:   *billingAddr.ToAddressDTO(),
 		ShippingMethodID: shippingMethodID,
 		ShippingOption:   shippingOption,
 		CustomerDetails:  *c.CustomerDetails.ToCustomerDetailsDTO(),
@@ -679,4 +690,64 @@ func (c *Checkout) SetAppliedDiscountJSON(discount *AppliedDiscount) error {
 	jsonStr := string(data)
 	c.AppliedDiscountJSON = &jsonStr
 	return nil
+}
+
+// GetShippingAddress returns the shipping address from JSON
+func (c *Checkout) GetShippingAddress() Address {
+	if c.ShippingAddressJSON == nil || *c.ShippingAddressJSON == "" {
+		return Address{}
+	}
+
+	var address Address
+	if err := json.Unmarshal([]byte(*c.ShippingAddressJSON), &address); err != nil {
+		return Address{}
+	}
+	return address
+}
+
+// SetShippingAddressJSON sets the shipping address as JSON
+func (c *Checkout) SetShippingAddressJSON(address *Address) {
+	if address == nil {
+		c.ShippingAddressJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(address)
+	if err != nil {
+		c.ShippingAddressJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	c.ShippingAddressJSON = &jsonStr
+}
+
+// GetBillingAddress returns the billing address from JSON
+func (c *Checkout) GetBillingAddress() Address {
+	if c.BillingAddressJSON == nil || *c.BillingAddressJSON == "" {
+		return Address{}
+	}
+
+	var address Address
+	if err := json.Unmarshal([]byte(*c.BillingAddressJSON), &address); err != nil {
+		return Address{}
+	}
+	return address
+}
+
+// SetBillingAddressJSON sets the billing address as JSON
+func (c *Checkout) SetBillingAddressJSON(address *Address) {
+	if address == nil {
+		c.BillingAddressJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(address)
+	if err != nil {
+		c.BillingAddressJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	c.BillingAddressJSON = &jsonStr
 }

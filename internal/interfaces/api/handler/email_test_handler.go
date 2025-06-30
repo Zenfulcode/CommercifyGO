@@ -56,22 +56,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		FinalAmount:       8300, // $83.00 final amount (99.50 + 8.50 - 15.00)
 		Currency:          "USD",
 		CheckoutSessionID: "test-checkout-session-12345", // Add checkout session ID for testing
-		ShippingAddr: entity.Address{
-			Street1:    "123 Test Street",
-			Street2:    "street 2",
-			City:       "Test City",
-			State:      "Test State",
-			PostalCode: "12345",
-			Country:    "US",
-		},
-		BillingAddr: entity.Address{
-			Street1:    "123 Test Street",
-			Street2:    "",
-			City:       "Test City",
-			State:      "Test State",
-			PostalCode: "12345",
-			Country:    "US",
-		},
 		CustomerDetails: &entity.CustomerDetails{
 			Email:    mockUser.Email,
 			Phone:    "+1234567890",
@@ -80,11 +64,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		IsGuestOrder:    false,
 		PaymentProvider: "stripe",
 		PaymentMethod:   "card",
-		AppliedDiscount: &entity.AppliedDiscount{
-			DiscountID:     1,
-			DiscountCode:   "SUMMER25",
-			DiscountAmount: 1500, // $15.00 discount
-		},
 		Items: []entity.OrderItem{
 			{
 				ProductID:   1,
@@ -139,6 +118,35 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.logger.Info("Order notification email sent successfully")
 	}
+
+	// Set addresses using JSON helper methods
+	shippingAddr := entity.Address{
+		Street1:    "123 Test Street",
+		Street2:    "street 2",
+		City:       "Test City",
+		State:      "Test State",
+		PostalCode: "12345",
+		Country:    "US",
+	}
+	billingAddr := entity.Address{
+		Street1:    "123 Test Street",
+		Street2:    "",
+		City:       "Test City",
+		State:      "Test State",
+		PostalCode: "12345",
+		Country:    "US",
+	}
+
+	mockOrder.SetShippingAddressJSON(&shippingAddr)
+	mockOrder.SetBillingAddressJSON(&billingAddr)
+
+	// Set applied discount using JSON helper method
+	appliedDiscount := &entity.AppliedDiscount{
+		DiscountID:     1,
+		DiscountCode:   "SUMMER25",
+		DiscountAmount: 1500, // $15.00 discount
+	}
+	mockOrder.SetAppliedDiscountJSON(appliedDiscount)
 
 	w.Header().Set("Content-Type", "application/json")
 

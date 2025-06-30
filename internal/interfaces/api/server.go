@@ -89,6 +89,9 @@ func (s *Server) setupRoutes() {
 	api := s.router.PathPrefix("/api").Subrouter()
 	api.Use(corsMiddleware.ApplyCors)
 
+	// Webhook routes (separate subrouter without CORS middleware for server-to-server communication)
+	webhooks := s.router.PathPrefix("/api/webhooks").Subrouter()
+
 	// Public routes
 	api.HandleFunc("/auth/register", userHandler.Register).Methods(http.MethodPost)
 	api.HandleFunc("/auth/signin", userHandler.Login).Methods(http.MethodPost)
@@ -100,9 +103,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/categories/{id:[0-9]+}/children", categoryHandler.GetChildCategories).Methods(http.MethodGet)
 	api.HandleFunc("/payment/providers", paymentHandler.GetAvailablePaymentProviders).Methods(http.MethodGet)
 
-	// Webhook routes (public, no authentication required)
-	api.HandleFunc("/webhooks/stripe", webhookHandlers.StripeHandler().HandleWebhook).Methods(http.MethodPost)
-	api.HandleFunc("/webhooks/mobilepay", webhookHandlers.MobilePayHandler().HandleWebhook).Methods(http.MethodPost)
+	// Webhook routes (public, no authentication or CORS required for server-to-server communication)
+	webhooks.HandleFunc("/stripe", webhookHandlers.StripeHandler().HandleWebhook).Methods(http.MethodPost)
+	webhooks.HandleFunc("/mobilepay", webhookHandlers.MobilePayHandler().HandleWebhook).Methods(http.MethodPost)
 
 	// Public discount routes
 	api.HandleFunc("/discounts/validate", discountHandler.ValidateDiscountCode).Methods(http.MethodPost)

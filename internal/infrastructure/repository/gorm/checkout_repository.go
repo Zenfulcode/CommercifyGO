@@ -124,8 +124,9 @@ func (c *CheckoutRepository) GetCheckoutsToAbandon() ([]*entity.Checkout, error)
 	abandonThreshold := time.Now().Add(-15 * time.Minute)
 
 	// Find active checkouts with customer/shipping info that haven't been active for 15 minutes
+	// Check if there's any customer details or shipping address data (JSON fields are not empty/null)
 	err := c.db.Preload("Items").
-		Where("status = ? AND last_activity_at < ? AND (customer_email != '' OR customer_phone != '' OR customer_full_name != '' OR shipping_street1 != '')",
+		Where("status = ? AND last_activity_at < ? AND (customer_email != '' OR customer_phone != '' OR customer_full_name != '' OR shipping_address_json IS NOT NULL)",
 			entity.CheckoutStatusActive, abandonThreshold).
 		Find(&checkouts).Error
 	if err != nil {
@@ -145,7 +146,7 @@ func (c *CheckoutRepository) GetCheckoutsToDelete() ([]*entity.Checkout, error) 
 	abandonedThreshold := now.Add(-7 * 24 * time.Hour)
 
 	err := c.db.Where(
-		"(customer_email = '' AND customer_phone = '' AND customer_full_name = '' AND shipping_street1 = '' AND last_activity_at < ?) OR "+
+		"(customer_email = '' AND customer_phone = '' AND customer_full_name = '' AND shipping_address_json IS NULL AND last_activity_at < ?) OR "+
 			"(status = ? AND updated_at < ?) OR "+
 			"status = ?",
 		emptyThreshold, entity.CheckoutStatusAbandoned, abandonedThreshold, entity.CheckoutStatusExpired).

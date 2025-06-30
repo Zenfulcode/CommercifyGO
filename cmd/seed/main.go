@@ -439,7 +439,111 @@ func seedProducts(db *gorm.DB) error {
 		})
 	}
 
-	for _, prodData := range products {
+	// Add DKK products for MobilePay testing
+	dkkProducts := []struct {
+		name        string
+		description string
+		currency    string
+		categoryID  uint
+		images      []string
+		active      bool
+		variants    []struct {
+			sku        string
+			stock      int
+			price      int64 // Price in øre (DKK cents)
+			weight     float64
+			attributes map[string]string
+			images     []string
+			isDefault  bool
+		}
+	}{
+		{
+			name:        "Danish Design T-Shirt",
+			description: "Stylish Danish design t-shirt made from organic cotton",
+			currency:    "DKK",
+			categoryID:  clothingCategoryID,
+			images:      []string{"danish_tshirt1.jpg", "danish_tshirt2.jpg"},
+			active:      true,
+			variants: []struct {
+				sku        string
+				stock      int
+				price      int64
+				weight     float64
+				attributes map[string]string
+				images     []string
+				isDefault  bool
+			}{
+				{"DK-TSHIRT-M", 30, 14900, 0.2, map[string]string{"Color": "Navy", "Size": "M", "Origin": "Denmark"}, []string{}, true},    // 149 DKK
+				{"DK-TSHIRT-L", 25, 14900, 0.2, map[string]string{"Color": "Navy", "Size": "L", "Origin": "Denmark"}, []string{}, false},   // 149 DKK
+				{"DK-TSHIRT-XL", 20, 14900, 0.2, map[string]string{"Color": "Navy", "Size": "XL", "Origin": "Denmark"}, []string{}, false}, // 149 DKK
+			},
+		},
+		{
+			name:        "Copenhagen Hoodie",
+			description: "Premium hoodie with Copenhagen city design",
+			currency:    "DKK",
+			categoryID:  clothingCategoryID,
+			images:      []string{"cph_hoodie1.jpg", "cph_hoodie2.jpg"},
+			active:      true,
+			variants: []struct {
+				sku        string
+				stock      int
+				price      int64
+				weight     float64
+				attributes map[string]string
+				images     []string
+				isDefault  bool
+			}{
+				{"CPH-HOODIE-M", 15, 39900, 0.6, map[string]string{"Color": "Gray", "Size": "M", "Design": "Copenhagen"}, []string{}, true},  // 399 DKK
+				{"CPH-HOODIE-L", 12, 39900, 0.6, map[string]string{"Color": "Gray", "Size": "L", "Design": "Copenhagen"}, []string{}, false}, // 399 DKK
+			},
+		},
+	}
+
+	// Add DKK electronics if category exists
+	if electronicsCategoryID > 0 {
+		dkkProducts = append(dkkProducts, struct {
+			name        string
+			description string
+			currency    string
+			categoryID  uint
+			images      []string
+			active      bool
+			variants    []struct {
+				sku        string
+				stock      int
+				price      int64
+				weight     float64
+				attributes map[string]string
+				images     []string
+				isDefault  bool
+			}
+		}{
+			name:        "Danish Audio Speakers",
+			description: "High-quality Danish audio speakers with premium sound",
+			currency:    "DKK",
+			categoryID:  electronicsCategoryID,
+			images:      []string{"dk_speakers1.jpg", "dk_speakers2.jpg"},
+			active:      true,
+			variants: []struct {
+				sku        string
+				stock      int
+				price      int64
+				weight     float64
+				attributes map[string]string
+				images     []string
+				isDefault  bool
+			}{
+				{"DK-SPEAKERS-BLK", 8, 149900, 2.5, map[string]string{"Color": "Black", "Brand": "Danish Audio", "Type": "Bluetooth"}, []string{}, true},  // 1499 DKK
+				{"DK-SPEAKERS-WHT", 5, 149900, 2.5, map[string]string{"Color": "White", "Brand": "Danish Audio", "Type": "Bluetooth"}, []string{}, false}, // 1499 DKK
+			},
+		})
+	}
+
+	// Combine USD and DKK products
+	allProducts := append(products, dkkProducts...)
+
+	for _, prodData := range allProducts {
 		// Check if product already exists
 		var existingProduct struct{ ID uint }
 		if err := db.Table("products").Select("id").Where("name = ?", prodData.name).First(&existingProduct).Error; err == nil {
@@ -753,8 +857,6 @@ func seedOrders(db *gorm.DB) error {
 			FinalAmount:   orderData.totalAmount, // Same as total for simplicity
 			Status:        orderData.status,
 			PaymentStatus: orderData.paymentStatus,
-			ShippingAddr:  orderData.shippingAddr,
-			BillingAddr:   orderData.billingAddr,
 			IsGuestOrder:  orderData.userID == 0,
 		}
 
@@ -762,6 +864,10 @@ func seedOrders(db *gorm.DB) error {
 			order.UserID = orderData.userID
 		}
 		// For guest orders (userID = 0), UserID will remain 0
+
+		// Set addresses using JSON helper methods
+		order.SetShippingAddressJSON(&orderData.shippingAddr)
+		order.SetBillingAddressJSON(&orderData.billingAddr)
 
 		// Set the creation time
 		order.CreatedAt = orderData.createdAt
@@ -1195,13 +1301,19 @@ func seedCheckouts(db *gorm.DB) error {
 
 	// Get some product variants for checkout items
 	var variants []struct {
-		ID        uint
-		ProductID uint
-		SKU       string
-		Price     int64
-		Weight    float64
+		ID          uint
+		ProductID   uint
+		SKU         string
+		Price       int64
+		Weight      float64
+		ProductName string
 	}
-	if err := db.Table("product_variants").Select("id, product_id, sku, price, weight").Limit(3).Find(&variants).Error; err != nil {
+	if err := db.Raw(`
+		SELECT pv.id, pv.product_id, pv.sku, pv.price, pv.weight, p.name as product_name
+		FROM product_variants pv 
+		JOIN products p ON p.id = pv.product_id 
+		LIMIT 5
+	`).Scan(&variants).Error; err != nil {
 		return fmt.Errorf("failed to fetch product variants: %w", err)
 	}
 
@@ -1210,8 +1322,424 @@ func seedCheckouts(db *gorm.DB) error {
 		return nil
 	}
 
+	// Get shipping methods
+	var shippingMethods []struct {
+		ID   uint
+		Name string
+	}
+	if err := db.Table("shipping_methods").Select("id, name").Find(&shippingMethods).Error; err != nil {
+		return fmt.Errorf("failed to fetch shipping methods: %w", err)
+	}
+
+	// Get shipping rates
+	var shippingRates []struct {
+		ID               uint
+		ShippingMethodID uint
+		BaseRate         int64
+	}
+	if err := db.Table("shipping_rates").Select("id, shipping_method_id, base_rate").Find(&shippingRates).Error; err != nil {
+		return fmt.Errorf("failed to fetch shipping rates: %w", err)
+	}
+
+	// Get discounts
+	var discounts []struct {
+		ID     uint
+		Code   string
+		Value  float64
+		Method string
+	}
+	if err := db.Table("discounts").Select("id, code, value, method").Where("active = ?", true).Find(&discounts).Error; err != nil {
+		return fmt.Errorf("failed to fetch discounts: %w", err)
+	}
+
 	now := time.Now()
-	checkouts := []struct {
+
+	// Create comprehensive checkout with all features
+	comprehensiveCheckout := struct {
+		sessionID       string
+		userID          uint
+		currency        string
+		status          entity.CheckoutStatus
+		shippingAddress entity.Address
+		billingAddress  entity.Address
+		customerDetails entity.CustomerDetails
+		items           []struct {
+			productID   uint
+			variantID   uint
+			quantity    int
+			price       int64
+			weight      float64
+			productName string
+			variantName string
+			sku         string
+		}
+		shippingOption  *entity.ShippingOption
+		appliedDiscount *entity.AppliedDiscount
+		createdAt       time.Time
+		lastActivityAt  time.Time
+		expiresAt       time.Time
+	}{
+		sessionID: "sess_comprehensive_001",
+		userID:    users[0].ID,
+		currency:  "USD",
+		status:    entity.CheckoutStatusActive,
+		shippingAddress: entity.Address{
+			Street1:    "123 Commerce Street",
+			Street2:    "Suite 456",
+			City:       "Copenhagen",
+			State:      "Capital Region",
+			PostalCode: "2100",
+			Country:    "Denmark",
+		},
+		billingAddress: entity.Address{
+			Street1:    "789 Business Avenue",
+			Street2:    "Floor 3",
+			City:       "Aarhus",
+			State:      "Central Denmark",
+			PostalCode: "8000",
+			Country:    "Denmark",
+		},
+		customerDetails: entity.CustomerDetails{
+			Email:    "customer@example.com",
+			Phone:    "+45 12 34 56 78",
+			FullName: "John Doe Nielsen",
+		},
+		items: []struct {
+			productID   uint
+			variantID   uint
+			quantity    int
+			price       int64
+			weight      float64
+			productName string
+			variantName string
+			sku         string
+		}{
+			{
+				productID:   variants[0].ProductID,
+				variantID:   variants[0].ID,
+				quantity:    2,
+				price:       variants[0].Price,
+				weight:      variants[0].Weight,
+				productName: variants[0].ProductName,
+				variantName: "Medium",
+				sku:         variants[0].SKU,
+			},
+			{
+				productID:   variants[1].ProductID,
+				variantID:   variants[1].ID,
+				quantity:    1,
+				price:       variants[1].Price,
+				weight:      variants[1].Weight,
+				productName: variants[1].ProductName,
+				variantName: "Large",
+				sku:         variants[1].SKU,
+			},
+			{
+				productID:   variants[2].ProductID,
+				variantID:   variants[2].ID,
+				quantity:    3,
+				price:       variants[2].Price,
+				weight:      variants[2].Weight,
+				productName: variants[2].ProductName,
+				variantName: "One Size",
+				sku:         variants[2].SKU,
+			},
+		},
+		createdAt:      now.Add(-2 * time.Hour),
+		lastActivityAt: now.Add(-30 * time.Minute),
+		expiresAt:      now.Add(22 * time.Hour),
+	}
+
+	// Add shipping option if shipping methods exist
+	if len(shippingMethods) > 0 && len(shippingRates) > 0 {
+		comprehensiveCheckout.shippingOption = &entity.ShippingOption{
+			ShippingRateID:        shippingRates[0].ID,
+			ShippingMethodID:      shippingMethods[0].ID,
+			Name:                  shippingMethods[0].Name,
+			Description:           "Standard shipping with tracking",
+			EstimatedDeliveryDays: 3,
+			Cost:                  shippingRates[0].BaseRate,
+			FreeShipping:          false,
+		}
+	}
+
+	// Add discount if discounts exist
+	if len(discounts) > 0 {
+		comprehensiveCheckout.appliedDiscount = &entity.AppliedDiscount{
+			DiscountID:     discounts[0].ID,
+			DiscountCode:   discounts[0].Code,
+			DiscountAmount: 500, // $5.00 discount
+		}
+	}
+
+	// Check if comprehensive checkout already exists
+	var existingCheckout struct{ ID uint }
+	if err := db.Table("checkouts").Select("id").Where("session_id = ?", comprehensiveCheckout.sessionID).First(&existingCheckout).Error; err != nil {
+		// Create comprehensive checkout
+		checkout, err := entity.NewCheckout(comprehensiveCheckout.sessionID, comprehensiveCheckout.currency)
+		if err != nil {
+			return fmt.Errorf("failed to create comprehensive checkout: %w", err)
+		}
+
+		// Set user and basic fields
+		checkout.UserID = &comprehensiveCheckout.userID
+		checkout.Status = comprehensiveCheckout.status
+		checkout.CustomerDetails = comprehensiveCheckout.customerDetails
+		checkout.CreatedAt = comprehensiveCheckout.createdAt
+		checkout.UpdatedAt = comprehensiveCheckout.createdAt
+		checkout.LastActivityAt = comprehensiveCheckout.lastActivityAt
+		checkout.ExpiresAt = comprehensiveCheckout.expiresAt
+
+		// Set addresses using JSON methods
+		checkout.SetShippingAddressJSON(&comprehensiveCheckout.shippingAddress)
+		checkout.SetBillingAddressJSON(&comprehensiveCheckout.billingAddress)
+
+		// Set shipping option if available
+		if comprehensiveCheckout.shippingOption != nil {
+			checkout.SetShippingOptionJSON(comprehensiveCheckout.shippingOption)
+			checkout.ShippingCost = comprehensiveCheckout.shippingOption.Cost
+		}
+
+		// Set applied discount if available
+		if comprehensiveCheckout.appliedDiscount != nil {
+			checkout.SetAppliedDiscountJSON(comprehensiveCheckout.appliedDiscount)
+			checkout.DiscountCode = comprehensiveCheckout.appliedDiscount.DiscountCode
+			checkout.DiscountAmount = comprehensiveCheckout.appliedDiscount.DiscountAmount
+		}
+
+		// Calculate totals
+		var totalAmount int64
+		var totalWeight float64
+		for _, item := range comprehensiveCheckout.items {
+			totalAmount += int64(item.quantity) * item.price
+			totalWeight += float64(item.quantity) * item.weight
+		}
+
+		checkout.TotalAmount = totalAmount
+		checkout.TotalWeight = totalWeight
+
+		// Calculate final amount (total + shipping - discount)
+		finalAmount := totalAmount
+		if comprehensiveCheckout.shippingOption != nil {
+			finalAmount += comprehensiveCheckout.shippingOption.Cost
+		}
+		if comprehensiveCheckout.appliedDiscount != nil {
+			finalAmount -= comprehensiveCheckout.appliedDiscount.DiscountAmount
+		}
+		if finalAmount < 0 {
+			finalAmount = 0
+		}
+		checkout.FinalAmount = finalAmount
+
+		// Save checkout
+		if err := db.Create(checkout).Error; err != nil {
+			return fmt.Errorf("failed to save comprehensive checkout: %w", err)
+		}
+
+		// Create checkout items
+		for _, itemData := range comprehensiveCheckout.items {
+			checkoutItem := &entity.CheckoutItem{
+				CheckoutID:       checkout.ID,
+				ProductID:        itemData.productID,
+				ProductVariantID: itemData.variantID,
+				Quantity:         itemData.quantity,
+				Price:            itemData.price,
+				Weight:           itemData.weight,
+				ProductName:      itemData.productName,
+				VariantName:      itemData.variantName,
+				SKU:              itemData.sku,
+			}
+
+			if err := db.Create(checkoutItem).Error; err != nil {
+				return fmt.Errorf("failed to save checkout item for comprehensive checkout: %w", err)
+			}
+		}
+
+		fmt.Printf("Created comprehensive checkout with ID %d\n", checkout.ID)
+	} else {
+		fmt.Println("Comprehensive checkout already exists")
+	}
+
+	// Create DKK checkout for MobilePay testing
+	// Get DKK product variants
+	var dkkVariants []struct {
+		ID          uint
+		ProductID   uint
+		SKU         string
+		Price       int64
+		Weight      float64
+		ProductName string
+	}
+	if err := db.Raw(`
+		SELECT pv.id, pv.product_id, pv.sku, pv.price, pv.weight, p.name as product_name
+		FROM product_variants pv 
+		JOIN products p ON p.id = pv.product_id 
+		WHERE p.currency = 'DKK'
+		LIMIT 3
+	`).Scan(&dkkVariants).Error; err == nil && len(dkkVariants) > 0 {
+
+		dkkCheckout := struct {
+			sessionID       string
+			userID          uint
+			currency        string
+			status          entity.CheckoutStatus
+			shippingAddress entity.Address
+			billingAddress  entity.Address
+			customerDetails entity.CustomerDetails
+			items           []struct {
+				productID   uint
+				variantID   uint
+				quantity    int
+				price       int64
+				weight      float64
+				productName string
+				variantName string
+				sku         string
+			}
+			createdAt      time.Time
+			lastActivityAt time.Time
+			expiresAt      time.Time
+		}{
+			sessionID: "sess_dkk_mobilepay_001",
+			userID:    users[0].ID,
+			currency:  "DKK",
+			status:    entity.CheckoutStatusActive,
+			shippingAddress: entity.Address{
+				Street1:    "Strøget 15",
+				Street2:    "",
+				City:       "København K",
+				State:      "Capital Region",
+				PostalCode: "1001",
+				Country:    "Denmark",
+			},
+			billingAddress: entity.Address{
+				Street1:    "Strøget 15",
+				Street2:    "",
+				City:       "København K",
+				State:      "Capital Region",
+				PostalCode: "1001",
+				Country:    "Denmark",
+			},
+			customerDetails: entity.CustomerDetails{
+				Email:    "mobilepay.test@example.dk",
+				Phone:    "+45 12 34 56 78",
+				FullName: "Lars Nielsen",
+			},
+			items: []struct {
+				productID   uint
+				variantID   uint
+				quantity    int
+				price       int64
+				weight      float64
+				productName string
+				variantName string
+				sku         string
+			}{
+				{
+					productID:   dkkVariants[0].ProductID,
+					variantID:   dkkVariants[0].ID,
+					quantity:    1,
+					price:       dkkVariants[0].Price,
+					weight:      dkkVariants[0].Weight,
+					productName: dkkVariants[0].ProductName,
+					variantName: "M",
+					sku:         dkkVariants[0].SKU,
+				},
+			},
+			createdAt:      now.Add(-1 * time.Hour),
+			lastActivityAt: now.Add(-5 * time.Minute),
+			expiresAt:      now.Add(23 * time.Hour),
+		}
+
+		// Add second item if available
+		if len(dkkVariants) > 1 {
+			dkkCheckout.items = append(dkkCheckout.items, struct {
+				productID   uint
+				variantID   uint
+				quantity    int
+				price       int64
+				weight      float64
+				productName string
+				variantName string
+				sku         string
+			}{
+				productID:   dkkVariants[1].ProductID,
+				variantID:   dkkVariants[1].ID,
+				quantity:    1,
+				price:       dkkVariants[1].Price,
+				weight:      dkkVariants[1].Weight,
+				productName: dkkVariants[1].ProductName,
+				variantName: "M",
+				sku:         dkkVariants[1].SKU,
+			})
+		}
+
+		// Check if DKK checkout already exists
+		var existingDKKCheckout struct{ ID uint }
+		if err := db.Table("checkouts").Select("id").Where("session_id = ?", dkkCheckout.sessionID).First(&existingDKKCheckout).Error; err != nil {
+			// Create DKK checkout
+			checkout, err := entity.NewCheckout(dkkCheckout.sessionID, dkkCheckout.currency)
+			if err != nil {
+				return fmt.Errorf("failed to create DKK checkout: %w", err)
+			}
+
+			// Set user and basic fields
+			checkout.UserID = &dkkCheckout.userID
+			checkout.Status = dkkCheckout.status
+			checkout.CustomerDetails = dkkCheckout.customerDetails
+			checkout.CreatedAt = dkkCheckout.createdAt
+			checkout.UpdatedAt = dkkCheckout.createdAt
+			checkout.LastActivityAt = dkkCheckout.lastActivityAt
+			checkout.ExpiresAt = dkkCheckout.expiresAt
+
+			// Set addresses using JSON methods
+			checkout.SetShippingAddressJSON(&dkkCheckout.shippingAddress)
+			checkout.SetBillingAddressJSON(&dkkCheckout.billingAddress)
+
+			// Calculate totals
+			var totalAmount int64
+			var totalWeight float64
+			for _, item := range dkkCheckout.items {
+				totalAmount += int64(item.quantity) * item.price
+				totalWeight += float64(item.quantity) * item.weight
+			}
+
+			checkout.TotalAmount = totalAmount
+			checkout.TotalWeight = totalWeight
+			checkout.FinalAmount = totalAmount
+
+			// Save checkout
+			if err := db.Create(checkout).Error; err != nil {
+				return fmt.Errorf("failed to save DKK checkout: %w", err)
+			}
+
+			// Create checkout items
+			for _, itemData := range dkkCheckout.items {
+				checkoutItem := &entity.CheckoutItem{
+					CheckoutID:       checkout.ID,
+					ProductID:        itemData.productID,
+					ProductVariantID: itemData.variantID,
+					Quantity:         itemData.quantity,
+					Price:            itemData.price,
+					Weight:           itemData.weight,
+					ProductName:      itemData.productName,
+					VariantName:      itemData.variantName,
+					SKU:              itemData.sku,
+				}
+
+				if err := db.Create(checkoutItem).Error; err != nil {
+					return fmt.Errorf("failed to save checkout item for DKK checkout: %w", err)
+				}
+			}
+
+			fmt.Printf("Created DKK checkout for MobilePay testing with ID %d\n", checkout.ID)
+		} else {
+			fmt.Println("DKK checkout already exists")
+		}
+	}
+
+	// Create additional simpler checkouts
+	simpleCheckouts := []struct {
 		sessionID string
 		userID    uint
 		currency  string
@@ -1230,38 +1758,10 @@ func seedCheckouts(db *gorm.DB) error {
 		expiresAt      time.Time
 	}{
 		{
-			sessionID: "sess_active_001",
-			userID:    users[0].ID,
-			currency:  "USD",
-			status:    entity.CheckoutStatusActive,
-			items: []struct {
-				productID   uint
-				variantID   uint
-				quantity    int
-				price       int64
-				weight      float64
-				productName string
-				sku         string
-			}{
-				{
-					productID:   variants[0].ProductID,
-					variantID:   variants[0].ID,
-					quantity:    2,
-					price:       variants[0].Price,
-					weight:      variants[0].Weight,
-					productName: "Classic T-Shirt",
-					sku:         variants[0].SKU,
-				},
-			},
-			createdAt:      now.Add(-2 * time.Hour),
-			lastActivityAt: now.Add(-30 * time.Minute),
-			expiresAt:      now.Add(22 * time.Hour), // Active, expires in 22 hours
-		},
-		{
-			sessionID: "sess_abandoned_002",
+			sessionID: "sess_simple_002",
 			userID:    0, // Guest checkout
 			currency:  "USD",
-			status:    entity.CheckoutStatusAbandoned,
+			status:    entity.CheckoutStatusActive,
 			items: []struct {
 				productID   uint
 				variantID   uint
@@ -1277,19 +1777,19 @@ func seedCheckouts(db *gorm.DB) error {
 					quantity:    1,
 					price:       variants[1].Price,
 					weight:      variants[1].Weight,
-					productName: "Premium Jeans",
+					productName: variants[1].ProductName,
 					sku:         variants[1].SKU,
 				},
 			},
-			createdAt:      now.Add(-48 * time.Hour),
-			lastActivityAt: now.Add(-24 * time.Hour),
-			expiresAt:      now.Add(-23 * time.Hour), // Expired yesterday
+			createdAt:      now.Add(-1 * time.Hour),
+			lastActivityAt: now.Add(-10 * time.Minute),
+			expiresAt:      now.Add(23 * time.Hour),
 		},
 		{
-			sessionID: "sess_expired_003",
-			userID:    users[1].ID,
+			sessionID: "sess_abandoned_003",
+			userID:    users[1%len(users)].ID,
 			currency:  "USD",
-			status:    entity.CheckoutStatusExpired,
+			status:    entity.CheckoutStatusAbandoned,
 			items: []struct {
 				productID   uint
 				variantID   uint
@@ -1302,20 +1802,21 @@ func seedCheckouts(db *gorm.DB) error {
 				{
 					productID:   variants[2].ProductID,
 					variantID:   variants[2].ID,
-					quantity:    1,
+					quantity:    2,
 					price:       variants[2].Price,
 					weight:      variants[2].Weight,
-					productName: "Wireless Headphones",
+					productName: variants[2].ProductName,
 					sku:         variants[2].SKU,
 				},
 			},
-			createdAt:      now.Add(-72 * time.Hour),
-			lastActivityAt: now.Add(-48 * time.Hour),
-			expiresAt:      now.Add(-47 * time.Hour), // Expired 2 days ago
+			createdAt:      now.Add(-48 * time.Hour),
+			lastActivityAt: now.Add(-24 * time.Hour),
+			expiresAt:      now.Add(-23 * time.Hour),
 		},
 	}
 
-	for _, checkoutData := range checkouts {
+	// Create simple checkouts
+	for _, checkoutData := range simpleCheckouts {
 		// Check if checkout already exists
 		var existingCheckout struct{ ID uint }
 		if err := db.Table("checkouts").Select("id").Where("session_id = ?", checkoutData.sessionID).First(&existingCheckout).Error; err == nil {
@@ -1332,12 +1833,23 @@ func seedCheckouts(db *gorm.DB) error {
 		if checkoutData.userID > 0 {
 			checkout.UserID = &checkoutData.userID
 		}
-		// For guest checkouts, UserID remains nil
 		checkout.Status = checkoutData.status
 		checkout.CreatedAt = checkoutData.createdAt
 		checkout.UpdatedAt = checkoutData.createdAt
 		checkout.LastActivityAt = checkoutData.lastActivityAt
 		checkout.ExpiresAt = checkoutData.expiresAt
+
+		// Calculate totals
+		var totalAmount int64
+		var totalWeight float64
+		for _, item := range checkoutData.items {
+			totalAmount += int64(item.quantity) * item.price
+			totalWeight += float64(item.quantity) * item.weight
+		}
+
+		checkout.TotalAmount = totalAmount
+		checkout.TotalWeight = totalWeight
+		checkout.FinalAmount = totalAmount
 
 		if err := db.Create(checkout).Error; err != nil {
 			return fmt.Errorf("failed to save checkout %s: %w", checkoutData.sessionID, err)
@@ -1359,23 +1871,6 @@ func seedCheckouts(db *gorm.DB) error {
 			if err := db.Create(checkoutItem).Error; err != nil {
 				return fmt.Errorf("failed to save checkout item for checkout %s: %w", checkoutData.sessionID, err)
 			}
-		}
-
-		// Update checkout totals
-		var totalAmount int64
-		var totalWeight float64
-		for _, item := range checkoutData.items {
-			totalAmount += int64(item.quantity) * item.price
-			totalWeight += float64(item.quantity) * item.weight
-		}
-
-		// Update the checkout with calculated totals
-		if err := db.Model(checkout).Updates(map[string]interface{}{
-			"total_amount": totalAmount,
-			"total_weight": totalWeight,
-			"final_amount": totalAmount, // No discounts or shipping for now
-		}).Error; err != nil {
-			return fmt.Errorf("failed to update checkout totals for %s: %w", checkoutData.sessionID, err)
 		}
 	}
 

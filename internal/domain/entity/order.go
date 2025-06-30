@@ -2,6 +2,7 @@ package entity
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -38,39 +39,37 @@ const (
 // Order represents an order entity
 type Order struct {
 	gorm.Model
-	OrderNumber       string         `gorm:"uniqueIndex;not null;size:100"`
-	Currency          string         `gorm:"not null;size:3"` // e.g., "USD", "EUR"
-	UserID            uint           `gorm:"index"`           // 0 for guest orders
-	User              *User          `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
-	Items             []OrderItem    `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	TotalAmount       int64          `gorm:"not null"` // stored in cents
-	Status            OrderStatus    `gorm:"not null;size:50;default:'pending'"`
-	PaymentStatus     PaymentStatus  `gorm:"not null;size:50;default:'pending'"` // New field for payment status
-	ShippingAddr      Address        `gorm:"embedded;embeddedPrefix:shipping_"`
-	BillingAddr       Address        `gorm:"embedded;embeddedPrefix:billing_"`
-	PaymentID         string         `gorm:"size:255"`
-	PaymentProvider   string         `gorm:"size:100"`
-	PaymentMethod     string         `gorm:"size:100"`
-	TrackingCode      sql.NullString `gorm:"size:255"`
-	ActionURL         sql.NullString `gorm:"size:500"` // URL for redirect to payment provider
-	CompletedAt       *time.Time
-	CheckoutSessionID string `gorm:"size:255"` // Tracks which checkout session created this order
+	OrderNumber         string         `gorm:"uniqueIndex;not null;size:100"`
+	Currency            string         `gorm:"not null;size:3"` // e.g., "USD", "EUR"
+	UserID              uint           `gorm:"index"`           // 0 for guest orders
+	User                *User          `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	Items               []OrderItem    `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	TotalAmount         int64          `gorm:"not null"` // stored in cents
+	Status              OrderStatus    `gorm:"not null;size:50;default:'pending'"`
+	PaymentStatus       PaymentStatus  `gorm:"not null;size:50;default:'pending'"` // New field for payment status
+	ShippingAddressJSON *string        `gorm:"column:shipping_address_json;type:text"`
+	BillingAddressJSON  *string        `gorm:"column:billing_address_json;type:text"`
+	ShippingOptionJSON  *string        `gorm:"column:shipping_option_json;type:text"`
+	AppliedDiscountJSON *string        `gorm:"column:applied_discount_json;type:text"`
+	PaymentID           string         `gorm:"size:255"`
+	PaymentProvider     string         `gorm:"size:100"`
+	PaymentMethod       string         `gorm:"size:100"`
+	TrackingCode        sql.NullString `gorm:"size:255"`
+	ActionURL           sql.NullString `gorm:"size:500"` // URL for redirect to payment provider
+	CompletedAt         *time.Time
+	CheckoutSessionID   string `gorm:"size:255"` // Tracks which checkout session created this order
 
 	// Guest information (only used for guest orders where UserID is 0)
 	CustomerDetails *CustomerDetails `gorm:"embedded;embeddedPrefix:customer_"`
 	IsGuestOrder    bool             `gorm:"default:false"`
 
-	// Shipping information
-	ShippingMethodID uint            `gorm:"index"`
-	ShippingMethod   *ShippingMethod `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
-	ShippingOption   *ShippingOption `gorm:"embedded;embeddedPrefix:shipping_option_"`
-	ShippingCost     int64
-	TotalWeight      float64
+	// Shipping information stored as JSON
+	ShippingCost int64
+	TotalWeight  float64
 
 	// Discount-related fields
-	DiscountAmount  int64
-	FinalAmount     int64            `gorm:"not null"` // stored in cents
-	AppliedDiscount *AppliedDiscount `gorm:"embedded;embeddedPrefix:discount_"`
+	DiscountAmount int64
+	FinalAmount    int64 `gorm:"not null"` // stored in cents
 
 	// Payment transactions
 	PaymentTransactions []PaymentTransaction `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
@@ -144,7 +143,7 @@ func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, bil
 	// Format: ORD-YYYYMMDD-TEMP
 	orderNumber := fmt.Sprintf("ORD-%s-TEMP", now.Format("20060102"))
 
-	return &Order{
+	order := &Order{
 		UserID:          userID,
 		OrderNumber:     orderNumber,
 		Currency:        currency,
@@ -156,11 +155,15 @@ func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, bil
 		FinalAmount:     totalAmount, // Initially same as total amount
 		Status:          OrderStatusPending,
 		PaymentStatus:   PaymentStatusPending, // Initialize payment status
-		ShippingAddr:    shippingAddr,
-		BillingAddr:     billingAddr,
 		CustomerDetails: &customerDetails,
 		IsGuestOrder:    false,
-	}, nil
+	}
+
+	// Set addresses using JSON helper methods
+	order.SetShippingAddressJSON(&shippingAddr)
+	order.SetBillingAddressJSON(&billingAddr)
+
+	return order, nil
 }
 
 // NewGuestOrder creates a new order for a guest user
@@ -188,7 +191,7 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 	// Format: GS-YYYYMMDD-TEMP (GS prefix for guest orders)
 	orderNumber := fmt.Sprintf("GS-%s-TEMP", now.Format("20060102"))
 
-	return &Order{
+	order := &Order{
 		UserID:         0, // Using 0 to indicate it should be NULL in the database
 		OrderNumber:    orderNumber,
 		Items:          items,
@@ -199,13 +202,17 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 		FinalAmount:    totalAmount, // Initially same as total amount
 		Status:         OrderStatusPending,
 		PaymentStatus:  PaymentStatusPending, // Initialize payment status
-		ShippingAddr:   shippingAddr,
-		BillingAddr:    billingAddr,
 
 		// Guest-specific information
 		CustomerDetails: &customerDetails,
 		IsGuestOrder:    true,
-	}, nil
+	}
+
+	// Set addresses using JSON helper methods
+	order.SetShippingAddressJSON(&shippingAddr)
+	order.SetBillingAddressJSON(&billingAddr)
+
+	return order, nil
 }
 
 // UpdateStatus updates the order status
@@ -311,12 +318,13 @@ func (o *Order) ApplyDiscount(discount *Discount) error {
 	o.DiscountAmount = discountAmount
 	o.FinalAmount = o.TotalAmount + o.ShippingCost - discountAmount
 
-	// Record the applied discount
-	o.AppliedDiscount = &AppliedDiscount{
+	// Record the applied discount using JSON storage
+	appliedDiscount := &AppliedDiscount{
 		DiscountID:     discount.ID,
 		DiscountCode:   discount.Code,
 		DiscountAmount: discountAmount,
 	}
+	o.SetAppliedDiscountJSON(appliedDiscount)
 
 	return nil
 }
@@ -325,8 +333,7 @@ func (o *Order) ApplyDiscount(discount *Discount) error {
 func (o *Order) RemoveDiscount() {
 	o.DiscountAmount = 0
 	o.FinalAmount = o.TotalAmount + o.ShippingCost
-	o.AppliedDiscount = nil
-
+	o.SetAppliedDiscountJSON(nil)
 }
 
 // SetActionURL sets the action URL for the order
@@ -349,8 +356,7 @@ func (o *Order) SetShippingMethod(option *ShippingOption) error {
 		return errors.New("shipping method cannot be nil")
 	}
 
-	o.ShippingMethodID = option.ShippingMethodID
-	o.ShippingOption = option
+	o.SetShippingOptionJSON(option)
 	o.ShippingCost = option.Cost
 
 	// Update final amount with new shipping cost
@@ -452,14 +458,17 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 }
 func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 	var discountDetails *dto.AppliedDiscountDTO
-	if o.AppliedDiscount != nil {
-		discountDetails = o.AppliedDiscount.ToAppliedDiscountDTO()
+	if appliedDiscount := o.GetAppliedDiscount(); appliedDiscount != nil {
+		discountDetails = appliedDiscount.ToAppliedDiscountDTO()
 	}
 
 	var shippingDetails *dto.ShippingOptionDTO
-	if o.ShippingOption != nil {
-		shippingDetails = o.ShippingOption.ToShippingOptionDTO()
+	if shippingOption := o.GetShippingOption(); shippingOption != nil {
+		shippingDetails = shippingOption.ToShippingOptionDTO()
 	}
+
+	shippingAddr := o.GetShippingAddress()
+	billingAddr := o.GetBillingAddress()
 
 	return &dto.OrderDTO{
 		ID:              o.ID,
@@ -477,8 +486,8 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		DiscountAmount:  money.FromCents(o.DiscountAmount),
 		FinalAmount:     money.FromCents(o.FinalAmount),
 		Items:           o.ToOrderItemsDTO(),
-		ShippingAddress: o.ShippingAddr.ToAddressDTO(),
-		BillingAddress:  o.BillingAddr.ToAddressDTO(),
+		ShippingAddress: shippingAddr.ToAddressDTO(),
+		BillingAddress:  billingAddr.ToAddressDTO(),
 		ActionRequired:  o.ActionURL.Valid && o.ActionURL.String != "",
 		ActionURL:       o.ActionURL.String,
 		CreatedAt:       o.CreatedAt,
@@ -523,4 +532,124 @@ func (c *CustomerDetails) ToCustomerDetailsDTO() *dto.CustomerDetailsDTO {
 		Phone:    c.Phone,
 		FullName: c.FullName,
 	}
+}
+
+// GetShippingAddress returns the shipping address from JSON
+func (o *Order) GetShippingAddress() Address {
+	if o.ShippingAddressJSON == nil || *o.ShippingAddressJSON == "" {
+		return Address{}
+	}
+
+	var address Address
+	if err := json.Unmarshal([]byte(*o.ShippingAddressJSON), &address); err != nil {
+		return Address{}
+	}
+	return address
+}
+
+// SetShippingAddressJSON sets the shipping address as JSON
+func (o *Order) SetShippingAddressJSON(address *Address) {
+	if address == nil {
+		o.ShippingAddressJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(address)
+	if err != nil {
+		o.ShippingAddressJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	o.ShippingAddressJSON = &jsonStr
+}
+
+// GetBillingAddress returns the billing address from JSON
+func (o *Order) GetBillingAddress() Address {
+	if o.BillingAddressJSON == nil || *o.BillingAddressJSON == "" {
+		return Address{}
+	}
+
+	var address Address
+	if err := json.Unmarshal([]byte(*o.BillingAddressJSON), &address); err != nil {
+		return Address{}
+	}
+	return address
+}
+
+// SetBillingAddressJSON sets the billing address as JSON
+func (o *Order) SetBillingAddressJSON(address *Address) {
+	if address == nil {
+		o.BillingAddressJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(address)
+	if err != nil {
+		o.BillingAddressJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	o.BillingAddressJSON = &jsonStr
+}
+
+// GetAppliedDiscount returns the applied discount from JSON
+func (o *Order) GetAppliedDiscount() *AppliedDiscount {
+	if o.AppliedDiscountJSON == nil || *o.AppliedDiscountJSON == "" {
+		return nil
+	}
+
+	var discount AppliedDiscount
+	if err := json.Unmarshal([]byte(*o.AppliedDiscountJSON), &discount); err != nil {
+		return nil
+	}
+	return &discount
+}
+
+// SetAppliedDiscountJSON sets the applied discount as JSON
+func (o *Order) SetAppliedDiscountJSON(discount *AppliedDiscount) {
+	if discount == nil {
+		o.AppliedDiscountJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(discount)
+	if err != nil {
+		o.AppliedDiscountJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	o.AppliedDiscountJSON = &jsonStr
+}
+
+// GetShippingOption returns the shipping option from JSON
+func (o *Order) GetShippingOption() *ShippingOption {
+	if o.ShippingOptionJSON == nil || *o.ShippingOptionJSON == "" {
+		return nil
+	}
+
+	var option ShippingOption
+	if err := json.Unmarshal([]byte(*o.ShippingOptionJSON), &option); err != nil {
+		return nil
+	}
+	return &option
+}
+
+// SetShippingOptionJSON sets the shipping option as JSON
+func (o *Order) SetShippingOptionJSON(option *ShippingOption) {
+	if option == nil {
+		o.ShippingOptionJSON = nil
+		return
+	}
+
+	jsonData, err := json.Marshal(option)
+	if err != nil {
+		o.ShippingOptionJSON = nil
+		return
+	}
+
+	jsonStr := string(jsonData)
+	o.ShippingOptionJSON = &jsonStr
 }

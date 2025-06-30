@@ -90,8 +90,8 @@ func (r *PaymentProviderRepository) GetEnabled() ([]*entity.PaymentProvider, err
 // GetEnabledByMethod implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByMethod(method common.PaymentMethod) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Use JSON query to check if the method exists in the methods array
-	if err := r.db.Where("enabled = ? AND methods::jsonb ? ?", true, string(method)).
+	// Use SQLite-compatible JSON query to check if the method exists in the methods array
+	if err := r.db.Where("enabled = ? AND json_extract(methods, '$') LIKE ?", true, "%\""+string(method)+"\"%").
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by method: %w", err)
 	}
@@ -101,9 +101,10 @@ func (r *PaymentProviderRepository) GetEnabledByMethod(method common.PaymentMeth
 // GetEnabledByCurrency implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByCurrency(currency string) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Use JSON query to check if the currency exists in the supported_currencies array
+	// Use SQLite-compatible JSON query to check if the currency exists in the supported_currencies array
 	// If supported_currencies is empty/null, include the provider (supports all currencies)
-	if err := r.db.Where("enabled = ? AND (supported_currencies IS NULL OR supported_currencies::jsonb ? ? OR json_array_length(supported_currencies) = 0)", true, currency).
+	if err := r.db.Where("enabled = ? AND (supported_currencies IS NULL OR supported_currencies = '[]' OR json_extract(supported_currencies, '$') LIKE ?)",
+		true, "%\""+currency+"\"%").
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by currency: %w", err)
 	}
@@ -113,9 +114,9 @@ func (r *PaymentProviderRepository) GetEnabledByCurrency(currency string) ([]*en
 // GetEnabledByMethodAndCurrency implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByMethodAndCurrency(method common.PaymentMethod, currency string) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Combine both method and currency filters
-	if err := r.db.Where("enabled = ? AND methods::jsonb ? ? AND (supported_currencies IS NULL OR supported_currencies::jsonb ? ? OR json_array_length(supported_currencies) = 0)",
-		true, string(method), currency).
+	// Combine both method and currency filters using SQLite-compatible JSON queries
+	if err := r.db.Where("enabled = ? AND json_extract(methods, '$') LIKE ? AND (supported_currencies IS NULL OR supported_currencies = '[]' OR json_extract(supported_currencies, '$') LIKE ?)",
+		true, "%\""+string(method)+"\"%", "%\""+currency+"\"%").
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by method and currency: %w", err)
 	}
