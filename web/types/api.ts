@@ -297,7 +297,7 @@ export interface VariantDTO {
   variant_name: string;
   sku: string;
   stock: number /* int */;
-  attributes: { [key: string]: string };
+  attributes: { [key: string]: string};
   images: string[];
   is_default: boolean;
   weight: number /* float64 */;

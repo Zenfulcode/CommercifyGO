@@ -1,5 +1,5 @@
 packages:
-  - path: "github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
+  - path: "github.com/zenfulcode/commercify/internal/domain/dto"
     output_path: "web/types/api.ts"
     indent: "  "
     type_mappings:

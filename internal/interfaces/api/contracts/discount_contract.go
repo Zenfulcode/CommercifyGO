@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
 )
 
 // CreateDiscountRequest represents the data needed to create a new discount

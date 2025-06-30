@@ -4,7 +4,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts/dto"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"gorm.io/gorm"
 )
 

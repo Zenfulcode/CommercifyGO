@@ -108,11 +108,13 @@ The application supports both SQLite for local development and PostgreSQL for pr
 SQLite is the easiest way to get started with local development:
 
 1. Copy the local development environment file:
+
 ```bash
 cp .env.local .env
 ```
 
 2. Run the application:
+
 ```bash
 make dev-sqlite
 # or
@@ -126,6 +128,7 @@ The SQLite database file (`commercify.db`) will be created automatically in the 
 For production or if you prefer PostgreSQL for development:
 
 1. **Using Docker (Recommended):**
+
 ```bash
 # Start PostgreSQL with Docker
 make db-start
@@ -137,16 +140,19 @@ make dev-setup
 2. **Manual PostgreSQL Setup:**
 
 Create a PostgreSQL user (optional):
+
 ```bash
 createuser -s newuser
 ```
 
 Create a PostgreSQL database:
+
 ```bash
 createdb -U newuser commercify
 ```
 
 Copy and configure environment file:
+
 ```bash
 cp .env.example .env
 # Edit .env and set:
@@ -159,11 +165,13 @@ cp .env.example .env
 ```
 
 Run migrations:
+
 ```bash
 go run cmd/migrate/main.go -up
 ```
 
 Seed the database with sample data (optional):
+
 ```bash
 go run cmd/seed/main.go -all
 ```
