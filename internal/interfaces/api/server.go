@@ -71,6 +71,7 @@ func (s *Server) setupRoutes() {
 	orderHandler := s.container.Handlers().OrderHandler()
 	paymentHandler := s.container.Handlers().PaymentHandler()
 	paymentProviderHandler := s.container.Handlers().PaymentProviderHandler()
+	webhookHandlers := s.container.Handlers().WebhookHandlerProvider()
 	discountHandler := s.container.Handlers().DiscountHandler()
 	shippingHandler := s.container.Handlers().ShippingHandler()
 	currencyHandler := s.container.Handlers().CurrencyHandler()
@@ -98,6 +99,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/categories/{id:[0-9]+}", categoryHandler.GetCategory).Methods(http.MethodGet)
 	api.HandleFunc("/categories/{id:[0-9]+}/children", categoryHandler.GetChildCategories).Methods(http.MethodGet)
 	api.HandleFunc("/payment/providers", paymentHandler.GetAvailablePaymentProviders).Methods(http.MethodGet)
+
+	// Webhook routes (public, no authentication required)
+	api.HandleFunc("/webhooks/stripe", webhookHandlers.StripeHandler().HandleWebhook).Methods(http.MethodPost)
+	api.HandleFunc("/webhooks/mobilepay", webhookHandlers.MobilePayHandler().HandleWebhook).Methods(http.MethodPost)
 
 	// Public discount routes
 	api.HandleFunc("/discounts/validate", discountHandler.ValidateDiscountCode).Methods(http.MethodPost)

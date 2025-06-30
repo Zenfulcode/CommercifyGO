@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/common"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -270,11 +271,104 @@ func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phon
 	return nil
 }
 
-func (s *MobilePayPaymentService) GetAccessToken() error {
-	err := s.vippsClient.EnsureValidToken()
-	if err != nil {
-		return s.vippsClient.GetAccessToken()
+func (s *MobilePayPaymentService) EnsureValidToken() error {
+	return s.vippsClient.EnsureValidToken()
+}
+
+// RegisterWebhook registers a webhook for MobilePay provider using the official SDK
+// This method:
+// 1. Validates MobilePay configuration (credentials and webhook URL)
+// 2. Creates a MobilePay client using the official SDK
+// 3. Removes any existing webhooks to ensure clean state
+// 4. Registers a new webhook with all payment events
+// 5. Updates the provider in the database with webhook information
+func (s *MobilePayPaymentService) RegisterWebhook(provider *entity.PaymentProvider, webhookURL string) error {
+	// Skip if MobilePay is not enabled
+	if !provider.Enabled {
+		s.logger.Info("MobilePay provider is disabled, skipping webhook registration")
+		return nil
 	}
 
+	// Skip if webhook is already registered (has secret and external ID)
+	if provider.WebhookSecret != "" && provider.ExternalWebhookID != "" {
+		s.logger.Info("MobilePay webhook already registered (ID: %s), skipping registration", provider.ExternalWebhookID)
+		return nil
+	}
+
+	if webhookURL == "" {
+		return errors.New("webhook URL is required for MobilePay")
+	}
+
+	s.logger.Info("Registering new MobilePay webhook for URL: %s", webhookURL)
+
+	// Get existing webhooks
+	existingWebhooks, err := s.webhookClient.GetAll()
+	if err != nil {
+		s.logger.Error("Failed to get existing webhooks: %v", err)
+		return fmt.Errorf("failed to get existing webhooks: %w", err)
+	}
+
+	// Check if there's already a webhook for our URL
+	for _, existingWebhook := range existingWebhooks {
+		if existingWebhook.URL == webhookURL {
+			s.logger.Info("Found existing webhook for URL %s (ID: %s), reusing it", webhookURL, existingWebhook.ID)
+
+			// Update provider with existing webhook information
+			provider.WebhookURL = webhookURL
+			provider.WebhookSecret = existingWebhook.Secret
+			provider.WebhookEvents = existingWebhook.Events
+			provider.ExternalWebhookID = existingWebhook.ID
+
+			s.logger.Info("Successfully reused existing MobilePay webhook with ID: %s", existingWebhook.ID)
+			return nil
+		}
+	}
+
+	// Remove any existing webhooks for different URLs to ensure clean state
+	for _, webhook := range existingWebhooks {
+		if err := s.webhookClient.Delete(webhook.ID); err != nil {
+			s.logger.Warn("Failed to remove existing webhook %s: %v", webhook.ID, err)
+		} else {
+			s.logger.Info("Removed existing webhook for different URL: %s (ID: %s)", webhook.URL, webhook.ID)
+		}
+	}
+
+	// Register new webhook
+	webhookReq := models.WebhookRegistrationRequest{
+		URL: webhookURL,
+		Events: []string{
+			string(models.WebhookEventPaymentAuthorized),
+			string(models.WebhookEventPaymentCaptured),
+			string(models.WebhookEventPaymentCancelled),
+			string(models.WebhookEventPaymentExpired),
+			string(models.WebhookEventPaymentRefunded),
+		},
+	}
+
+	webhook, err := s.webhookClient.Register(webhookReq)
+	if err != nil {
+		s.logger.Error("Failed to register MobilePay webhook: %v", err)
+		return fmt.Errorf("failed to register MobilePay webhook: %w", err)
+	}
+
+	// Update provider with webhook information
+	provider.WebhookURL = webhookURL
+	provider.WebhookSecret = webhook.Secret
+	provider.WebhookEvents = webhookReq.Events
+	provider.ExternalWebhookID = webhook.ID
+
+	s.logger.Info("Successfully registered MobilePay webhook with ID: %s", webhook.ID)
+	return nil
+}
+
+// DeleteWebhook deletes a webhook for MobilePay provider via API
+func (s *MobilePayPaymentService) DeleteWebhook(provider *entity.PaymentProvider) error {
+	// Delete the webhook
+	if err := s.webhookClient.Delete(provider.ExternalWebhookID); err != nil {
+		s.logger.Error("Failed to delete MobilePay webhook %s: %v", provider.ExternalWebhookID, err)
+		return fmt.Errorf("failed to delete MobilePay webhook: %w", err)
+	}
+
+	s.logger.Info("Successfully deleted MobilePay webhook: %s", provider.ExternalWebhookID)
 	return nil
 }

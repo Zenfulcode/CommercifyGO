@@ -13,17 +13,25 @@ import (
 
 // PaymentProviderServiceImpl implements service.PaymentProviderService
 type PaymentProviderServiceImpl struct {
-	repo   repository.PaymentProviderRepository
-	config *config.Config
-	logger logger.Logger
+	repo             repository.PaymentProviderRepository
+	config           *config.Config
+	logger           logger.Logger
+	mobilePayService *MobilePayPaymentService
 }
 
 // NewPaymentProviderService creates a new PaymentProviderServiceImpl
 func NewPaymentProviderService(repo repository.PaymentProviderRepository, cfg *config.Config, logger logger.Logger) service.PaymentProviderService {
+	// Create MobilePay service if enabled
+	var mobilePayService *MobilePayPaymentService
+	if cfg.MobilePay.Enabled {
+		mobilePayService = NewMobilePayPaymentService(cfg.MobilePay, logger)
+	}
+
 	return &PaymentProviderServiceImpl{
-		repo:   repo,
-		config: cfg,
-		logger: logger,
+		repo:             repo,
+		config:           cfg,
+		logger:           logger,
+		mobilePayService: mobilePayService,
 	}
 }
 
@@ -95,11 +103,34 @@ func (s *PaymentProviderServiceImpl) RegisterWebhook(providerType common.Payment
 		return fmt.Errorf("webhook URL cannot be empty")
 	}
 
-	// Generate a mock external webhook ID for now
-	// In a real implementation, this would come from the payment provider's API
-	externalWebhookID := fmt.Sprintf("webhook_%s_%d", providerType, len(events))
+	// Get the provider to check its configuration
+	provider, err := s.repo.GetByType(providerType)
+	if err != nil {
+		return fmt.Errorf("failed to get provider %s: %w", providerType, err)
+	}
 
-	err := s.repo.UpdateWebhookInfo(providerType, webhookURL, "", externalWebhookID, events)
+	// Handle MobilePay webhook registration using the dedicated MobilePay service
+	if providerType == common.PaymentProviderMobilePay {
+		if s.mobilePayService == nil {
+			return fmt.Errorf("MobilePay service not initialized")
+		}
+
+		// Register webhook using MobilePay service
+		if err := s.mobilePayService.RegisterWebhook(provider, webhookURL); err != nil {
+			return fmt.Errorf("failed to register MobilePay webhook via API: %w", err)
+		}
+
+		// Update the provider in the database
+		if err := s.repo.Update(provider); err != nil {
+			return fmt.Errorf("failed to update provider in database: %w", err)
+		}
+
+		s.logger.Info("Successfully registered MobilePay webhook via API: %s", webhookURL)
+		return nil
+	}
+
+	// For other providers, use mock implementation
+	err = s.repo.UpdateWebhookInfo(providerType, provider.WebhookURL, provider.WebhookSecret, provider.ExternalWebhookID, provider.WebhookEvents)
 	if err != nil {
 		return fmt.Errorf("failed to register webhook for provider %s: %w", providerType, err)
 	}
@@ -110,6 +141,27 @@ func (s *PaymentProviderServiceImpl) RegisterWebhook(providerType common.Payment
 
 // DeleteWebhook implements service.PaymentProviderService.
 func (s *PaymentProviderServiceImpl) DeleteWebhook(providerType common.PaymentProviderType) error {
+	// Handle MobilePay webhook deletion using the dedicated MobilePay service
+	if providerType == common.PaymentProviderMobilePay {
+		if s.mobilePayService == nil {
+			return fmt.Errorf("MobilePay service not initialized")
+		}
+
+		provider, err := s.repo.GetByType(providerType)
+		if err != nil {
+			return fmt.Errorf("failed to get MobilePay provider: %w", err)
+		}
+
+		// If there's an external webhook ID, delete it via API
+		if provider.ExternalWebhookID != "" {
+			if err := s.mobilePayService.DeleteWebhook(provider); err != nil {
+				s.logger.Error("Failed to delete MobilePay webhook via API: %v", err)
+				// Continue with database cleanup even if API call fails
+			}
+		}
+	}
+
+	// Update database to remove webhook info
 	err := s.repo.UpdateWebhookInfo(providerType, "", "", "", nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete webhook for provider %s: %w", providerType, err)
@@ -267,7 +319,7 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 
 	// Create providers if they don't exist
 	for _, provider := range defaultProviders {
-		_, err := s.repo.GetByType(provider.Type)
+		existingProvider, err := s.repo.GetByType(provider.Type)
 		if err != nil {
 			// Provider doesn't exist, create it
 			if err := s.repo.Create(provider); err != nil {
@@ -276,9 +328,39 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			}
 			s.logger.Info("Created default provider: %s", provider.Type)
 			createdCount++
+
+			// Register webhook for MobilePay if enabled
+			if provider.Type == common.PaymentProviderMobilePay && provider.Enabled && s.mobilePayService != nil {
+				webhookURL, _ := provider.Configuration["WebhookURL"].(string)
+				if err := s.mobilePayService.RegisterWebhook(provider, webhookURL); err != nil {
+					s.logger.Error("Failed to register MobilePay webhook during initialization: %v", err)
+					// Don't fail the entire initialization if webhook registration fails
+				} else {
+					// Update the provider in the database
+					if err := s.repo.Update(provider); err != nil {
+						s.logger.Error("Failed to update provider with webhook info: %v", err)
+					}
+				}
+			}
 		} else {
 			s.logger.Debug("Provider %s already exists, skipping creation", provider.Type)
 			existingCount++
+
+			// Check if MobilePay webhook needs to be registered for existing provider
+			if existingProvider.Type == common.PaymentProviderMobilePay && existingProvider.Enabled &&
+				(existingProvider.WebhookSecret == "" || existingProvider.ExternalWebhookID == "") && s.mobilePayService != nil {
+				s.logger.Info("Registering webhook for existing MobilePay provider (missing webhook data)")
+				webhookURL, _ := existingProvider.Configuration["WebhookURL"].(string)
+				if err := s.mobilePayService.RegisterWebhook(existingProvider, webhookURL); err != nil {
+					s.logger.Error("Failed to register MobilePay webhook for existing provider: %v", err)
+					// Don't fail the entire initialization if webhook registration fails
+				} else {
+					// Update the provider in the database
+					if err := s.repo.Update(existingProvider); err != nil {
+						s.logger.Error("Failed to update existing provider with webhook info: %v", err)
+					}
+				}
+			}
 		}
 	}
 

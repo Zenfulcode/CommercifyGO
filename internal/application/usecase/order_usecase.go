@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
@@ -521,6 +522,41 @@ func (uc *OrderUseCase) UpdatePaymentStatus(input UpdatePaymentStatusInput) (*en
 	}
 
 	return order, nil
+}
+
+// UpdateOrderPaymentStatus updates the payment status of an order
+func (uc *OrderUseCase) UpdateOrderPaymentStatus(orderID uint, paymentStatus entity.PaymentStatus, transactionID string) error {
+	// Get the order
+	order, err := uc.orderRepo.GetByID(orderID)
+	if err != nil {
+		return fmt.Errorf("failed to get order %d: %w", orderID, err)
+	}
+
+	// Update payment status
+	order.PaymentStatus = paymentStatus
+	order.PaymentID = transactionID
+
+	// Update order status based on payment status
+	switch paymentStatus {
+	case entity.PaymentStatusCaptured:
+		order.Status = entity.OrderStatusPaid
+		if order.CompletedAt == nil {
+			now := time.Now()
+			order.CompletedAt = &now
+		}
+	case entity.PaymentStatusFailed, entity.PaymentStatusCancelled:
+		order.Status = entity.OrderStatusCancelled
+	case entity.PaymentStatusAuthorized, entity.PaymentStatusPending:
+		// Keep current order status, just update payment status
+	}
+
+	// Save the updated order
+	if err := uc.orderRepo.Update(order); err != nil {
+		return fmt.Errorf("failed to update order %d: %w", orderID, err)
+	}
+
+	log.Printf("Updated order %d payment status to %s (transaction: %s)", orderID, paymentStatus, transactionID)
+	return nil
 }
 
 // handleStockUpdatesForPaymentStatusChange handles stock updates when payment status changes
