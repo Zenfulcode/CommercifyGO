@@ -149,7 +149,13 @@ func (h *StripeWebhookHandler) handlePaymentSucceeded(event *StripeWebhookEvent)
 	h.logger.Info("Processing successful Stripe payment for order %d, transaction %s", orderID, transactionID)
 
 	// Update order payment status to captured
-	return h.orderUseCase.UpdateOrderPaymentStatus(uint(orderID), entity.PaymentStatusCaptured, transactionID)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       uint(orderID),
+		PaymentStatus: entity.PaymentStatusAuthorized,
+		TransactionID: transactionID,
+	})
+
+	return err
 }
 
 // handlePaymentFailed handles failed Stripe payments
@@ -175,7 +181,13 @@ func (h *StripeWebhookHandler) handlePaymentFailed(event *StripeWebhookEvent) er
 	h.logger.Info("Processing failed Stripe payment for order %d, transaction %s", orderID, transactionID)
 
 	// Update order payment status to failed
-	return h.orderUseCase.UpdateOrderPaymentStatus(uint(orderID), entity.PaymentStatusFailed, transactionID)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       uint(orderID),
+		PaymentStatus: entity.PaymentStatusFailed,
+		TransactionID: transactionID,
+	})
+	return err
+
 }
 
 // handlePaymentCanceled handles canceled Stripe payments
@@ -201,7 +213,13 @@ func (h *StripeWebhookHandler) handlePaymentCanceled(event *StripeWebhookEvent) 
 	h.logger.Info("Processing canceled Stripe payment for order %d, transaction %s", orderID, transactionID)
 
 	// Update order payment status to cancelled
-	return h.orderUseCase.UpdateOrderPaymentStatus(uint(orderID), entity.PaymentStatusCancelled, transactionID)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       uint(orderID),
+		PaymentStatus: entity.PaymentStatusCancelled,
+		TransactionID: transactionID,
+	})
+	return err
+
 }
 
 // handlePaymentRequiresAction handles Stripe payments that require action
@@ -227,7 +245,13 @@ func (h *StripeWebhookHandler) handlePaymentRequiresAction(event *StripeWebhookE
 	h.logger.Info("Processing Stripe payment requiring action for order %d, transaction %s", orderID, transactionID)
 
 	// Update order payment status to pending (awaiting action)
-	return h.orderUseCase.UpdateOrderPaymentStatus(uint(orderID), entity.PaymentStatusPending, transactionID)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       uint(orderID),
+		PaymentStatus: entity.PaymentStatusPending,
+		TransactionID: transactionID,
+	})
+	return err
+
 }
 
 // handleAmountCapturableUpdated handles when the capturable amount is updated
@@ -252,8 +276,13 @@ func (h *StripeWebhookHandler) handleAmountCapturableUpdated(event *StripeWebhoo
 
 	h.logger.Info("Processing Stripe capturable amount update for order %d, transaction %s", orderID, transactionID)
 
-	// Update order payment status to authorized (ready for capture)
-	return h.orderUseCase.UpdateOrderPaymentStatus(uint(orderID), entity.PaymentStatusAuthorized, transactionID)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       uint(orderID),
+		PaymentStatus: entity.PaymentStatusCaptured,
+		TransactionID: transactionID,
+	})
+
+	return err
 }
 
 // handlePartiallyFunded handles partially funded payments

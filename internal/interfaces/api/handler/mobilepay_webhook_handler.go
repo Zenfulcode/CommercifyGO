@@ -79,8 +79,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentAuthorized(event *models.Webho
 
 	h.logger.Info("Processing authorized MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
-	// Update order payment status to authorized (reserved but not captured)
-	return h.orderUseCase.UpdateOrderPaymentStatus(orderID, entity.PaymentStatusAuthorized, event.Reference)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusAuthorized,
+		TransactionID: event.Reference,
+	})
+
+	return err
 }
 
 // handleSDKPaymentCaptured handles payment captured events from the SDK
@@ -93,7 +98,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCaptured(event *models.Webhook
 	h.logger.Info("Processing captured MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
 	// Update order payment status to captured
-	return h.orderUseCase.UpdateOrderPaymentStatus(orderID, entity.PaymentStatusCaptured, event.Reference)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusCaptured,
+		TransactionID: event.Reference,
+	})
+
+	return err
 }
 
 // handleSDKPaymentCancelled handles payment cancelled events from the SDK
@@ -106,7 +117,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCancelled(event *models.Webhoo
 	h.logger.Info("Processing cancelled MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
 	// Update order payment status to cancelled
-	return h.orderUseCase.UpdateOrderPaymentStatus(orderID, entity.PaymentStatusCancelled, event.Reference)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusCancelled,
+		TransactionID: event.Reference,
+	})
+
+	return err
 }
 
 // handleSDKPaymentExpired handles payment expired events from the SDK
@@ -119,7 +136,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentExpired(event *models.WebhookE
 	h.logger.Info("Processing expired MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
 	// Update order payment status to failed
-	return h.orderUseCase.UpdateOrderPaymentStatus(orderID, entity.PaymentStatusFailed, event.Reference)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusFailed,
+		TransactionID: event.Reference,
+	})
+
+	return err
 }
 
 // handleSDKPaymentRefunded handles payment refunded events from the SDK
@@ -132,7 +155,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentRefunded(event *models.Webhook
 	h.logger.Info("Processing refunded MobilePay payment for order %d, transaction %s", orderID, event.Reference)
 
 	// Update order payment status to refunded
-	return h.orderUseCase.UpdateOrderPaymentStatus(orderID, entity.PaymentStatusRefunded, event.Reference)
+	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusRefunded,
+		TransactionID: event.Reference,
+	})
+
+	return err
 }
 
 // getOrderIDFromSDKEvent gets the order ID associated with a MobilePay payment from SDK event
