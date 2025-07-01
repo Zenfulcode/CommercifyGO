@@ -27,6 +27,33 @@ func (t *TransactionRepository) CountSuccessfulByOrderIDAndType(orderID uint, tr
 
 // Create implements repository.PaymentTransactionRepository.
 func (t *TransactionRepository) Create(transaction *entity.PaymentTransaction) error {
+	// Check if a transaction with the same transaction_id already exists
+	var existingTxn entity.PaymentTransaction
+	err := t.db.Where("transaction_id = ?", transaction.TransactionID).First(&existingTxn).Error
+	if err == nil {
+		// Transaction already exists, update its status and other fields if different
+		if existingTxn.Status != transaction.Status ||
+			existingTxn.Amount != transaction.Amount ||
+			existingTxn.RawResponse != transaction.RawResponse {
+
+			// Update the existing transaction with new data
+			existingTxn.Status = transaction.Status
+			existingTxn.Amount = transaction.Amount
+			existingTxn.RawResponse = transaction.RawResponse
+			existingTxn.Metadata = transaction.Metadata
+
+			// Save the updated transaction
+			return t.db.Save(&existingTxn).Error
+		}
+		// Transaction exists and is identical, return without error (idempotent operation)
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Some other error occurred while checking
+		return fmt.Errorf("failed to check for existing transaction: %w", err)
+	}
+
+	// Transaction doesn't exist, create it
 	return t.db.Create(transaction).Error
 }
 

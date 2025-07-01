@@ -29,20 +29,24 @@ func NewProductUseCase(
 	orderRepo repository.OrderRepository,
 	checkoutRepo repository.CheckoutRepository,
 ) *ProductUseCase {
-	defaultCurrency, err := currencyRepo.GetDefault()
-	if err != nil {
-		return nil
-	}
-
-	return &ProductUseCase{
+	uc := &ProductUseCase{
 		productRepo:        productRepo,
 		categoryRepo:       categoryRepo,
 		productVariantRepo: productVariantRepo,
 		currencyRepo:       currencyRepo,
 		orderRepo:          orderRepo,
 		checkoutRepo:       checkoutRepo,
-		defaultCurrency:    defaultCurrency,
 	}
+
+	// Try to get default currency but don't fail if it doesn't exist
+	defaultCurrency, err := currencyRepo.GetDefault()
+	if err == nil {
+		uc.defaultCurrency = defaultCurrency
+	}
+	// If no default currency exists, defaultCurrency will be nil
+	// This should be handled in methods that need it
+
+	return uc
 }
 
 type VariantInput struct {
@@ -155,21 +159,9 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 }
 
 // GetProductByID retrieves a product by ID
-func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.Product, error) {
-	var currency *entity.Currency
-	if currencyCode == "" {
-		// Use default currency if none provided
-		currency = uc.defaultCurrency
-	} else {
-		var err error
-		currency, err = uc.currencyRepo.GetByCode(currencyCode)
-		if err != nil {
-			return nil, errors.New("invalid currency code: " + currencyCode)
-		}
-	}
-
-	// First get the product with all its data
-	product, err := uc.productRepo.GetByIDAndCurrency(id, currency.Code)
+func (uc *ProductUseCase) GetProductByID(id uint) (*entity.Product, error) {
+	// Simply get the product with all its data - no currency filtering needed
+	product, err := uc.productRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}

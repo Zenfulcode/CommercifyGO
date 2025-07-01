@@ -1,8 +1,8 @@
 package contracts
 
 import (
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/dto"
 )
 
 // CreateCategoryRequest represents the data needed to create a new category

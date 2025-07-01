@@ -14,7 +14,6 @@ type UseCaseProvider interface {
 	CheckoutUseCase() *usecase.CheckoutUseCase
 	OrderUseCase() *usecase.OrderUseCase
 	DiscountUseCase() *usecase.DiscountUseCase
-	WebhookUseCase() *usecase.WebhookUseCase
 	ShippingUseCase() *usecase.ShippingUseCase
 	CurrencyUsecase() *usecase.CurrencyUseCase
 }
@@ -30,7 +29,6 @@ type useCaseProvider struct {
 	checkoutUseCase *usecase.CheckoutUseCase
 	orderUseCase    *usecase.OrderUseCase
 	discountUseCase *usecase.DiscountUseCase
-	webhookUseCase  *usecase.WebhookUseCase
 	shippingUseCase *usecase.ShippingUseCase
 	currencyUseCase *usecase.CurrencyUseCase
 }
@@ -152,20 +150,6 @@ func (p *useCaseProvider) DiscountUseCase() *usecase.DiscountUseCase {
 		)
 	}
 	return p.discountUseCase
-}
-
-// WebhookUseCase returns the webhook use case
-func (p *useCaseProvider) WebhookUseCase() *usecase.WebhookUseCase {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.webhookUseCase == nil {
-		p.webhookUseCase = usecase.NewWebhookUseCase(
-			p.container.Repositories().WebhookRepository(),
-			p.container.Services().WebhookService(),
-		)
-	}
-	return p.webhookUseCase
 }
 
 // ShippingUseCase returns the shipping use case

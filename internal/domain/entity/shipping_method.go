@@ -3,7 +3,7 @@ package entity
 import (
 	"errors"
 
-	"github.com/zenfulcode/commercify/internal/dto"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"gorm.io/gorm"
 )
 

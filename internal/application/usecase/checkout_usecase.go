@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"github.com/zenfulcode/commercify/internal/domain/service"
@@ -50,8 +51,8 @@ type CheckoutUseCase struct {
 }
 
 type ProcessPaymentInput struct {
-	PaymentProvider service.PaymentProviderType
-	PaymentMethod   service.PaymentMethod
+	PaymentProvider common.PaymentProviderType
+	PaymentMethod   common.PaymentMethod
 	CardDetails     *service.CardDetails `json:"card_details,omitempty"`
 	PhoneNumber     string               `json:"phone_number,omitempty"`
 }
@@ -74,7 +75,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New("customer details are required for payment processing")
 	}
 
-	if order.ShippingMethodID == 0 {
+	if order.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required for payment processing")
 	}
 
@@ -387,7 +388,8 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	// Validate shipping address is set
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	shippingAddr := checkout.GetShippingAddress()
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required to calculate shipping options")
 	}
 
@@ -403,7 +405,7 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	calculateOptionsInput := CalculateShippingOptionsInput{
-		Address:     checkout.ShippingAddr,
+		Address:     shippingAddr,
 		OrderValue:  checkout.TotalAmount,
 		OrderWeight: checkout.TotalWeight,
 	}
@@ -580,11 +582,14 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("checkout has no items")
 	}
 
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	shippingAddr := checkout.GetShippingAddress()
+	billingAddr := checkout.GetBillingAddress()
+
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required")
 	}
 
-	if checkout.BillingAddr.Street == "" || checkout.BillingAddr.Country == "" {
+	if billingAddr.Street1 == "" || billingAddr.Country == "" {
 		return nil, errors.New("billing address is required")
 	}
 
@@ -592,7 +597,7 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("customer details are required")
 	}
 
-	if checkout.ShippingMethodID == 0 {
+	if checkout.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required")
 	}
 
@@ -605,6 +610,13 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, err
 	}
 
+	// Update order number to final format now that we have an ID
+	order.SetOrderNumber(order.ID)
+	err = uc.orderRepo.Update(order)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order number: %w", err)
+	}
+
 	// Mark checkout as completed
 	checkout.MarkAsCompleted(order.ID)
 	err = uc.checkoutRepo.Update(checkout)
@@ -614,8 +626,8 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 	}
 
 	// Increment discount usage if a discount was applied
-	if checkout.AppliedDiscount != nil {
-		discount, err := uc.discountRepo.GetByID(checkout.AppliedDiscount.DiscountID)
+	if appliedDiscount := checkout.GetAppliedDiscount(); appliedDiscount != nil {
+		discount, err := uc.discountRepo.GetByID(appliedDiscount.DiscountID)
 		if err == nil {
 			discount.IncrementUsage()
 			uc.discountRepo.Update(discount)
@@ -818,8 +830,8 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
 	}
 
-	// Get the parent product
-	product, err := uc.productRepo.GetByIDAndCurrency(variant.ProductID, checkout.Currency)
+	// Get the parent product (without currency constraint first)
+	product, err := uc.productRepo.GetByID(variant.ProductID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product for variant: %w", err)
 	}
@@ -827,6 +839,20 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 	// Check if product is active
 	if !product.Active {
 		return nil, errors.New("product is not available")
+	}
+
+	// Handle currency mismatch
+	if product.Currency != checkout.Currency {
+		// If the checkout is empty, change the checkout currency to match the product
+		if len(checkout.Items) == 0 {
+			checkout, err = uc.ChangeCurrency(checkout, product.Currency)
+			if err != nil {
+				return nil, fmt.Errorf("failed to change checkout currency to %s: %w", product.Currency, err)
+			}
+		} else {
+			// If checkout has items, don't allow mixing currencies
+			return nil, fmt.Errorf("cannot add %s product to %s checkout. Please complete your current checkout or start a new one", product.Currency, checkout.Currency)
+		}
 	}
 
 	// Populate input with variant details

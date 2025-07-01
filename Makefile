@@ -6,10 +6,13 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Development environment setup
-dev-sqlite: ## Setup local development environment with SQLite
-	@echo "Setting up SQLite development environment..."
-	@cp .env.local .env 2>/dev/null || true
-	@echo "Environment configured for SQLite. Starting application..."
+dev-postgres: ## Run the application locally with database
+	@echo "Setting up PostgreSQL development environment..."
+	@cp .env.production .env 2>/dev/null || true
+	@echo "Environment configured for PostgreSQL. Starting application..."
+	@echo "Starting database and waiting for it to be ready..."
+	make db-start
+	@sleep 3
 	go run ./cmd/api
 
 # Database commands (PostgreSQL)
@@ -39,9 +42,10 @@ build: ## Build the application
 	go build -o bin/seed ./cmd/seed
 	go build -o bin/expire-checkouts ./cmd/expire-checkouts
 
-run: db-start ## Run the application locally with database
-	@echo "Starting database and waiting for it to be ready..."
-	@sleep 3
+run:
+	@echo "Setting up SQLite development environment..."
+	@cp .env.local .env 2>/dev/null || true
+	@echo "Environment configured for SQLite. Starting application..."
 	go run ./cmd/api
 
 run-docker: ## Run the entire application stack with Docker (PostgreSQL)

@@ -16,7 +16,7 @@ type RepositoryProvider interface {
 	OrderRepository() repository.OrderRepository
 	CheckoutRepository() repository.CheckoutRepository
 	DiscountRepository() repository.DiscountRepository
-	WebhookRepository() repository.WebhookRepository
+	PaymentProviderRepository() repository.PaymentProviderRepository
 	PaymentTransactionRepository() repository.PaymentTransactionRepository
 	CurrencyRepository() repository.CurrencyRepository
 
@@ -31,16 +31,16 @@ type repositoryProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	userRepo           repository.UserRepository
-	productVariantRepo repository.ProductVariantRepository
-	productRepo        repository.ProductRepository
-	categoryRepo       repository.CategoryRepository
-	orderRepo          repository.OrderRepository
-	checkoutRepo       repository.CheckoutRepository
-	discountRepo       repository.DiscountRepository
-	webhookRepo        repository.WebhookRepository
-	paymentTrxRepo     repository.PaymentTransactionRepository
-	currencyRepo       repository.CurrencyRepository
+	userRepo            repository.UserRepository
+	productVariantRepo  repository.ProductVariantRepository
+	productRepo         repository.ProductRepository
+	categoryRepo        repository.CategoryRepository
+	orderRepo           repository.OrderRepository
+	checkoutRepo        repository.CheckoutRepository
+	discountRepo        repository.DiscountRepository
+	paymentProviderRepo repository.PaymentProviderRepository
+	paymentTrxRepo      repository.PaymentTransactionRepository
+	currencyRepo        repository.CurrencyRepository
 
 	shippingMethodRepo repository.ShippingMethodRepository
 	shippingZoneRepo   repository.ShippingZoneRepository
@@ -135,15 +135,15 @@ func (p *repositoryProvider) DiscountRepository() repository.DiscountRepository 
 	return p.discountRepo
 }
 
-// WebhookRepository returns the webhook repository
-func (p *repositoryProvider) WebhookRepository() repository.WebhookRepository {
+// PaymentProviderRepository returns the payment provider repository
+func (p *repositoryProvider) PaymentProviderRepository() repository.PaymentProviderRepository {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.webhookRepo == nil {
-		p.webhookRepo = gorm.NewWebhookRepository(p.container.DB())
+	if p.paymentProviderRepo == nil {
+		p.paymentProviderRepo = gorm.NewPaymentProviderRepository(p.container.DB())
 	}
-	return p.webhookRepo
+	return p.paymentProviderRepo
 }
 
 // PaymentTransactionRepository returns the payment transaction repository

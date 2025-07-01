@@ -319,7 +319,8 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 	}
 
 	address := entity.Address{
-		Street:     request.AddressLine1,
+		Street1:    request.AddressLine1,
+		Street2:    request.AddressLine2,
 		City:       request.City,
 		State:      request.State,
 		PostalCode: request.PostalCode,
@@ -370,7 +371,8 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 
 	// Convert DTO to address entity
 	address := entity.Address{
-		Street:     request.AddressLine1,
+		Street1:    request.AddressLine1,
+		Street2:    request.AddressLine2,
 		City:       request.City,
 		State:      request.State,
 		PostalCode: request.PostalCode,
@@ -681,13 +683,13 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Determine the payment method based on provided data
-	paymentMethod := service.PaymentMethodWallet
+	paymentMethod := common.PaymentMethodWallet
 	if paymentInput.PaymentData.CardDetails != nil {
-		paymentMethod = service.PaymentMethodCreditCard
+		paymentMethod = common.PaymentMethodCreditCard
 	}
 
 	processInput := usecase.ProcessPaymentInput{
-		PaymentProvider: service.PaymentProviderType(paymentInput.PaymentProvider),
+		PaymentProvider: common.PaymentProviderType(paymentInput.PaymentProvider),
 		PaymentMethod:   paymentMethod,
 		PhoneNumber:     paymentInput.PaymentData.PhoneNumber,
 	}

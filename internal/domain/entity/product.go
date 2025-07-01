@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -14,14 +15,14 @@ import (
 // All products must have at least one variant as per the database schema
 type Product struct {
 	gorm.Model
-	Name        string            `gorm:"not null;size:255"`
-	Description string            `gorm:"type:text"`
-	Currency    string            `gorm:"not null;size:3"`
-	CategoryID  uint              `gorm:"not null;index"`
-	Category    Category          `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
-	Images      []string          `gorm:"type:jsonb;default:'[]'"`
-	Active      bool              `gorm:"default:true"`
-	Variants    []*ProductVariant `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Name        string             `gorm:"not null;size:255"`
+	Description string             `gorm:"type:text"`
+	Currency    string             `gorm:"not null;size:3"`
+	CategoryID  uint               `gorm:"not null;index"`
+	Category    Category           `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Images      common.StringSlice `gorm:"type:json;default:'[]'"`
+	Active      bool               `gorm:"default:true"`
+	Variants    []*ProductVariant  `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
 
 // NewProduct creates a new product with the given details
@@ -39,13 +40,17 @@ func NewProduct(name, description, currency string, categoryID uint, images []st
 		return nil, errors.New("at least one variant must be provided")
 	}
 
+	// Copy variants to ensure product has its own slice
+	productVariants := make([]*ProductVariant, len(variants))
+	copy(productVariants, variants)
+
 	return &Product{
 		Name:        name,
 		Description: description,
 		Currency:    currency,
 		CategoryID:  categoryID,
-		Images:      images,
-		Variants:    make([]*ProductVariant, 0, len(variants)),
+		Images:      common.StringSlice(images),
+		Variants:    productVariants,
 		Active:      isActive,
 	}, nil
 }

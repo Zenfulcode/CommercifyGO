@@ -6,12 +6,14 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/client"
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
 	"github.com/google/uuid"
 	"github.com/zenfulcode/commercify/config"
+	"github.com/zenfulcode/commercify/internal/domain/common"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/client"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/models"
 )
 
 // MobilePayPaymentService implements a MobilePay payment service
@@ -48,11 +50,11 @@ func NewMobilePayPaymentService(config config.MobilePayConfig, logger logger.Log
 func (s *MobilePayPaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:                service.PaymentProviderMobilePay,
+			Type:                common.PaymentProviderMobilePay,
 			Name:                "MobilePay",
 			Description:         "Pay with MobilePay app",
 			IconURL:             "/assets/images/mobilepay-logo.png",
-			Methods:             []service.PaymentMethod{service.PaymentMethodWallet},
+			Methods:             []common.PaymentMethod{common.PaymentMethodWallet},
 			Enabled:             true,
 			SupportedCurrencies: []string{"NOK", "DKK", "EUR"},
 		},
@@ -125,13 +127,13 @@ func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest)
 		Message:        "payment requires user action",
 		RequiresAction: true,
 		ActionURL:      res.RedirectURL,
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // VerifyPayment verifies a payment
-func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider service.PaymentProviderType) (bool, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider common.PaymentProviderType) (bool, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return false, errors.New("invalid payment provider")
 	}
 
@@ -149,8 +151,8 @@ func (s *MobilePayPaymentService) VerifyPayment(transactionID string, provider s
 }
 
 // RefundPayment refunds a payment
-func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -178,13 +180,13 @@ func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, 
 		Message:        "payment refunded successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for refunds
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // CapturePayment captures an authorized payment
-func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -215,13 +217,13 @@ func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string,
 		Message:        "payment captured successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for captures
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
 // CancelPayment cancels a payment
-func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider common.PaymentProviderType) (*service.PaymentResult, error) {
+	if provider != common.PaymentProviderMobilePay {
 		return nil, errors.New("invalid payment provider")
 	}
 
@@ -243,12 +245,12 @@ func (s *MobilePayPaymentService) CancelPayment(transactionID string, provider s
 		Message:        "payment cancelled successfully",
 		RequiresAction: false,
 		ActionURL:      "", // No action URL needed for cancellations
-		Provider:       service.PaymentProviderMobilePay,
+		Provider:       common.PaymentProviderMobilePay,
 	}, nil
 }
 
-func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {
-	if provider != service.PaymentProviderMobilePay {
+func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider common.PaymentProviderType) error {
+	if provider != common.PaymentProviderMobilePay {
 		return errors.New("invalid payment provider")
 	}
 
@@ -269,11 +271,88 @@ func (s *MobilePayPaymentService) ForceApprovePayment(transactionID string, phon
 	return nil
 }
 
-func (s *MobilePayPaymentService) GetAccessToken() error {
-	err := s.vippsClient.EnsureValidToken()
-	if err != nil {
-		return s.vippsClient.GetAccessToken()
+func (s *MobilePayPaymentService) EnsureValidToken() error {
+	return s.vippsClient.EnsureValidToken()
+}
+
+// RegisterWebhook registers a webhook for MobilePay provider using the official SDK
+// This method:
+// 1. Validates MobilePay configuration (credentials and webhook URL)
+// 2. Creates a MobilePay client using the official SDK
+// 3. Removes any existing webhooks to ensure clean state
+// 4. Registers a new webhook with all payment events
+// 5. Updates the provider in the database with webhook information
+func (s *MobilePayPaymentService) RegisterWebhook(provider *entity.PaymentProvider, webhookURL string) error {
+	// Skip if MobilePay is not enabled
+	if !provider.Enabled {
+		s.logger.Info("MobilePay provider is disabled, skipping webhook registration")
+		return nil
 	}
 
+	// Skip if webhook is already registered (has secret and external ID)
+	if provider.WebhookSecret != "" && provider.ExternalWebhookID != "" {
+		s.logger.Info("MobilePay webhook already registered (ID: %s), skipping registration", provider.ExternalWebhookID)
+		return nil
+	}
+
+	if webhookURL == "" {
+		return errors.New("webhook URL is required for MobilePay")
+	}
+
+	s.logger.Info("Registering new MobilePay webhook for URL: %s", webhookURL)
+
+	// Get existing webhooks
+	existingWebhooks, err := s.webhookClient.GetAll()
+	if err != nil {
+		s.logger.Error("Failed to get existing webhooks: %v", err)
+		return fmt.Errorf("failed to get existing webhooks: %w", err)
+	}
+
+	// Remove any existing webhooks for different URLs to ensure clean state
+	for _, webhook := range existingWebhooks {
+		if err := s.webhookClient.Delete(webhook.ID); err != nil {
+			s.logger.Warn("Failed to remove existing webhook %s: %v", webhook.ID, err)
+		} else {
+			s.logger.Info("Removed existing webhook for different URL: %s (ID: %s)", webhook.URL, webhook.ID)
+		}
+	}
+
+	// Register new webhook
+	webhookReq := models.WebhookRegistrationRequest{
+		URL: webhookURL,
+		Events: []string{
+			string(models.WebhookEventPaymentAuthorized),
+			string(models.WebhookEventPaymentCaptured),
+			string(models.WebhookEventPaymentCancelled),
+			string(models.WebhookEventPaymentExpired),
+			string(models.WebhookEventPaymentRefunded),
+		},
+	}
+
+	webhook, err := s.webhookClient.Register(webhookReq)
+	if err != nil {
+		s.logger.Error("Failed to register MobilePay webhook: %v", err)
+		return fmt.Errorf("failed to register MobilePay webhook: %w", err)
+	}
+
+	// Update provider with webhook information
+	provider.WebhookURL = webhookURL
+	provider.WebhookSecret = webhook.Secret
+	provider.WebhookEvents = webhookReq.Events
+	provider.ExternalWebhookID = webhook.ID
+
+	s.logger.Info("Successfully registered MobilePay webhook with ID: %s", webhook.ID)
+	return nil
+}
+
+// DeleteWebhook deletes a webhook for MobilePay provider via API
+func (s *MobilePayPaymentService) DeleteWebhook(provider *entity.PaymentProvider) error {
+	// Delete the webhook
+	if err := s.webhookClient.Delete(provider.ExternalWebhookID); err != nil {
+		s.logger.Error("Failed to delete MobilePay webhook %s: %v", provider.ExternalWebhookID, err)
+		return fmt.Errorf("failed to delete MobilePay webhook: %w", err)
+	}
+
+	s.logger.Info("Successfully deleted MobilePay webhook: %s", provider.ExternalWebhookID)
 	return nil
 }

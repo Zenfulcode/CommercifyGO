@@ -36,7 +36,7 @@ type DatabaseConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
-	Debug    string // Debug mode for database queries
+	Debug    string // Silent, Info, Warn, Error
 }
 
 // AuthConfig holds authentication-specific configuration

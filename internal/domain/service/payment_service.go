@@ -1,31 +1,16 @@
 package service
 
-// PaymentProviderType represents a payment provider type
-type PaymentProviderType string
-
-const (
-	PaymentProviderStripe    PaymentProviderType = "stripe"
-	PaymentProviderMobilePay PaymentProviderType = "mobilepay"
-	PaymentProviderMock      PaymentProviderType = "mock"
-)
-
-// PaymentMethod represents a payment method type
-type PaymentMethod string
-
-const (
-	PaymentMethodCreditCard PaymentMethod = "credit_card"
-	PaymentMethodWallet     PaymentMethod = "wallet"
-)
+import "github.com/zenfulcode/commercify/internal/domain/common"
 
 // PaymentProvider represents information about a payment provider
 type PaymentProvider struct {
-	Type                PaymentProviderType `json:"type"`
-	Name                string              `json:"name"`
-	Description         string              `json:"description"`
-	IconURL             string              `json:"icon_url,omitempty"`
-	Methods             []PaymentMethod     `json:"methods"`
-	Enabled             bool                `json:"enabled"`
-	SupportedCurrencies []string            `json:"supported_currencies,omitempty"`
+	Type                common.PaymentProviderType `json:"type"`
+	Name                string                     `json:"name"`
+	Description         string                     `json:"description"`
+	IconURL             string                     `json:"icon_url,omitempty"`
+	Methods             []common.PaymentMethod     `json:"methods"`
+	Enabled             bool                       `json:"enabled"`
+	SupportedCurrencies []string                   `json:"supported_currencies,omitempty"`
 }
 
 // PaymentRequest represents a request to process a payment
@@ -34,8 +19,8 @@ type PaymentRequest struct {
 	OrderNumber     string
 	Amount          int64
 	Currency        string
-	PaymentMethod   PaymentMethod
-	PaymentProvider PaymentProviderType
+	PaymentMethod   common.PaymentMethod
+	PaymentProvider common.PaymentProviderType
 	CardDetails     *CardDetails
 	PhoneNumber     string
 	CustomerEmail   string
@@ -71,7 +56,7 @@ type PaymentResult struct {
 	Message        string
 	RequiresAction bool
 	ActionURL      string
-	Provider       PaymentProviderType
+	Provider       common.PaymentProviderType
 }
 
 // PaymentService defines the interface for payment processing
@@ -86,17 +71,17 @@ type PaymentService interface {
 	ProcessPayment(request PaymentRequest) (*PaymentResult, error)
 
 	// VerifyPayment verifies a payment
-	VerifyPayment(transactionID string, provider PaymentProviderType) (bool, error)
+	VerifyPayment(transactionID string, provider common.PaymentProviderType) (bool, error)
 
 	// RefundPayment refunds a payment
-	RefundPayment(transactionID, currency string, amount int64, provider PaymentProviderType) (*PaymentResult, error)
+	RefundPayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*PaymentResult, error)
 
 	// CapturePayment captures a payment
-	CapturePayment(transactionID, currency string, amount int64, provider PaymentProviderType) (*PaymentResult, error)
+	CapturePayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*PaymentResult, error)
 
 	// CancelPayment cancels a payment
-	CancelPayment(transactionID string, provider PaymentProviderType) (*PaymentResult, error)
+	CancelPayment(transactionID string, provider common.PaymentProviderType) (*PaymentResult, error)
 
 	// ForceApprovePayment force approves a payment
-	ForceApprovePayment(transactionID string, phoneNumber string, provider PaymentProviderType) error
+	ForceApprovePayment(transactionID string, phoneNumber string, provider common.PaymentProviderType) error
 }

@@ -1,2 +1,0 @@
--- Do nothing in the down migration as we don't want to remove the column if it exists
--- This is a repair migration that should be idempotent

@@ -3,8 +3,8 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -165,6 +165,8 @@ func (r *ShippingRate) Deactivate() {
 
 func (s *ShippingOption) ToShippingOptionDTO() *dto.ShippingOptionDTO {
 	return &dto.ShippingOptionDTO{
+		ShippingRateID:        s.ShippingRateID,
+		ShippingMethodID:      s.ShippingMethodID,
 		Name:                  s.Name,
 		Description:           s.Description,
 		EstimatedDeliveryDays: s.EstimatedDeliveryDays,

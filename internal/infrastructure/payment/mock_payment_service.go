@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
@@ -20,10 +21,10 @@ func NewMockPaymentService() *MockPaymentService {
 func (s *MockPaymentService) GetAvailableProviders() []service.PaymentProvider {
 	return []service.PaymentProvider{
 		{
-			Type:                service.PaymentProviderMock,
+			Type:                common.PaymentProviderMock,
 			Name:                "Test Payment",
 			Description:         "For testing purposes only",
-			Methods:             []service.PaymentMethod{service.PaymentMethodCreditCard},
+			Methods:             []common.PaymentMethod{common.PaymentMethodCreditCard},
 			Enabled:             true,
 			SupportedCurrencies: []string{"USD", "EUR", "GBP", "NOK", "DKK"},
 		},
@@ -57,12 +58,12 @@ func (s *MockPaymentService) ProcessPayment(request service.PaymentRequest) (*se
 
 	// Validate payment details based on method
 	switch request.PaymentMethod {
-	case service.PaymentMethodCreditCard:
+	case common.PaymentMethodCreditCard:
 		if request.CardDetails == nil {
 			return &service.PaymentResult{
 				Success:  false,
 				Message:  "card details are required for credit card payment",
-				Provider: service.PaymentProviderMock,
+				Provider: common.PaymentProviderMock,
 			}, nil
 		}
 		// Validate card details
@@ -70,14 +71,14 @@ func (s *MockPaymentService) ProcessPayment(request service.PaymentRequest) (*se
 			return &service.PaymentResult{
 				Success:  false,
 				Message:  "invalid card details",
-				Provider: service.PaymentProviderMock,
+				Provider: common.PaymentProviderMock,
 			}, nil
 		}
 	default:
 		return &service.PaymentResult{
 			Success:  false,
 			Message:  "unsupported payment method",
-			Provider: service.PaymentProviderMock,
+			Provider: common.PaymentProviderMock,
 		}, nil
 	}
 
@@ -85,12 +86,12 @@ func (s *MockPaymentService) ProcessPayment(request service.PaymentRequest) (*se
 	return &service.PaymentResult{
 		Success:       true,
 		TransactionID: transactionID,
-		Provider:      service.PaymentProviderMock,
+		Provider:      common.PaymentProviderMock,
 	}, nil
 }
 
 // VerifyPayment verifies a payment
-func (s *MockPaymentService) VerifyPayment(transactionID string, provider service.PaymentProviderType) (bool, error) {
+func (s *MockPaymentService) VerifyPayment(transactionID string, provider common.PaymentProviderType) (bool, error) {
 	if transactionID == "" {
 		return false, errors.New("transaction ID is required")
 	}
@@ -103,7 +104,7 @@ func (s *MockPaymentService) VerifyPayment(transactionID string, provider servic
 }
 
 // RefundPayment refunds a payment
-func (s *MockPaymentService) RefundPayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *MockPaymentService) RefundPayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -124,7 +125,7 @@ func (s *MockPaymentService) RefundPayment(transactionID, currency string, amoun
 }
 
 // CapturePayment captures a payment
-func (s *MockPaymentService) CapturePayment(transactionID, currency string, amount int64, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *MockPaymentService) CapturePayment(transactionID, currency string, amount int64, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -147,7 +148,7 @@ func (s *MockPaymentService) CapturePayment(transactionID, currency string, amou
 }
 
 // CancelPayment cancels a payment
-func (s *MockPaymentService) CancelPayment(transactionID string, provider service.PaymentProviderType) (*service.PaymentResult, error) {
+func (s *MockPaymentService) CancelPayment(transactionID string, provider common.PaymentProviderType) (*service.PaymentResult, error) {
 	if transactionID == "" {
 		return nil, errors.New("transaction ID is required")
 	}
@@ -164,6 +165,6 @@ func (s *MockPaymentService) CancelPayment(transactionID string, provider servic
 	}, nil
 }
 
-func (s *MockPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider service.PaymentProviderType) error {
+func (s *MockPaymentService) ForceApprovePayment(transactionID string, phoneNumber string, provider common.PaymentProviderType) error {
 	return nil
 }

@@ -9,7 +9,7 @@ type EmailData struct {
 	Body     string
 	IsHTML   bool
 	Template string
-	Data     map[string]interface{}
+	Data     map[string]any
 }
 
 // EmailService defines the interface for email operations

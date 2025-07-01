@@ -5,8 +5,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"gorm.io/gorm"
 )
 

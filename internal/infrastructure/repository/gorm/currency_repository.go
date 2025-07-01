@@ -77,7 +77,7 @@ func (c *CurrencyRepository) SetDefault(code string) error {
 
 		// Then set the specified currency as default and ensure it's enabled
 		if err := tx.Model(&entity.Currency{}).Where("code = ?", code).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"is_default": true,
 				"is_enabled": true,
 			}).Error; err != nil {

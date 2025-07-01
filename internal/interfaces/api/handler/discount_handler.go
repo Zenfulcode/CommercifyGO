@@ -348,7 +348,7 @@ func (h *DiscountHandler) RemoveDiscountFromOrder(w http.ResponseWriter, r *http
 	}
 
 	// Check if order has a discount applied
-	if order.AppliedDiscount == nil {
+	if order.GetAppliedDiscount() == nil {
 		h.logger.Error("No discount applied to this order")
 		response := contracts.ErrorResponse("No discount applied to this order")
 		w.Header().Set("Content-Type", "application/json")

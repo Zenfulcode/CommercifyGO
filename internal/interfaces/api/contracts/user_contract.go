@@ -2,8 +2,8 @@ package contracts
 
 import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/dto"
 )
 
 // CreateUserRequest represents the data needed to create a new user
@@ -56,13 +56,13 @@ func (r *CreateUserRequest) ToUseCaseInput() usecase.RegisterInput {
 	}
 }
 
-func CreateUserLoginResponse(user *dto.UserDTO, accessToken, refreshToken string, expiresIn int) UserLoginResponse {
-	return UserLoginResponse{
+func CreateUserLoginResponse(user *dto.UserDTO, accessToken, refreshToken string, expiresIn int) ResponseDTO[UserLoginResponse] {
+	return SuccessResponse(UserLoginResponse{
 		User:         *user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
-	}
+	})
 }
 
 func CreateUserListResponse(users []*entity.User, totalCount, page, pageSize int) ListResponseDTO[dto.UserDTO] {

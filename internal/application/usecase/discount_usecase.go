@@ -344,12 +344,13 @@ func (uc *DiscountUseCase) ApplyDiscountToOrder(input ApplyDiscountToOrderInput,
 		order.DiscountAmount = discountAmount
 		order.FinalAmount = order.TotalAmount - discountAmount
 
-		// Record the applied discount
-		order.AppliedDiscount = &entity.AppliedDiscount{
+		// Record the applied discount using JSON helper method
+		appliedDiscount := &entity.AppliedDiscount{
 			DiscountID:     discount.ID,
 			DiscountCode:   discount.Code,
 			DiscountAmount: discountAmount,
 		}
+		order.SetAppliedDiscountJSON(appliedDiscount)
 
 		order.UpdatedAt = time.Now()
 	} else {

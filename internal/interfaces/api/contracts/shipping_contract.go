@@ -2,9 +2,9 @@ package contracts
 
 import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
-	"github.com/zenfulcode/commercify/internal/dto"
 )
 
 // CreateShippingMethodRequest represents the data needed to create a new shipping method
@@ -85,7 +85,8 @@ type CalculateShippingOptionsRequest struct {
 func (c CalculateShippingOptionsRequest) ToUseCaseInput() usecase.CalculateShippingOptionsInput {
 	return usecase.CalculateShippingOptionsInput{
 		Address: entity.Address{
-			Street:     c.Address.AddressLine1,
+			Street1:    c.Address.AddressLine1,
+			Street2:    c.Address.AddressLine2,
 			City:       c.Address.City,
 			State:      c.Address.State,
 			Country:    c.Address.Country,

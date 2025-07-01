@@ -2,17 +2,13 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/webhooks"
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/infrastructure/container"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
-	"github.com/zenfulcode/commercify/internal/interfaces/api/handler"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 	"gorm.io/gorm"
 )
@@ -31,14 +27,12 @@ func NewServer(cfg *config.Config, db *gorm.DB, logger logger.Logger) *Server {
 	// Initialize dependency container
 	diContainer := container.NewContainer(cfg, db, logger)
 
-	// Post-initialization to break circular dependencies
-	if cfg.MobilePay.Enabled {
-		// Connect MobilePay service to WebhookService
-		mobilePayService := diContainer.Services().MobilePayService()
-		webhookService := diContainer.Services().WebhookService()
-		if mobilePayService != nil && webhookService != nil {
-			webhookService.SetMobilePayService(mobilePayService)
-		}
+	// Initialize default payment providers
+	paymentProviderService := diContainer.Services().PaymentProviderService()
+	if err := paymentProviderService.InitializeDefaultProviders(); err != nil {
+		logger.Error("Failed to initialize default payment providers: %v", err)
+	} else {
+		logger.Info("Default payment providers initialized successfully")
 	}
 
 	router := mux.NewRouter()
@@ -76,7 +70,8 @@ func (s *Server) setupRoutes() {
 	checkoutHandler := s.container.Handlers().CheckoutHandler()
 	orderHandler := s.container.Handlers().OrderHandler()
 	paymentHandler := s.container.Handlers().PaymentHandler()
-	webhookHandler := s.container.Handlers().WebhookHandler()
+	paymentProviderHandler := s.container.Handlers().PaymentProviderHandler()
+	webhookHandlers := s.container.Handlers().WebhookHandlerProvider()
 	discountHandler := s.container.Handlers().DiscountHandler()
 	shippingHandler := s.container.Handlers().ShippingHandler()
 	currencyHandler := s.container.Handlers().CurrencyHandler()
@@ -94,6 +89,9 @@ func (s *Server) setupRoutes() {
 	api := s.router.PathPrefix("/api").Subrouter()
 	api.Use(corsMiddleware.ApplyCors)
 
+	// Webhook routes (separate subrouter without CORS middleware for server-to-server communication)
+	webhooks := s.router.PathPrefix("/api/webhooks").Subrouter()
+
 	// Public routes
 	api.HandleFunc("/auth/register", userHandler.Register).Methods(http.MethodPost)
 	api.HandleFunc("/auth/signin", userHandler.Login).Methods(http.MethodPost)
@@ -104,6 +102,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/categories/{id:[0-9]+}", categoryHandler.GetCategory).Methods(http.MethodGet)
 	api.HandleFunc("/categories/{id:[0-9]+}/children", categoryHandler.GetChildCategories).Methods(http.MethodGet)
 	api.HandleFunc("/payment/providers", paymentHandler.GetAvailablePaymentProviders).Methods(http.MethodGet)
+
+	// Webhook routes (public, no authentication or CORS required for server-to-server communication)
+	webhooks.HandleFunc("/stripe", webhookHandlers.StripeHandler().HandleWebhook).Methods(http.MethodPost)
+	webhooks.HandleFunc("/mobilepay", webhookHandlers.MobilePayHandler().HandleWebhook).Methods(http.MethodPost)
 
 	// Public discount routes
 	api.HandleFunc("/discounts/validate", discountHandler.ValidateDiscountCode).Methods(http.MethodPost)
@@ -134,10 +136,6 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/checkout/discount", checkoutHandler.RemoveDiscount).Methods(http.MethodDelete)
 	api.HandleFunc("/checkout/complete", checkoutHandler.CompleteOrder).Methods(http.MethodPost)
 	// api.HandleFunc("/checkout/convert", checkoutHandler.ConvertGuestCheckoutToUserCheckout).Methods(http.MethodPost)
-
-	// Setup payment provider webhooks
-	s.setupMobilePayWebhooks(api, webhookHandler)
-	s.setupStripeWebhooks(api, webhookHandler)
 
 	// Routes with optional authentication (accessible via auth or checkout session)
 	optionalAuth := api.PathPrefix("").Subrouter()
@@ -212,13 +210,14 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/payments/{paymentId}/refund", paymentHandler.RefundPayment).Methods(http.MethodPost)
 	admin.HandleFunc("/payments/{paymentId}/force-approve", paymentHandler.ForceApproveMobilePayPayment).Methods(http.MethodPost)
 
-	// Webhook management routes (admin only)
-	admin.HandleFunc("/webhooks", webhookHandler.ListWebhooks).Methods(http.MethodGet)
-	admin.HandleFunc("/webhooks/{webhookId:[0-9]+}", webhookHandler.GetWebhook).Methods(http.MethodGet)
-	admin.HandleFunc("/webhooks/{webhookId:[0-9]+}", webhookHandler.DeleteWebhook).Methods(http.MethodDelete)
-	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.RegisterMobilePayWebhook).Methods(http.MethodPost)
-	admin.HandleFunc("/webhooks/mobilepay", webhookHandler.GetMobilePayWebhooks).Methods(http.MethodGet)
-	admin.HandleFunc("/webhooks/mobilepay/{externalId}", webhookHandler.DeleteMobilePayWebhook).Methods(http.MethodDelete)
+	// Payment provider management routes (admin only)
+	admin.HandleFunc("/payment-providers", paymentProviderHandler.GetPaymentProviders).Methods(http.MethodGet)
+	admin.HandleFunc("/payment-providers/enabled", paymentProviderHandler.GetEnabledPaymentProviders).Methods(http.MethodGet)
+	admin.HandleFunc("/payment-providers/{providerType}/enable", paymentProviderHandler.EnablePaymentProvider).Methods(http.MethodPut)
+	admin.HandleFunc("/payment-providers/{providerType}/configuration", paymentProviderHandler.UpdateProviderConfiguration).Methods(http.MethodPut)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.RegisterWebhook).Methods(http.MethodPost)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.DeleteWebhook).Methods(http.MethodDelete)
+	admin.HandleFunc("/payment-providers/{providerType}/webhook", paymentProviderHandler.GetWebhookInfo).Methods(http.MethodGet)
 
 	admin.HandleFunc("/products", productHandler.ListProducts).Methods(http.MethodGet)
 	admin.HandleFunc("/products", productHandler.CreateProduct).Methods(http.MethodPost)
@@ -234,85 +233,6 @@ func (s *Server) setupRoutes() {
 // GetContainer returns the dependency injection container
 func (s *Server) GetContainer() container.Container {
 	return s.container
-}
-
-// setupStripeWebhooks configures Stripe webhooks
-func (s *Server) setupStripeWebhooks(api *mux.Router, webhookHandler *handler.WebhookHandler) {
-	if !s.config.Stripe.Enabled {
-		return
-	}
-
-	if s.config.Stripe.WebhookSecret == "" {
-		s.logger.Warn("Stripe webhook secret is not configured, webhooks will not validate signatures")
-	} else {
-		s.logger.Info("Stripe webhook endpoint configured at /api/webhooks/stripe")
-		api.HandleFunc("/webhooks/stripe", webhookHandler.HandleStripeWebhook).Methods(http.MethodPost)
-	}
-
-	// Note: For Stripe, webhook endpoints are already registered in the routes.
-	// We don't need to dynamically register them like in MobilePay.
-	// This method exists for consistency with MobilePay setup and to handle any future
-	// Stripe webhook configuration needs.
-}
-
-// setupMobilePayWebhooks configures MobilePay webhooks if enabled
-func (s *Server) setupMobilePayWebhooks(api *mux.Router, webhookHandler *handler.WebhookHandler) {
-	if !s.config.MobilePay.Enabled {
-		return
-	}
-
-	// Get webhooks
-	webhookUseCase := s.container.UseCases().WebhookUseCase()
-	result, err := webhookUseCase.GetAllWebhooks()
-	if err != nil {
-		s.logger.Error("Failed to get MobilePay webhooks: %v", err)
-		return
-	}
-
-	// Register webhook if none exists
-	if len(result) == 0 {
-		webhookService := s.container.Services().WebhookService()
-		webhook, err := webhookService.RegisterMobilePayWebhook(s.config.MobilePay.WebhookURL, []string{
-			string(models.WebhookEventPaymentAborted),
-			string(models.WebhookEventPaymentCancelled),
-			string(models.WebhookEventPaymentCaptured),
-			string(models.WebhookEventPaymentRefunded),
-			string(models.WebhookEventPaymentExpired),
-			string(models.WebhookEventPaymentAuthorized),
-		})
-
-		if err != nil {
-			s.logger.Error("Failed to register MobilePay webhook: %v", err)
-		} else {
-			s.logger.Info("Registered new MobilePay webhook: %s", webhook.URL)
-			result = append(result, webhook)
-		}
-	} else {
-		s.logger.Info("Found %d MobilePay webhooks", len(result))
-	}
-
-	// Configure webhook handlers
-	for _, webhook := range result {
-		if webhook.IsActive && webhook.Provider == "mobilepay" {
-			handler := webhooks.NewHandler(webhook.Secret)
-			router := webhooks.NewRouter()
-
-			router.HandleFunc(models.EventAuthorized, webhookHandler.HandleMobilePayAuthorized)
-			router.HandleFunc(models.EventAborted, webhookHandler.HandleMobilePayAborted)
-			router.HandleFunc(models.EventCancelled, webhookHandler.HandleMobilePayCancelled)
-			router.HandleFunc(models.EventCaptured, webhookHandler.HandleMobilePayCaptured)
-			router.HandleFunc(models.EventRefunded, webhookHandler.HandleMobilePayRefunded)
-			router.HandleFunc(models.EventExpired, webhookHandler.HandleMobilePayExpired)
-
-			router.HandleDefault(func(event *models.WebhookEvent) error {
-				fmt.Printf("Received unhandled event: %s\n", event.Name)
-				return nil
-			})
-
-			api.HandleFunc("/webhooks/mobilepay", handler.HandleHTTP(router.Process))
-			s.logger.Info("Registered MobilePay webhook: %s", webhook.URL)
-		}
-	}
 }
 
 // Start starts the server

@@ -21,7 +21,7 @@ func (r *ShippingRateRepository) Create(rate *entity.ShippingRate) error {
 // GetByID implements repository.ShippingRateRepository.
 func (r *ShippingRateRepository) GetByID(rateID uint) (*entity.ShippingRate, error) {
 	var rate entity.ShippingRate
-	if err := r.db.First(&rate, rateID).Error; err != nil {
+	if err := r.db.Preload("ShippingMethod").First(&rate, rateID).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch shipping rate: %w", err)
 	}
 	return &rate, nil
@@ -30,7 +30,7 @@ func (r *ShippingRateRepository) GetByID(rateID uint) (*entity.ShippingRate, err
 // GetByMethodID implements repository.ShippingRateRepository.
 func (r *ShippingRateRepository) GetByMethodID(methodID uint) ([]*entity.ShippingRate, error) {
 	var rates []*entity.ShippingRate
-	if err := r.db.Where("method_id = ?", methodID).Find(&rates).Error; err != nil {
+	if err := r.db.Preload("ShippingMethod").Where("method_id = ?", methodID).Find(&rates).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch shipping rates by method: %w", err)
 	}
 	return rates, nil
@@ -39,7 +39,7 @@ func (r *ShippingRateRepository) GetByMethodID(methodID uint) ([]*entity.Shippin
 // GetByZoneID implements repository.ShippingRateRepository.
 func (r *ShippingRateRepository) GetByZoneID(zoneID uint) ([]*entity.ShippingRate, error) {
 	var rates []*entity.ShippingRate
-	if err := r.db.Where("zone_id = ?", zoneID).Find(&rates).Error; err != nil {
+	if err := r.db.Preload("ShippingMethod").Where("zone_id = ?", zoneID).Find(&rates).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch shipping rates by zone: %w", err)
 	}
 	return rates, nil
@@ -49,7 +49,7 @@ func (r *ShippingRateRepository) GetByZoneID(zoneID uint) ([]*entity.ShippingRat
 func (r *ShippingRateRepository) GetAvailableRatesForAddress(address entity.Address, orderValue int64) ([]*entity.ShippingRate, error) {
 	// This is a placeholder implementation
 	var rates []*entity.ShippingRate
-	if err := r.db.Find(&rates).Error; err != nil {
+	if err := r.db.Preload("ShippingMethod").Find(&rates).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch available shipping rates: %w", err)
 	}
 	return rates, nil

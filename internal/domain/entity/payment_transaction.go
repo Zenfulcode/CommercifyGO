@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"gorm.io/gorm"
 )
 
@@ -37,7 +38,7 @@ type PaymentTransaction struct {
 	Currency      string            `gorm:"not null;size:3"`               // Currency of the transaction
 	Provider      string            `gorm:"not null;size:100"`             // Payment provider (stripe, paypal, etc.)
 	RawResponse   string            `gorm:"type:text"`                     // Raw response from payment provider (JSON)
-	Metadata      map[string]string `gorm:"type:jsonb"`                    // Additional metadata
+	Metadata      common.StringMap  `gorm:"type:text"`                     // Additional metadata stored as JSON
 }
 
 // NewPaymentTransaction creates a new payment transaction
@@ -77,17 +78,16 @@ func NewPaymentTransaction(
 		Amount:        amount,
 		Currency:      currency,
 		Provider:      provider,
-		Metadata:      make(map[string]string),
+		Metadata:      make(common.StringMap),
 	}, nil
 }
 
 // AddMetadata adds metadata to the transaction
 func (pt *PaymentTransaction) AddMetadata(key, value string) {
 	if pt.Metadata == nil {
-		pt.Metadata = make(map[string]string)
+		pt.Metadata = make(common.StringMap)
 	}
 	pt.Metadata[key] = value
-
 }
 
 // SetRawResponse sets the raw response from the payment provider

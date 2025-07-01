@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -113,6 +114,29 @@ func (uc *OrderUseCase) GetOrderByPaymentID(paymentID string) (*entity.Order, er
 	return order, nil
 }
 
+func (uc *OrderUseCase) GetOrderByExternalID(externalID string) (*entity.Order, error) {
+	if externalID == "" {
+		return nil, errors.New("external ID cannot be empty")
+	}
+
+	// Extract order ID from the reference
+	var orderID uint
+	_, err := fmt.Sscanf(externalID, "order-%d-", &orderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid reference format in MobilePay webhook event: %s", externalID)
+	}
+
+	fmt.Printf("Extracted order ID from external ID: %d\n", orderID)
+
+	// Delegate to the order repository which has this functionality
+	order, err := uc.orderRepo.GetByID(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order by external ID: %w", err)
+	}
+
+	return order, nil
+}
+
 // GetUserOrders retrieves orders for a user
 func (uc *OrderUseCase) GetUserOrders(userID uint, offset, limit int) ([]*entity.Order, error) {
 	return uc.orderRepo.GetByUser(userID, offset, limit)
@@ -168,7 +192,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		return errors.New("capture amount cannot exceed the original payment amount")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	// Call payment service to capture payment
 	_, err = uc.paymentSvc.CapturePayment(transactionID, order.Currency, amount, providerType)
@@ -261,7 +285,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		return errors.New("transaction ID is required")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	_, err = uc.paymentSvc.CancelPayment(transactionID, providerType)
 	if err != nil {
@@ -345,7 +369,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return errors.New("refund amount cannot exceed the original payment amount")
 	}
 
-	providerType := service.PaymentProviderType(order.PaymentProvider)
+	providerType := common.PaymentProviderType(order.PaymentProvider)
 
 	// Get total refunded amount so far (if any)
 	var totalRefundedSoFar int64 = 0
@@ -450,7 +474,7 @@ func (uc *OrderUseCase) ForceApproveMobilePayPayment(paymentID string, phoneNumb
 	}
 
 	// Force approve the payment
-	return paymentSvc.ForceApprovePayment(paymentID, phoneNumber, service.PaymentProviderMobilePay)
+	return paymentSvc.ForceApprovePayment(paymentID, phoneNumber, common.PaymentProviderMobilePay)
 }
 
 // GetUserByID retrieves a user by ID

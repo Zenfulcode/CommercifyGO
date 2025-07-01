@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // InitDB initializes the GORM database connection and auto-migrates tables
@@ -76,7 +77,9 @@ func initPostgresDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		host, port, user, password, dbname, sslmode)
 
 	// Open database connection
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
 	}
@@ -116,9 +119,7 @@ func autoMigrate(db *gorm.DB) error {
 
 		// Payment entities
 		&entity.PaymentTransaction{},
-
-		// Webhook entities
-		&entity.Webhook{},
+		&entity.PaymentProvider{},
 	)
 }
 
