@@ -44,7 +44,7 @@ func (c *CheckoutRepository) Create(checkout *entity.Checkout) error {
 
 // Delete implements repository.CheckoutRepository.
 func (c *CheckoutRepository) Delete(checkoutID uint) error {
-	return c.db.Delete(&entity.Checkout{}, checkoutID).Error
+	return c.db.Unscoped().Delete(&entity.Checkout{}, checkoutID).Error
 }
 
 // GetActiveCheckoutsByUserID implements repository.CheckoutRepository.

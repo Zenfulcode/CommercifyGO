@@ -29,7 +29,7 @@ type Checkout struct {
 	gorm.Model
 	UserID              *uint           `gorm:"index"`
 	User                *User           `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
-	SessionID           string          `gorm:"uniqueIndex;not null;size:255"`
+	SessionID           string          `gorm:"index;not null;size:255"`
 	Items               []CheckoutItem  `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	Status              CheckoutStatus  `gorm:"not null;size:50;default:'active'"`
 	ShippingAddressJSON *string         `gorm:"column:shipping_address;type:text"`
