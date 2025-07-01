@@ -210,6 +210,32 @@ func (p *Product) Update(name *string, description *string, images *[]string, ac
 	return updated
 }
 
+func (p *Product) GetProdNumber() string {
+	if p == nil || len(p.Variants) == 0 {
+		return ""
+	}
+
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant != nil {
+		return defaultVariant.SKU
+	}
+
+	return ""
+}
+
+func (p *Product) GetPrice() int64 {
+	if p == nil || len(p.Variants) == 0 {
+		return 0
+	}
+
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant != nil {
+		return defaultVariant.Price
+	}
+
+	return 0
+}
+
 func (product *Product) ToProductDTO() *dto.ProductDTO {
 	if product == nil {
 		return nil
@@ -220,13 +246,19 @@ func (product *Product) ToProductDTO() *dto.ProductDTO {
 		variantsDTO[i] = *v.ToVariantDTO()
 	}
 
+	defaultVariant := product.GetDefaultVariant()
+	if defaultVariant == nil {
+
+	}
+
 	return &dto.ProductDTO{
 		ID:          product.ID,
 		Name:        product.Name,
+		SKU:         product.GetProdNumber(),
 		Description: product.Description,
 		Currency:    product.Currency,
 		TotalStock:  product.GetTotalStock(),
-		Price:       money.FromCents(product.GetDefaultVariant().Price),
+		Price:       money.FromCents(product.GetPrice()),
 		Category:    product.Category.Name,
 		CategoryID:  product.CategoryID,
 		Images:      product.Images,

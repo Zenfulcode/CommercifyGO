@@ -157,7 +157,7 @@ func (variant *ProductVariant) ToVariantDTO() *dto.VariantDTO {
 		VariantName: variant.Name(),
 		SKU:         variant.SKU,
 		Stock:       variant.Stock,
-		Attributes:  variant.Attributes,
+		Attributes:  common.StringMap(variant.Attributes),
 		Images:      variant.Images,
 		IsDefault:   variant.IsDefault,
 		Weight:      variant.Weight,

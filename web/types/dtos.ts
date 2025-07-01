@@ -181,12 +181,12 @@ export interface OrderDTO {
   discount_amount: number /* float64 */; // Discount applied amount
   final_amount: number /* float64 */; // Total including shipping and discounts
   currency: string;
-  shipping_address?: AddressDTO;
-  billing_address?: AddressDTO;
+  shipping_address: AddressDTO;
+  billing_address: AddressDTO;
   payment_details?: PaymentDetails;
-  shipping_details?: ShippingOptionDTO;
+  shipping_details: ShippingOptionDTO;
   discount_details?: AppliedDiscountDTO;
-  customer?: CustomerDetailsDTO;
+  customer: CustomerDetailsDTO;
   action_required: boolean; // Indicates if action is needed (e.g., payment)
   action_url?: string; // URL for payment or order actions
   created_at: string;
@@ -278,6 +278,7 @@ export interface ProductDTO {
   description: string;
   currency: string;
   price: number /* float64 */; // Default variant price in given currency
+  sku: string; // Default variant SKU
   total_stock: number /* int */; // Total stock across all variants
   category: string;
   category_id: number /* uint */;
@@ -297,7 +298,7 @@ export interface VariantDTO {
   variant_name: string;
   sku: string;
   stock: number /* int */;
-  attributes: { [key: string]: string};
+  attributes: any /* common.StringMap */;
   images: string[];
   is_default: boolean;
   weight: number /* float64 */;
@@ -380,8 +381,8 @@ export interface ValueBasedRateDTO {
  * ShippingOptionDTO represents a shipping option with calculated cost
  */
 export interface ShippingOptionDTO {
-  shipping_rate_id?: number /* uint */;
-  shipping_method_id?: number /* uint */;
+  shipping_rate_id: number /* uint */;
+  shipping_method_id: number /* uint */;
   name: string;
   description: string;
   estimated_delivery_days: number /* int */;

@@ -447,6 +447,10 @@ func isValidPaymentStatusTransition(from, to PaymentStatus) bool {
 	return slices.Contains(validTransitions[from], to)
 }
 
+func (o *Order) ActionRequired() bool {
+	return o.Status == OrderStatusPending && o.ActionURL.Valid && o.ActionURL.String != ""
+}
+
 func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 	var customer dto.CustomerDetailsDTO
 	if o.CustomerDetails != nil {
@@ -492,8 +496,8 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		OrderNumber:     o.OrderNumber,
 		UserID:          o.UserID,
 		CheckoutID:      o.CheckoutSessionID,
-		CustomerDetails: customerDetails,
-		ShippingDetails: shippingDetails,
+		CustomerDetails: *customerDetails,
+		ShippingDetails: *shippingDetails,
 		DiscountDetails: discountDetails,
 		Status:          dto.OrderStatus(o.Status),
 		PaymentStatus:   dto.PaymentStatus(o.PaymentStatus),
@@ -503,9 +507,9 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		DiscountAmount:  money.FromCents(o.DiscountAmount),
 		FinalAmount:     money.FromCents(o.FinalAmount),
 		Items:           o.ToOrderItemsDTO(),
-		ShippingAddress: shippingAddr.ToAddressDTO(),
-		BillingAddress:  billingAddr.ToAddressDTO(),
-		ActionRequired:  o.ActionURL.Valid && o.ActionURL.String != "",
+		ShippingAddress: *shippingAddr.ToAddressDTO(),
+		BillingAddress:  *billingAddr.ToAddressDTO(),
+		ActionRequired:  o.ActionRequired(),
 		ActionURL:       o.ActionURL.String,
 		CreatedAt:       o.CreatedAt,
 		UpdatedAt:       o.UpdatedAt,

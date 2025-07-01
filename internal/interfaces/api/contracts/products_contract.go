@@ -101,7 +101,7 @@ func (cp *CreateProductRequest) ToUseCaseInput() usecase.CreateProductInput {
 
 func (cv *CreateVariantRequest) ToUseCaseInput() usecase.CreateVariantInput {
 	// Convert attributes array to map
-	attributesMap := make(map[string]string)
+	attributesMap := make(entity.VariantAttributes)
 	for _, attr := range cv.Attributes {
 		attributesMap[attr.Name] = attr.Value
 	}

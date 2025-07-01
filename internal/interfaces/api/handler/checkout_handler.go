@@ -729,7 +729,7 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Create response
-	response := contracts.CreateCompleteCheckoutResponse(processedOrder.ToOrderDetailsDTO())
+	response := contracts.CreateCompleteCheckoutResponse(processedOrder)
 
 	// Return created order
 	w.Header().Set("Content-Type", "application/json")

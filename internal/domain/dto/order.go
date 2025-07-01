@@ -18,12 +18,12 @@ type OrderDTO struct {
 	DiscountAmount  float64             `json:"discount_amount"` // Discount applied amount
 	FinalAmount     float64             `json:"final_amount"`    // Total including shipping and discounts
 	Currency        string              `json:"currency"`
-	ShippingAddress *AddressDTO         `json:"shipping_address"`
-	BillingAddress  *AddressDTO         `json:"billing_address"`
+	ShippingAddress AddressDTO          `json:"shipping_address"`
+	BillingAddress  AddressDTO          `json:"billing_address"`
 	PaymentDetails  *PaymentDetails     `json:"payment_details"`
-	ShippingDetails *ShippingOptionDTO  `json:"shipping_details"`
+	ShippingDetails ShippingOptionDTO   `json:"shipping_details"`
 	DiscountDetails *AppliedDiscountDTO `json:"discount_details"`
-	CustomerDetails *CustomerDetailsDTO `json:"customer"`
+	CustomerDetails CustomerDetailsDTO  `json:"customer"`
 	ActionRequired  bool                `json:"action_required"`      // Indicates if action is needed (e.g., payment)
 	ActionURL       string              `json:"action_url,omitempty"` // URL for payment or order actions
 	CreatedAt       time.Time           `json:"created_at"`

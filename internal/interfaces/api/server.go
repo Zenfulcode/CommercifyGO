@@ -80,14 +80,14 @@ func (s *Server) setupRoutes() {
 
 	// Extract middleware from container
 	authMiddleware := s.container.Middlewares().AuthMiddleware()
-	corsMiddleware := s.container.Middlewares().CorsMiddleware()
+	// corsMiddleware := s.container.Middlewares().CorsMiddleware()
 
 	// Health check routes (no prefix, for load balancers and monitoring)
 	s.router.HandleFunc("/health", healthHandler.Health).Methods(http.MethodGet)
 
 	// Register routes
 	api := s.router.PathPrefix("/api").Subrouter()
-	api.Use(corsMiddleware.ApplyCors)
+	// api.Use(corsMiddleware.ApplyCors)
 
 	// Webhook routes (separate subrouter without CORS middleware for server-to-server communication)
 	webhooks := s.router.PathPrefix("/api/webhooks").Subrouter()

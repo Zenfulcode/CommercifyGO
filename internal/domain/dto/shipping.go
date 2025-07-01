@@ -67,8 +67,8 @@ type ValueBasedRateDTO struct {
 
 // ShippingOptionDTO represents a shipping option with calculated cost
 type ShippingOptionDTO struct {
-	ShippingRateID        uint    `json:"shipping_rate_id,omitempty"`
-	ShippingMethodID      uint    `json:"shipping_method_id,omitempty"`
+	ShippingRateID        uint    `json:"shipping_rate_id"`
+	ShippingMethodID      uint    `json:"shipping_method_id"`
 	Name                  string  `json:"name"`
 	Description           string  `json:"description"`
 	EstimatedDeliveryDays int     `json:"estimated_delivery_days"`
