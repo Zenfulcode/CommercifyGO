@@ -114,6 +114,29 @@ func (uc *OrderUseCase) GetOrderByPaymentID(paymentID string) (*entity.Order, er
 	return order, nil
 }
 
+func (uc *OrderUseCase) GetOrderByExternalID(externalID string) (*entity.Order, error) {
+	if externalID == "" {
+		return nil, errors.New("external ID cannot be empty")
+	}
+
+	// Extract order ID from the reference
+	var orderID uint
+	_, err := fmt.Sscanf(externalID, "order-%d-", &orderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid reference format in MobilePay webhook event: %s", externalID)
+	}
+
+	fmt.Printf("Extracted order ID from external ID: %d\n", orderID)
+
+	// Delegate to the order repository which has this functionality
+	order, err := uc.orderRepo.GetByID(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order by external ID: %w", err)
+	}
+
+	return order, nil
+}
+
 // GetUserOrders retrieves orders for a user
 func (uc *OrderUseCase) GetUserOrders(userID uint, offset, limit int) ([]*entity.Order, error) {
 	return uc.orderRepo.GetByUser(userID, offset, limit)

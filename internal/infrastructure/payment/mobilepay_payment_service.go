@@ -6,14 +6,14 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/client"
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
 	"github.com/google/uuid"
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/client"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/models"
 )
 
 // MobilePayPaymentService implements a MobilePay payment service

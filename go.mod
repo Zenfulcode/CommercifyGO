@@ -3,7 +3,6 @@ module github.com/zenfulcode/commercify
 go 1.24.0
 
 require (
-	github.com/gkhaavik/vipps-mobilepay-sdk v1.0.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -11,6 +10,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.10.0
 	github.com/stripe/stripe-go/v82 v82.1.0
+	github.com/zenfulcode/vipps-mobilepay-sdk v1.0.2
 	golang.org/x/crypto v0.39.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0

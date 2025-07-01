@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/models"
-	"github.com/gkhaavik/vipps-mobilepay-sdk/pkg/webhooks"
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/models"
+	"github.com/zenfulcode/vipps-mobilepay-sdk/pkg/webhooks"
 )
 
 // MobilePayWebhookHandler handles MobilePay webhook callbacks
@@ -244,13 +244,13 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentRefunded(event *models.Webhook
 // getOrderIDFromSDKEvent gets the order ID associated with a MobilePay payment from SDK event
 func (h *MobilePayWebhookHandler) getOrderIDFromSDKEvent(event *models.WebhookEvent) (uint, error) {
 	// Try to find the order by PaymentID field using the event reference
-	order, err := h.orderUseCase.GetOrderByPaymentID(event.Reference)
-	if err == nil && order != nil {
-		return order.ID, nil
+	order, err := h.orderUseCase.GetOrderByExternalID(event.Reference)
+	if err != nil {
+		h.logger.Error("Could not find order for MobilePay payment %s", event.Reference)
+		return 0, fmt.Errorf("order not found for MobilePay payment %s", event.Reference)
 	}
 
-	h.logger.Error("Could not find order for MobilePay payment %s", event.Reference)
-	return 0, fmt.Errorf("order not found for MobilePay payment %s", event.Reference)
+	return order.ID, nil
 }
 
 // getWebhookSecretFromDatabase retrieves the webhook secret for MobilePay from the database

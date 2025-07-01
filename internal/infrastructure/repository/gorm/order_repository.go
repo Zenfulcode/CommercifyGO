@@ -23,7 +23,7 @@ func (o *OrderRepository) Create(order *entity.Order) error {
 func (o *OrderRepository) GetByCheckoutSessionID(checkoutSessionID string) (*entity.Order, error) {
 	var order entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").Preload("PaymentTransactions").
+		Preload("User").Preload("PaymentTransactions").
 		Where("checkout_session_id = ?", checkoutSessionID).First(&order).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("order with checkout session ID %s not found", checkoutSessionID)
@@ -37,7 +37,7 @@ func (o *OrderRepository) GetByCheckoutSessionID(checkoutSessionID string) (*ent
 func (o *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	var order entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").Preload("PaymentTransactions").
+		Preload("User").Preload("PaymentTransactions").
 		First(&order, orderID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("order with ID %d not found", orderID)
@@ -51,7 +51,7 @@ func (o *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 func (o *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error) {
 	var order entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").Preload("PaymentTransactions").
+		Preload("User").Preload("PaymentTransactions").
 		Where("payment_id = ?", paymentID).First(&order).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("order with payment ID %s not found", paymentID)
@@ -65,7 +65,7 @@ func (o *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 func (o *OrderRepository) GetByUser(userID uint, offset int, limit int) ([]*entity.Order, error) {
 	var orders []*entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("user_id = ?", userID).
 		Offset(offset).Limit(limit).
 		Order("created_at DESC").
@@ -102,7 +102,7 @@ func (o *OrderRepository) IsDiscountIdUsed(discountID uint) (bool, error) {
 func (o *OrderRepository) ListAll(offset int, limit int) ([]*entity.Order, error) {
 	var orders []*entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Offset(offset).Limit(limit).
 		Order("created_at DESC").
 		Find(&orders).Error; err != nil {
@@ -115,7 +115,7 @@ func (o *OrderRepository) ListAll(offset int, limit int) ([]*entity.Order, error
 func (o *OrderRepository) ListByStatus(status entity.OrderStatus, offset int, limit int) ([]*entity.Order, error) {
 	var orders []*entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").Preload("ShippingMethod").
+		Preload("User").
 		Where("status = ?", status).
 		Offset(offset).Limit(limit).
 		Order("created_at DESC").
