@@ -84,6 +84,37 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Add test address data to mock order
+	testShippingAddr := entity.Address{
+		Street1:    "123 Test Street",
+		Street2:    "Apt 4B",
+		City:       "Test City",
+		State:      "Test State",
+		PostalCode: "12345",
+		Country:    "Test Country",
+	}
+	
+	testBillingAddr := entity.Address{
+		Street1:    "456 Billing Ave",
+		Street2:    "",
+		City:       "Billing City",
+		State:      "Billing State", 
+		PostalCode: "67890",
+		Country:    "Billing Country",
+	}
+	
+	// Set addresses using JSON helper methods
+	mockOrder.SetShippingAddressJSON(&testShippingAddr)
+	mockOrder.SetBillingAddressJSON(&testBillingAddr)
+
+	// Add test applied discount
+	testDiscount := &entity.AppliedDiscount{
+		DiscountID:     1,
+		DiscountCode:   "TEST15",
+		DiscountAmount: 1500, // $15.00 in cents
+	}
+	mockOrder.SetAppliedDiscountJSON(testDiscount)
+
 	var errors []string
 
 	// Override email addresses to send both emails to admin for testing
@@ -118,35 +149,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.logger.Info("Order notification email sent successfully")
 	}
-
-	// Set addresses using JSON helper methods
-	shippingAddr := entity.Address{
-		Street1:    "123 Test Street",
-		Street2:    "street 2",
-		City:       "Test City",
-		State:      "Test State",
-		PostalCode: "12345",
-		Country:    "US",
-	}
-	billingAddr := entity.Address{
-		Street1:    "123 Test Street",
-		Street2:    "",
-		City:       "Test City",
-		State:      "Test State",
-		PostalCode: "12345",
-		Country:    "US",
-	}
-
-	mockOrder.SetShippingAddressJSON(&shippingAddr)
-	mockOrder.SetBillingAddressJSON(&billingAddr)
-
-	// Set applied discount using JSON helper method
-	appliedDiscount := &entity.AppliedDiscount{
-		DiscountID:     1,
-		DiscountCode:   "SUMMER25",
-		DiscountAmount: 1500, // $15.00 discount
-	}
-	mockOrder.SetAppliedDiscountJSON(appliedDiscount)
 
 	w.Header().Set("Content-Type", "application/json")
 

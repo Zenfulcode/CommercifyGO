@@ -101,11 +101,24 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 	s.logger.Info("Sending order confirmation email for Order ID: %d to User: %s", order.ID, user.Email)
 
 	// Prepare data for the template
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Email template data - Order ID: %d", order.ID)
+	s.logger.Info("Shipping Address: %+v", shippingAddr)
+	s.logger.Info("Billing Address: %+v", billingAddr)
+	s.logger.Info("Applied Discount: %+v", appliedDiscount)
+
 	data := map[string]any{
-		"Order":        order,
-		"User":         user,
-		"StoreName":    s.config.FromName,
-		"ContactEmail": s.config.FromEmail,
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.FromName,
+		"ContactEmail":    s.config.FromEmail,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
 	}
 
 	// Send email
@@ -123,10 +136,23 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	s.logger.Info("Sending order notification email for Order ID: %d to Admin: %s", order.ID, s.config.AdminEmail)
 
 	// Prepare data for the template
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Email template data - Order ID: %d", order.ID)
+	s.logger.Info("Shipping Address: %+v", shippingAddr)
+	s.logger.Info("Billing Address: %+v", billingAddr)
+	s.logger.Info("Applied Discount: %+v", appliedDiscount)
+
 	data := map[string]any{
-		"Order":     order,
-		"User":      user,
-		"StoreName": s.config.FromName,
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.FromName,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
 	}
 
 	// Send email

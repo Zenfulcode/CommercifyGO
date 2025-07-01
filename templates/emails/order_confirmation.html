@@ -69,8 +69,7 @@
     <div class="order-details">
       <p><strong>Order Number:</strong> #{{.Order.ID}}</p>
       <p>
-        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2,
-        2006"}}
+        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006"}}
       </p>
       <p><strong>Order Status:</strong> {{.Order.Status}}</p>
     </div>
@@ -105,11 +104,11 @@
       <p><strong>Shipping:</strong> ${{formatPrice .Order.ShippingCost}}</p>
       {{else}}
       <p><strong>Shipping:</strong> Free</p>
-      {{end}} {{if gt .Order.DiscountAmount 0}}
+      {{end}}      {{if gt .Order.DiscountAmount 0}}
       <p>
         <strong>Discount:</strong> -${{formatPrice .Order.DiscountAmount}} {{if
-        .Order.AppliedDiscount}} {{if .Order.AppliedDiscount.DiscountCode}}
-        (Code: {{.Order.AppliedDiscount.DiscountCode}}) {{end}} {{end}}
+        .AppliedDiscount}} {{if .AppliedDiscount.DiscountCode}}
+        (Code: {{.AppliedDiscount.DiscountCode}}) {{end}} {{end}}
       </p>
       {{end}}
 
@@ -120,20 +119,28 @@
 
     <h2>Shipping Address</h2>
     <div class="address">
-      {{.Order.ShippingAddr.Street1}}<br />
-      {{.Order.ShippingAddr.Street2}}<br />
-      {{.Order.ShippingAddr.City}}, {{.Order.ShippingAddr.State}}
-      {{.Order.ShippingAddr.PostalCode}}<br />
-      {{.Order.ShippingAddr.Country}}
+      {{if .ShippingAddr.Street1}}
+        {{.ShippingAddr.Street1}}<br />
+        {{if .ShippingAddr.Street2}}{{.ShippingAddr.Street2}}<br />{{end}}
+        {{.ShippingAddr.City}}{{if .ShippingAddr.State}}, {{.ShippingAddr.State}}{{end}}
+        {{if .ShippingAddr.PostalCode}} {{.ShippingAddr.PostalCode}}{{end}}<br />
+        {{.ShippingAddr.Country}}
+      {{else}}
+        <p>No shipping address provided</p>
+      {{end}}
     </div>
 
     <h2>Billing Address</h2>
     <div class="address">
-      {{.Order.BillingAddr.Street1}}<br />
-      {{.Order.BillingAddr.Street2}}<br />
-      {{.Order.BillingAddr.City}}, {{.Order.BillingAddr.State}}
-      {{.Order.BillingAddr.PostalCode}}<br />
-      {{.Order.BillingAddr.Country}}
+      {{if .BillingAddr.Street1}}
+        {{.BillingAddr.Street1}}<br />
+        {{if .BillingAddr.Street2}}{{.BillingAddr.Street2}}<br />{{end}}
+        {{.BillingAddr.City}}{{if .BillingAddr.State}}, {{.BillingAddr.State}}{{end}}
+        {{if .BillingAddr.PostalCode}} {{.BillingAddr.PostalCode}}{{end}}<br />
+        {{.BillingAddr.Country}}
+      {{else}}
+        <p>No billing address provided</p>
+      {{end}}
     </div>
 
     <p>
