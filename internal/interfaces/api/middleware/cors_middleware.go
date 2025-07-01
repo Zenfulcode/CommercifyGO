@@ -32,8 +32,6 @@ func (m *CorsMiddleware) ApplyCors(next http.Handler) http.Handler {
 			allowedOrigins = []string{"*"}
 		}
 
-		fmt.Println("Allowed Origins:", allowedOrigins)
-
 		// Get origin from request
 		origin := r.Header.Get("Origin")
 
@@ -69,8 +67,6 @@ func (m *CorsMiddleware) getAllowedOrigins() []string {
 func (m *CorsMiddleware) isAllowedOrigin(origin string, allowedOrigins []string) bool {
 	// For webhook requests that don't send Origin header, allow them through
 	// This is common for server-to-server communications like webhooks
-	fmt.Println("Checking allowed origin for:", origin)
-
 	if origin == "" {
 		return true
 	}

@@ -610,6 +610,13 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, err
 	}
 
+	// Update order number to final format now that we have an ID
+	order.SetOrderNumber(order.ID)
+	err = uc.orderRepo.Update(order)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order number: %w", err)
+	}
+
 	// Mark checkout as completed
 	checkout.MarkAsCompleted(order.ID)
 	err = uc.checkoutRepo.Update(checkout)

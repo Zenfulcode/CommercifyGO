@@ -294,8 +294,14 @@ func (o *Order) SetTrackingCode(trackingCode string) error {
 
 // SetOrderNumber sets the order number
 func (o *Order) SetOrderNumber(id uint) {
-	// Format: ORD-YYYYMMDD-000001
-	o.OrderNumber = fmt.Sprintf("ORD-%s-%06d", o.CreatedAt.Format("20060102"), id)
+	// Choose prefix based on whether it's a guest order
+	prefix := "ORD"
+	if o.IsGuestOrder {
+		prefix = "GS"
+	}
+
+	// Format: ORD-YYYYMMDD-000001 or GS-YYYYMMDD-000001
+	o.OrderNumber = fmt.Sprintf("%s-%s-%06d", prefix, o.CreatedAt.Format("20060102"), id)
 }
 
 // ApplyDiscount applies a discount to the order
@@ -446,7 +452,7 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 	if o.CustomerDetails != nil {
 		customer = *o.CustomerDetails.ToCustomerDetailsDTO()
 	}
-	
+
 	return &dto.OrderSummaryDTO{
 		ID:               o.ID,
 		OrderNumber:      o.OrderNumber,
