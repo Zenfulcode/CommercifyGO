@@ -41,7 +41,7 @@ type Order struct {
 	gorm.Model
 	OrderNumber         string         `gorm:"uniqueIndex;not null;size:100"`
 	Currency            string         `gorm:"not null;size:3"` // e.g., "USD", "EUR"
-	UserID              uint           `gorm:"index"`           // 0 for guest orders
+	UserID              *uint          `gorm:"index"`           // NULL for guest orders
 	User                *User          `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
 	Items               []OrderItem    `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	TotalAmount         int64          `gorm:"not null"` // stored in cents
@@ -112,10 +112,7 @@ type CustomerDetails struct {
 }
 
 // NewOrder creates a new order
-func NewOrder(userID uint, items []OrderItem, currency string, shippingAddr, billingAddr Address, customerDetails CustomerDetails) (*Order, error) {
-	if userID == 0 {
-		return nil, errors.New("user ID cannot be empty")
-	}
+func NewOrder(userID *uint, items []OrderItem, currency string, shippingAddr, billingAddr Address, customerDetails CustomerDetails) (*Order, error) {
 	if len(items) == 0 {
 		return nil, errors.New("order must have at least one item")
 	}
@@ -193,7 +190,7 @@ func NewGuestOrder(items []OrderItem, shippingAddr, billingAddr Address, custome
 	orderNumber := fmt.Sprintf("GS-%s-TEMP-%d", now.Format("20060102"), now.UnixNano())
 
 	order := &Order{
-		UserID:         0, // Using 0 to indicate it should be NULL in the database
+		UserID:         nil, // NULL for guest orders
 		OrderNumber:    orderNumber,
 		Items:          items,
 		TotalAmount:    totalAmount,
@@ -457,11 +454,16 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 		customer = *o.CustomerDetails.ToCustomerDetailsDTO()
 	}
 
+	var userID uint
+	if o.UserID != nil {
+		userID = *o.UserID
+	}
+
 	return &dto.OrderSummaryDTO{
 		ID:               o.ID,
 		OrderNumber:      o.OrderNumber,
 		CheckoutID:       o.CheckoutSessionID,
-		UserID:           o.UserID,
+		UserID:           userID,
 		Customer:         customer,
 		Status:           dto.OrderStatus(o.Status),
 		PaymentStatus:    dto.PaymentStatus(o.PaymentStatus),
@@ -491,10 +493,15 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		customerDetails = o.CustomerDetails.ToCustomerDetailsDTO()
 	}
 
+	var userID uint
+	if o.UserID != nil {
+		userID = *o.UserID
+	}
+
 	return &dto.OrderDTO{
 		ID:              o.ID,
 		OrderNumber:     o.OrderNumber,
-		UserID:          o.UserID,
+		UserID:          userID,
 		CheckoutID:      o.CheckoutSessionID,
 		CustomerDetails: *customerDetails,
 		ShippingDetails: *shippingDetails,

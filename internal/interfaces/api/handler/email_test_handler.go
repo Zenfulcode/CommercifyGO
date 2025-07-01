@@ -47,7 +47,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: time.Now(),
 		},
 		OrderNumber:       "ORD-12345",
-		UserID:            mockUser.ID,
+		UserID:            &mockUser.ID,
 		Status:            entity.OrderStatusCompleted,
 		PaymentStatus:     entity.PaymentStatusCaptured,
 		TotalAmount:       9950, // $99.50 in cents (subtotal before shipping/discounts)
@@ -93,16 +93,16 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		PostalCode: "12345",
 		Country:    "Test Country",
 	}
-	
+
 	testBillingAddr := entity.Address{
 		Street1:    "456 Billing Ave",
 		Street2:    "",
 		City:       "Billing City",
-		State:      "Billing State", 
+		State:      "Billing State",
 		PostalCode: "67890",
 		Country:    "Billing Country",
 	}
-	
+
 	// Set addresses using JSON helper methods
 	mockOrder.SetShippingAddressJSON(&testShippingAddr)
 	mockOrder.SetBillingAddressJSON(&testBillingAddr)

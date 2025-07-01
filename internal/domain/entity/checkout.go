@@ -479,9 +479,10 @@ func (c *Checkout) ToOrder() *Order {
 	// Determine if this is a guest order
 	isGuestOrder := c.UserID == nil
 
-	var userID uint
+	// For the order, use the UserID pointer directly (will be nil for guest orders)
+	var userIDPtr *uint
 	if c.UserID != nil {
-		userID = *c.UserID
+		userIDPtr = c.UserID
 	}
 
 	// Create the order
@@ -498,7 +499,7 @@ func (c *Checkout) ToOrder() *Order {
 	}
 
 	order := &Order{
-		UserID:            userID, // This will be 0 for guest orders
+		UserID:            userIDPtr, // This will be nil for guest orders
 		Items:             items,
 		Currency:          c.Currency,
 		TotalAmount:       c.TotalAmount,

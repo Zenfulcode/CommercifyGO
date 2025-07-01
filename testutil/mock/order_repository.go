@@ -159,7 +159,7 @@ func (m *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 	var results []*entity.Order
 	var count int
 	for _, order := range m.orders {
-		if order.UserID == userID {
+		if order.UserID != nil && *order.UserID == userID {
 			if count >= offset {
 				if limit > 0 && len(results) >= limit {
 					break

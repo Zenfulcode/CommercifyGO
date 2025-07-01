@@ -57,7 +57,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Check if authenticated user owns the order or is admin
 	if isAuthenticated {
-		if order.UserID == userID {
+		if order.UserID != nil && *order.UserID == userID {
 			authorized = true
 		} else {
 			// Check if user is admin

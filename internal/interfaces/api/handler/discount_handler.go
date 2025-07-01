@@ -254,7 +254,7 @@ func (h *DiscountHandler) ApplyDiscountToOrder(w http.ResponseWriter, r *http.Re
 	role, _ := r.Context().Value("role").(string)
 
 	// Check if the user is authorized to apply discount to this order
-	if order.UserID != userID && role != string(entity.RoleAdmin) {
+	if (order.UserID == nil || *order.UserID != userID) && role != string(entity.RoleAdmin) {
 		h.logger.Error("Unauthorized access: user does not own the order")
 		response := contracts.ErrorResponse("Unauthorized access: user does not own the order")
 		w.Header().Set("Content-Type", "application/json")
@@ -330,7 +330,7 @@ func (h *DiscountHandler) RemoveDiscountFromOrder(w http.ResponseWriter, r *http
 	role, _ := r.Context().Value("role").(string)
 
 	// Check if the user is authorized to remove discount from this order
-	if order.UserID != userID && role != string(entity.RoleAdmin) {
+	if (order.UserID == nil || *order.UserID != userID) && role != string(entity.RoleAdmin) {
 		response := contracts.ErrorResponse("Unauthorized access: user does not own the order")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)

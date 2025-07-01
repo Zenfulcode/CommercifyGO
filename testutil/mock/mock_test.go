@@ -159,7 +159,7 @@ func TestOrderRepository(t *testing.T) {
 	order := &entity.Order{
 		OrderNumber:       "ORD-123",
 		Currency:          "USD",
-		UserID:            1,
+		UserID:            &[]uint{1}[0],
 		TotalAmount:       10000,
 		FinalAmount:       10000,
 		Status:            entity.OrderStatusPending,

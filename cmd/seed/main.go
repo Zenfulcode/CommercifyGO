@@ -861,9 +861,9 @@ func seedOrders(db *gorm.DB) error {
 		}
 
 		if orderData.userID > 0 {
-			order.UserID = orderData.userID
+			order.UserID = &orderData.userID
 		}
-		// For guest orders (userID = 0), UserID will remain 0
+		// For guest orders (userID = 0), UserID will remain nil
 
 		// Set addresses using JSON helper methods
 		order.SetShippingAddressJSON(&orderData.shippingAddr)

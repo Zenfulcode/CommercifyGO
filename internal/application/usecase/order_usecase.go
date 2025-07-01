@@ -664,7 +664,7 @@ func (uc *OrderUseCase) handleEmailsForPaymentStatusChange(order *entity.Order, 
 
 	// Create user object for email sending
 	var user *entity.User
-	if order.IsGuestOrder || order.UserID == 0 {
+	if order.IsGuestOrder || order.UserID == nil {
 		// Guest order - create a temporary user object with customer details
 		if order.CustomerDetails == nil {
 			return fmt.Errorf("guest order missing customer details")
@@ -676,9 +676,9 @@ func (uc *OrderUseCase) handleEmailsForPaymentStatusChange(order *entity.Order, 
 	} else {
 		// Registered user - get from repository
 		var err error
-		user, err = uc.userRepo.GetByID(order.UserID)
+		user, err = uc.userRepo.GetByID(*order.UserID)
 		if err != nil {
-			return fmt.Errorf("failed to get user %d: %w", order.UserID, err)
+			return fmt.Errorf("failed to get user %d: %w", *order.UserID, err)
 		}
 	}
 

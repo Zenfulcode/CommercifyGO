@@ -52,12 +52,13 @@ func TestOrder(t *testing.T) {
 			FullName: "John Doe",
 		}
 
-		order, err := NewOrder(1, items, "USD", shippingAddr, billingAddr, customerDetails)
+		userID := uint(1)
+		order, err := NewOrder(&userID, items, "USD", shippingAddr, billingAddr, customerDetails)
 
 		require.NoError(t, err)
 		assert.Contains(t, order.OrderNumber, "ORD-")
 		assert.Equal(t, "USD", order.Currency)
-		assert.Equal(t, uint(1), order.UserID)
+		assert.Equal(t, &userID, order.UserID)
 		assert.Equal(t, OrderStatusPending, order.Status)
 		assert.Equal(t, PaymentStatusPending, order.PaymentStatus)
 		assert.Equal(t, int64(24997), order.TotalAmount) // (2*9999) + (1*4999)
@@ -79,35 +80,28 @@ func TestOrder(t *testing.T) {
 
 		tests := []struct {
 			name          string
-			userID        uint
+			userID        *uint
 			items         []OrderItem
 			currency      string
 			expectedError string
 		}{
 			{
-				name:          "zero user ID",
-				userID:        0,
-				items:         validItems,
-				currency:      "USD",
-				expectedError: "user ID cannot be empty",
-			},
-			{
 				name:          "empty items",
-				userID:        1,
+				userID:        func() *uint { u := uint(1); return &u }(),
 				items:         []OrderItem{},
 				currency:      "USD",
 				expectedError: "order must have at least one item",
 			},
 			{
 				name:          "empty currency",
-				userID:        1,
+				userID:        func() *uint { u := uint(1); return &u }(),
 				items:         validItems,
 				currency:      "",
 				expectedError: "currency cannot be empty",
 			},
 			{
 				name:   "invalid item quantity",
-				userID: 1,
+				userID: func() *uint { u := uint(1); return &u }(),
 				items: []OrderItem{
 					{ProductID: 1, ProductName: "Test", SKU: "SKU-001", Quantity: 0, Price: 9999, Weight: 1.0},
 				},
@@ -116,7 +110,7 @@ func TestOrder(t *testing.T) {
 			},
 			{
 				name:   "invalid item price",
-				userID: 1,
+				userID: func() *uint { u := uint(1); return &u }(),
 				items: []OrderItem{
 					{ProductID: 1, ProductName: "Test", SKU: "SKU-001", Quantity: 1, Price: 0, Weight: 1.0},
 				},
@@ -155,7 +149,7 @@ func TestOrder(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Contains(t, order.OrderNumber, "GS-")
-		assert.Equal(t, uint(0), order.UserID)
+		assert.Nil(t, order.UserID)
 		assert.True(t, order.IsGuestOrder)
 		assert.Equal(t, int64(9999), order.TotalAmount)
 		assert.Equal(t, 1.5, order.TotalWeight)
@@ -189,7 +183,8 @@ func TestOrderDTOConversions(t *testing.T) {
 			FullName: "John Doe",
 		}
 
-		order, err := NewOrder(1, items, "USD", shippingAddr, shippingAddr, customerDetails)
+		userID := uint(1)
+		order, err := NewOrder(&userID, items, "USD", shippingAddr, shippingAddr, customerDetails)
 		require.NoError(t, err)
 
 		// Mock ID that would be set by GORM
@@ -231,7 +226,8 @@ func TestOrderDTOConversions(t *testing.T) {
 			FullName: "John Doe",
 		}
 
-		order, err := NewOrder(1, items, "USD", shippingAddr, shippingAddr, customerDetails)
+		userID := uint(1)
+		order, err := NewOrder(&userID, items, "USD", shippingAddr, shippingAddr, customerDetails)
 		require.NoError(t, err)
 
 		// Mock ID that would be set by GORM
