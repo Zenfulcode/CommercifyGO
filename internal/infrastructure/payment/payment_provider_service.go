@@ -274,7 +274,8 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 				"ReturnURL":          s.config.Stripe.ReturnURL,
 				"Enabled":            s.config.Stripe.Enabled,
 			},
-			Priority: 100,
+			Priority:   100,
+			IsTestMode: false,
 		},
 		{
 			Type:                common.PaymentProviderMobilePay,
@@ -295,7 +296,8 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 				"Enabled":              s.config.MobilePay.Enabled,
 				"IsTestMode":           s.config.MobilePay.IsTestMode,
 			},
-			Priority: 90,
+			Priority:   90,
+			IsTestMode: s.config.MobilePay.IsTestMode,
 		},
 		{
 			Type:                common.PaymentProviderMock,
@@ -310,7 +312,8 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 				"PaymentDescription": "Test payment for development",
 				"AutoConfirm":        true,
 			},
-			Priority: 10,
+			Priority:   10,
+			IsTestMode: true,
 		},
 	}
 

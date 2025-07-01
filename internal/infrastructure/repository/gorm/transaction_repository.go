@@ -3,6 +3,8 @@ package gorm
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -27,34 +29,50 @@ func (t *TransactionRepository) CountSuccessfulByOrderIDAndType(orderID uint, tr
 
 // Create implements repository.PaymentTransactionRepository.
 func (t *TransactionRepository) Create(transaction *entity.PaymentTransaction) error {
-	// Check if a transaction with the same transaction_id already exists
-	var existingTxn entity.PaymentTransaction
-	err := t.db.Where("transaction_id = ?", transaction.TransactionID).First(&existingTxn).Error
-	if err == nil {
-		// Transaction already exists, update its status and other fields if different
-		if existingTxn.Status != transaction.Status ||
-			existingTxn.Amount != transaction.Amount ||
-			existingTxn.RawResponse != transaction.RawResponse {
+	// Check if a transaction of this type already exists for this order
+	var existingTransaction entity.PaymentTransaction
+	err := t.db.Where("order_id = ? AND type = ?", transaction.OrderID, transaction.Type).
+		First(&existingTransaction).Error
 
-			// Update the existing transaction with new data
-			existingTxn.Status = transaction.Status
-			existingTxn.Amount = transaction.Amount
-			existingTxn.RawResponse = transaction.RawResponse
-			existingTxn.Metadata = transaction.Metadata
-
-			// Save the updated transaction
-			return t.db.Save(&existingTxn).Error
-		}
-		// Transaction exists and is identical, return without error (idempotent operation)
-		return nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		// Some other error occurred while checking
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return fmt.Errorf("failed to check for existing transaction: %w", err)
 	}
 
-	// Transaction doesn't exist, create it
-	return t.db.Create(transaction).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// No existing transaction, create a new one
+		if transaction.TransactionID == "" {
+			sequence, err := t.getNextSequenceNumber(transaction.Type)
+			if err != nil {
+				return fmt.Errorf("failed to generate sequence number: %w", err)
+			}
+			transaction.SetTransactionID(sequence)
+		}
+		return t.db.Create(transaction).Error
+	} else {
+		// Transaction exists, update it with new information
+		existingTransaction.Status = transaction.Status
+		existingTransaction.Amount = transaction.Amount
+		existingTransaction.ExternalID = transaction.ExternalID
+		existingTransaction.RawResponse = transaction.RawResponse
+		existingTransaction.Metadata = transaction.Metadata
+
+		// Update the transaction in the database
+		err = t.db.Save(&existingTransaction).Error
+		if err != nil {
+			return fmt.Errorf("failed to update existing transaction: %w", err)
+		}
+
+		// Copy the updated values back to the input transaction for consistency
+		*transaction = existingTransaction
+		return nil
+	}
+}
+
+// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
+// of the same type already exists for the order. This ensures only one transaction
+// per type per order, with status updates reflecting the transaction lifecycle.
+func (t *TransactionRepository) CreateOrUpdate(transaction *entity.PaymentTransaction) error {
+	return t.Create(transaction) // Delegate to Create which now handles upsert logic
 }
 
 // Delete implements repository.PaymentTransactionRepository.
@@ -133,4 +151,38 @@ func (t *TransactionRepository) Update(transaction *entity.PaymentTransaction) e
 // NewTransactionRepository creates a new GORM-based TransactionRepository
 func NewTransactionRepository(db *gorm.DB) repository.PaymentTransactionRepository {
 	return &TransactionRepository{db: db}
+}
+
+// getNextSequenceNumber generates the next sequence number for a given transaction type and year
+func (t *TransactionRepository) getNextSequenceNumber(transactionType entity.TransactionType) (int, error) {
+	var count int64
+
+	// Count existing transactions of this type for the current year
+	// This creates a sequence like: TXN-AUTH-2025-001, TXN-AUTH-2025-002, etc.
+	year := time.Now().Year()
+
+	// Count transactions with IDs matching the pattern for this type and year
+	if err := t.db.Model(&entity.PaymentTransaction{}).
+		Where("transaction_id LIKE ?", fmt.Sprintf("TXN-%s-%d-%%", getTypeCode(transactionType), year)).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count existing transactions: %w", err)
+	}
+
+	return int(count) + 1, nil
+}
+
+// getTypeCode returns the short type code for transaction types
+func getTypeCode(transactionType entity.TransactionType) string {
+	switch transactionType {
+	case entity.TransactionTypeAuthorize:
+		return "AUTH"
+	case entity.TransactionTypeCapture:
+		return "CAPT"
+	case entity.TransactionTypeRefund:
+		return "REFUND"
+	case entity.TransactionTypeCancel:
+		return "CANCEL"
+	default:
+		return strings.ToUpper(string(transactionType))
+	}
 }

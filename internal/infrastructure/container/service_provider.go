@@ -63,6 +63,7 @@ func (p *serviceProvider) PaymentService() service.PaymentService {
 		)
 		p.paymentService = multiProviderService
 
+		// TODO: Get rid of this
 		// Extract MobilePay service for webhook registration if it exists
 		// We need to access the actual MultiProviderPaymentService concrete type
 		// to access its GetProviders method
