@@ -442,12 +442,17 @@ func isValidPaymentStatusTransition(from, to PaymentStatus) bool {
 }
 
 func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
+	var customer dto.CustomerDetailsDTO
+	if o.CustomerDetails != nil {
+		customer = *o.CustomerDetails.ToCustomerDetailsDTO()
+	}
+	
 	return &dto.OrderSummaryDTO{
 		ID:               o.ID,
 		OrderNumber:      o.OrderNumber,
 		CheckoutID:       o.CheckoutSessionID,
 		UserID:           o.UserID,
-		Customer:         *o.CustomerDetails.ToCustomerDetailsDTO(),
+		Customer:         customer,
 		Status:           dto.OrderStatus(o.Status),
 		PaymentStatus:    dto.PaymentStatus(o.PaymentStatus),
 		TotalAmount:      money.FromCents(o.TotalAmount),
@@ -471,12 +476,17 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 	shippingAddr := o.GetShippingAddress()
 	billingAddr := o.GetBillingAddress()
 
+	var customerDetails *dto.CustomerDetailsDTO
+	if o.CustomerDetails != nil {
+		customerDetails = o.CustomerDetails.ToCustomerDetailsDTO()
+	}
+
 	return &dto.OrderDTO{
 		ID:              o.ID,
 		OrderNumber:     o.OrderNumber,
 		UserID:          o.UserID,
 		CheckoutID:      o.CheckoutSessionID,
-		CustomerDetails: o.CustomerDetails.ToCustomerDetailsDTO(),
+		CustomerDetails: customerDetails,
 		ShippingDetails: shippingDetails,
 		DiscountDetails: discountDetails,
 		Status:          dto.OrderStatus(o.Status),
