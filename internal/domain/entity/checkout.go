@@ -32,9 +32,9 @@ type Checkout struct {
 	SessionID           string          `gorm:"uniqueIndex;not null;size:255"`
 	Items               []CheckoutItem  `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	Status              CheckoutStatus  `gorm:"not null;size:50;default:'active'"`
-	ShippingAddressJSON *string         `gorm:"column:shipping_address_json;type:text"`
-	BillingAddressJSON  *string         `gorm:"column:billing_address_json;type:text"`
-	ShippingOptionJSON  *string         `gorm:"column:shipping_option_json;type:text"`
+	ShippingAddressJSON *string         `gorm:"column:shipping_address;type:text"`
+	BillingAddressJSON  *string         `gorm:"column:billing_address;type:text"`
+	ShippingOptionJSON  *string         `gorm:"column:shipping_option;type:text"`
 	PaymentProvider     string          `gorm:"size:100"`
 	TotalAmount         int64           `gorm:"default:0"`
 	ShippingCost        int64           `gorm:"default:0"`
@@ -44,7 +44,7 @@ type Checkout struct {
 	DiscountCode        string          `gorm:"size:100"`
 	DiscountAmount      int64           `gorm:"default:0"`
 	FinalAmount         int64           `gorm:"default:0"`
-	AppliedDiscountJSON *string         `gorm:"column:applied_discount_json;type:text"`
+	AppliedDiscountJSON *string         `gorm:"column:applied_discount;type:text"`
 	LastActivityAt      time.Time       `gorm:"index"`
 	ExpiresAt           time.Time       `gorm:"index"`
 	CompletedAt         *time.Time

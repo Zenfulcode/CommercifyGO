@@ -47,10 +47,10 @@ type Order struct {
 	TotalAmount         int64          `gorm:"not null"` // stored in cents
 	Status              OrderStatus    `gorm:"not null;size:50;default:'pending'"`
 	PaymentStatus       PaymentStatus  `gorm:"not null;size:50;default:'pending'"` // New field for payment status
-	ShippingAddressJSON *string        `gorm:"column:shipping_address_json;type:text"`
-	BillingAddressJSON  *string        `gorm:"column:billing_address_json;type:text"`
-	ShippingOptionJSON  *string        `gorm:"column:shipping_option_json;type:text"`
-	AppliedDiscountJSON *string        `gorm:"column:applied_discount_json;type:text"`
+	ShippingAddressJSON *string        `gorm:"column:shipping_address;type:text"`
+	BillingAddressJSON  *string        `gorm:"column:billing_address;type:text"`
+	ShippingOptionJSON  *string        `gorm:"column:shipping_option;type:text"`
+	AppliedDiscountJSON *string        `gorm:"column:applied_discount;type:text"`
 	PaymentID           string         `gorm:"size:255"`
 	PaymentProvider     string         `gorm:"size:100"`
 	PaymentMethod       string         `gorm:"size:100"`
