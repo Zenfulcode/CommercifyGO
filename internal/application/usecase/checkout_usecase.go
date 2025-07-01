@@ -830,8 +830,8 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
 	}
 
-	// Get the parent product
-	product, err := uc.productRepo.GetByIDAndCurrency(variant.ProductID, checkout.Currency)
+	// Get the parent product (without currency constraint first)
+	product, err := uc.productRepo.GetByID(variant.ProductID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product for variant: %w", err)
 	}
@@ -839,6 +839,20 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 	// Check if product is active
 	if !product.Active {
 		return nil, errors.New("product is not available")
+	}
+
+	// Handle currency mismatch
+	if product.Currency != checkout.Currency {
+		// If the checkout is empty, change the checkout currency to match the product
+		if len(checkout.Items) == 0 {
+			checkout, err = uc.ChangeCurrency(checkout, product.Currency)
+			if err != nil {
+				return nil, fmt.Errorf("failed to change checkout currency to %s: %w", product.Currency, err)
+			}
+		} else {
+			// If checkout has items, don't allow mixing currencies
+			return nil, fmt.Errorf("cannot add %s product to %s checkout. Please complete your current checkout or start a new one", product.Currency, checkout.Currency)
+		}
 	}
 
 	// Populate input with variant details

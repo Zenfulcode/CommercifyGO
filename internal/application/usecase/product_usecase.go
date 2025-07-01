@@ -159,21 +159,9 @@ func (uc *ProductUseCase) CreateProduct(input CreateProductInput) (*entity.Produ
 }
 
 // GetProductByID retrieves a product by ID
-func (uc *ProductUseCase) GetProductByID(id uint, currencyCode string) (*entity.Product, error) {
-	var currency *entity.Currency
-	if currencyCode == "" {
-		// Use default currency if none provided
-		currency = uc.defaultCurrency
-	} else {
-		var err error
-		currency, err = uc.currencyRepo.GetByCode(currencyCode)
-		if err != nil {
-			return nil, errors.New("invalid currency code: " + currencyCode)
-		}
-	}
-
-	// First get the product with all its data
-	product, err := uc.productRepo.GetByIDAndCurrency(id, currency.Code)
+func (uc *ProductUseCase) GetProductByID(id uint) (*entity.Product, error) {
+	// Simply get the product with all its data - no currency filtering needed
+	product, err := uc.productRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}

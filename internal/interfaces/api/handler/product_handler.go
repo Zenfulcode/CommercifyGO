@@ -114,14 +114,9 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get product
-	currencyCode := &h.config.DefaultCurrency
-	if currencyCodeStr := r.URL.Query().Get("currency"); currencyCodeStr != "" {
-		currencyCode = &currencyCodeStr
-	}
-
+	// Get product - no currency filtering needed since each product has its own currency
 	var product *entity.Product
-	product, err = h.productUseCase.GetProductByID(uint(id), *currencyCode)
+	product, err = h.productUseCase.GetProductByID(uint(id))
 
 	if err != nil {
 		h.logger.Error("Failed to get product: %v", err)
@@ -132,9 +127,6 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
 			errorMessage = "Product not found"
-		} else if strings.Contains(err.Error(), "currency") {
-			statusCode = http.StatusBadRequest
-			errorMessage = "Invalid currency code"
 		}
 
 		response := contracts.ErrorResponse(errorMessage)
@@ -341,6 +333,21 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		currencyCode = currencyCodeStr
 	}
 
+	// Parse active parameter - defaults to true for admin (show active products)
+	activeOnly := true // Default to showing active products for admin
+	if activeStr := r.URL.Query().Get("active"); activeStr != "" {
+		if activeStr == "false" || activeStr == "0" {
+			activeOnly = false
+		} else if activeStr == "true" || activeStr == "1" {
+			activeOnly = true
+		}
+		// If the query parameter is "all", we want to show all products regardless of status
+		if activeStr == "all" {
+			// We'll handle this case in the repository by modifying the logic
+			activeOnly = false // For now, this will need repository changes
+		}
+	}
+
 	offset := (page - 1) * pageSize
 
 	// Convert to usecase input
@@ -348,6 +355,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		Offset:       uint(offset),
 		Limit:        uint(pageSize),
 		CurrencyCode: currencyCode,
+		ActiveOnly:   activeOnly,
 	}
 
 	// Handle optional fields
