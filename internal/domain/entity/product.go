@@ -236,36 +236,54 @@ func (p *Product) GetPrice() int64 {
 	return 0
 }
 
-func (product *Product) ToProductDTO() *dto.ProductDTO {
-	if product == nil {
+func (p *Product) ToProductDTO() *dto.ProductDTO {
+	if p == nil {
 		return nil
 	}
 
-	variantsDTO := make([]dto.VariantDTO, len(product.Variants))
-	for i, v := range product.Variants {
+	variantsDTO := make([]dto.VariantDTO, len(p.Variants))
+	for i, v := range p.Variants {
 		variantsDTO[i] = *v.ToVariantDTO()
 	}
 
-	defaultVariant := product.GetDefaultVariant()
+	defaultVariant := p.GetDefaultVariant()
 	if defaultVariant == nil {
 
 	}
 
 	return &dto.ProductDTO{
-		ID:          product.ID,
-		Name:        product.Name,
-		SKU:         product.GetProdNumber(),
-		Description: product.Description,
-		Currency:    product.Currency,
-		TotalStock:  product.GetTotalStock(),
-		Price:       money.FromCents(product.GetPrice()),
-		Category:    product.Category.Name,
-		CategoryID:  product.CategoryID,
-		Images:      product.Images,
-		HasVariants: product.HasVariants(),
-		Active:      product.Active,
+		ID:          p.ID,
+		Name:        p.Name,
+		SKU:         p.GetProdNumber(),
+		Description: p.Description,
+		Currency:    p.Currency,
+		TotalStock:  p.GetTotalStock(),
+		Price:       money.FromCents(p.GetPrice()),
+		Category:    p.Category.Name,
+		CategoryID:  p.CategoryID,
+		Images:      p.Images,
+		HasVariants: p.HasVariants(),
+		Active:      p.Active,
 		Variants:    variantsDTO,
-		CreatedAt:   product.CreatedAt,
-		UpdatedAt:   product.UpdatedAt,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+	}
+}
+
+func (p *Product) ToProductSummaryDTO() *dto.ProductDTO {
+	return &dto.ProductDTO{
+		ID:          p.ID,
+		Name:        p.Name,
+		SKU:         p.GetProdNumber(),
+		Description: p.Description,
+		Currency:    p.Currency,
+		TotalStock:  p.GetTotalStock(),
+		Price:       money.FromCents(p.GetPrice()),
+		Category:    p.Category.Name,
+		Images:      p.Images,
+		HasVariants: p.HasVariants(),
+		Active:      p.Active,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
 	}
 }

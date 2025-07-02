@@ -59,7 +59,7 @@ type UpdateVariantRequest struct {
 func CreateProductListResponse(products []*entity.Product, totalCount, page, pageSize int) ListResponseDTO[dto.ProductDTO] {
 	var productDTOs []dto.ProductDTO
 	for _, product := range products {
-		productDTOs = append(productDTOs, *product.ToProductDTO())
+		productDTOs = append(productDTOs, *product.ToProductSummaryDTO())
 	}
 	if len(productDTOs) == 0 {
 		return ListResponseDTO[dto.ProductDTO]{

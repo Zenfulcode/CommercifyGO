@@ -14,7 +14,7 @@ type ProductDTO struct {
 	SKU         string       `json:"sku"`         // Default variant SKU
 	TotalStock  int          `json:"total_stock"` // Total stock across all variants
 	Category    string       `json:"category"`
-	CategoryID  uint         `json:"category_id"`
+	CategoryID  uint         `json:"category_id,omitempty"`
 	Images      []string     `json:"images"`
 	HasVariants bool         `json:"has_variants"`
 	Active      bool         `json:"active"`
