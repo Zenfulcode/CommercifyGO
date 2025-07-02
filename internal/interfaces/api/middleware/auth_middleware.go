@@ -83,3 +83,44 @@ func AdminOnly(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// OptionalAuthenticate attempts to authenticate a request but allows it to proceed even if authentication fails
+func (m *AuthMiddleware) OptionalAuthenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+
+		// If no auth header, proceed without authentication
+		if authHeader == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if the header has the Bearer prefix
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			// Invalid format, but proceed without authentication
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Extract token
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+		// Validate token
+		claims, err := m.jwtService.ValidateToken(tokenString)
+		if err != nil {
+			// Invalid token, but proceed without authentication
+			m.logger.Debug("Optional authentication failed: %v", err)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Add user info to request context if authentication succeeded
+		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, emailKey, claims.Email)
+		ctx = context.WithValue(ctx, RoleKey, claims.Role)
+
+		// Call the next handler with the updated context
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}

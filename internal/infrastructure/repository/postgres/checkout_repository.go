@@ -1010,3 +1010,136 @@ func (r *CheckoutRepository) scanCheckoutItem(rows *sql.Rows) (*entity.CheckoutI
 
 	return &item, nil
 }
+
+// GetCheckoutsToAbandon retrieves active checkouts with customer/shipping info that should be marked as abandoned
+func (r *CheckoutRepository) GetCheckoutsToAbandon() ([]*entity.Checkout, error) {
+	// Find active checkouts with customer or shipping info that haven't been active for 15 minutes
+	abandonThreshold := time.Now().Add(-15 * time.Minute)
+
+	query := `
+		SELECT 
+			id, user_id, session_id, status, shipping_address, 
+			billing_address, shipping_method_id, payment_provider, 
+			total_amount, shipping_cost, total_weight, customer_details, 
+			currency, discount_code, discount_amount, final_amount, 
+			applied_discount, created_at, updated_at, last_activity_at, 
+			expires_at, completed_at, converted_order_id
+		FROM checkouts 
+		WHERE status = $1 
+		AND last_activity_at < $2
+		AND (
+			(customer_details->>'email' != '' AND customer_details->>'email' IS NOT NULL)
+			OR (customer_details->>'phone' != '' AND customer_details->>'phone' IS NOT NULL)
+			OR (customer_details->>'full_name' != '' AND customer_details->>'full_name' IS NOT NULL)
+			OR (shipping_address->>'street' != '' AND shipping_address->>'street' IS NOT NULL)
+			OR (shipping_address->>'city' != '' AND shipping_address->>'city' IS NOT NULL)
+			OR (shipping_address->>'state' != '' AND shipping_address->>'state' IS NOT NULL)
+			OR (shipping_address->>'postal_code' != '' AND shipping_address->>'postal_code' IS NOT NULL)
+			OR (shipping_address->>'country' != '' AND shipping_address->>'country' IS NOT NULL)
+		)`
+
+	rows, err := r.db.Query(query, entity.CheckoutStatusActive, abandonThreshold)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanCheckoutsWithItems(rows)
+}
+
+// GetCheckoutsToDelete retrieves checkouts that should be deleted
+func (r *CheckoutRepository) GetCheckoutsToDelete() ([]*entity.Checkout, error) {
+	now := time.Now()
+	emptyDeleteThreshold := now.Add(-24 * time.Hour)
+	abandonedDeleteThreshold := now.Add(-7 * 24 * time.Hour)
+
+	query := `
+		SELECT 
+			id, user_id, session_id, status, shipping_address, 
+			billing_address, shipping_method_id, payment_provider, 
+			total_amount, shipping_cost, total_weight, customer_details, 
+			currency, discount_code, discount_amount, final_amount, 
+			applied_discount, created_at, updated_at, last_activity_at, 
+			expires_at, completed_at, converted_order_id
+		FROM checkouts 
+		WHERE 
+		(
+			-- Delete empty checkouts after 24 hours
+			(
+				status = $1 
+				AND last_activity_at < $2
+				AND (customer_details->>'email' = '' OR customer_details->>'email' IS NULL)
+				AND (customer_details->>'phone' = '' OR customer_details->>'phone' IS NULL)
+				AND (customer_details->>'full_name' = '' OR customer_details->>'full_name' IS NULL)
+				AND (shipping_address->>'street' = '' OR shipping_address->>'street' IS NULL)
+				AND (shipping_address->>'city' = '' OR shipping_address->>'city' IS NULL)
+				AND (shipping_address->>'state' = '' OR shipping_address->>'state' IS NULL)
+				AND (shipping_address->>'postal_code' = '' OR shipping_address->>'postal_code' IS NULL)
+				AND (shipping_address->>'country' = '' OR shipping_address->>'country' IS NULL)
+			)
+			OR
+			-- Delete abandoned checkouts after 7 days
+			(
+				status = $3 
+				AND updated_at < $4
+			)
+			OR
+			-- Delete all expired checkouts
+			(
+				status = $5
+			)
+		)`
+
+	rows, err := r.db.Query(query,
+		entity.CheckoutStatusActive, emptyDeleteThreshold,
+		entity.CheckoutStatusAbandoned, abandonedDeleteThreshold,
+		entity.CheckoutStatusExpired)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanCheckoutsWithItems(rows)
+}
+
+// scanCheckoutsWithItems is a helper method to scan checkouts and their items
+func (r *CheckoutRepository) scanCheckoutsWithItems(rows *sql.Rows) ([]*entity.Checkout, error) {
+	checkouts := []*entity.Checkout{}
+	for rows.Next() {
+		checkout, err := r.scanCheckout(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get checkout items
+		itemsQuery := `
+			SELECT 
+				id, checkout_id, product_id, product_variant_id, quantity, 
+				price, weight, product_name, variant_name, sku, 
+				created_at, updated_at
+			FROM checkout_items 
+			WHERE checkout_id = $1
+			ORDER BY id ASC`
+
+		itemRows, err := r.db.Query(itemsQuery, checkout.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		items := []entity.CheckoutItem{}
+		for itemRows.Next() {
+			item, err := r.scanCheckoutItem(itemRows)
+			if err != nil {
+				itemRows.Close()
+				return nil, err
+			}
+			items = append(items, *item)
+		}
+		itemRows.Close()
+
+		checkout.Items = items
+		checkouts = append(checkouts, checkout)
+	}
+
+	return checkouts, nil
+}

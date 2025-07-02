@@ -48,6 +48,9 @@ func main() {
 	// Initialize API server
 	server := api.NewServer(cfg, db, logger)
 
+	// Start background checkout expiry process
+	go startCheckoutExpiryProcess(server, logger)
+
 	// Start server in a goroutine
 	go func() {
 		logger.Info("Starting server on port %s", cfg.Server.Port)
@@ -72,4 +75,36 @@ func main() {
 	}
 
 	logger.Info("Server exited properly")
+}
+
+// startCheckoutExpiryProcess runs a background process to expire old checkouts
+func startCheckoutExpiryProcess(server *api.Server, logger logger.Logger) {
+	// Run every 15 minutes
+	ticker := time.NewTicker(15 * time.Minute)
+	defer ticker.Stop()
+
+	// Run immediately on startup
+	expireCheckouts(server, logger)
+
+	for range ticker.C {
+		expireCheckouts(server, logger)
+	}
+}
+
+// expireCheckouts expires old checkouts
+func expireCheckouts(server *api.Server, logger logger.Logger) {
+	checkoutUseCase := server.GetContainer().UseCases().CheckoutUseCase()
+	if checkoutUseCase == nil {
+		logger.Error("CheckoutUseCase not available")
+		return
+	}
+
+	result, err := checkoutUseCase.ExpireOldCheckouts()
+	if err != nil {
+		logger.Error("Failed to expire old checkouts: %v", err)
+	} else {
+		logger.Info("Checkout cleanup completed: %d abandoned, %d deleted, %d expired (total: %d)",
+			result.AbandonedCount, result.DeletedCount, result.ExpiredCount,
+			result.AbandonedCount+result.DeletedCount+result.ExpiredCount)
+	}
 }

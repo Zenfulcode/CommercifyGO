@@ -28,6 +28,38 @@ func NewMockCheckoutRepository() repository.CheckoutRepository {
 	}
 }
 
+// GetCheckoutsToAbandon implements repository.CheckoutRepository.
+func (r *MockCheckoutRepository) GetCheckoutsToAbandon() ([]*entity.Checkout, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var checkoutsToAbandon []*entity.Checkout
+
+	for _, checkout := range r.checkouts {
+		if checkout.ShouldBeAbandoned() {
+			checkoutsToAbandon = append(checkoutsToAbandon, checkout)
+		}
+	}
+
+	return checkoutsToAbandon, nil
+}
+
+// GetCheckoutsToDelete implements repository.CheckoutRepository.
+func (r *MockCheckoutRepository) GetCheckoutsToDelete() ([]*entity.Checkout, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var checkoutsToDelete []*entity.Checkout
+
+	for _, checkout := range r.checkouts {
+		if checkout.ShouldBeDeleted() {
+			checkoutsToDelete = append(checkoutsToDelete, checkout)
+		}
+	}
+
+	return checkoutsToDelete, nil
+}
+
 // Create adds a checkout to the repository
 func (r *MockCheckoutRepository) Create(checkout *entity.Checkout) error {
 	r.mutex.Lock()

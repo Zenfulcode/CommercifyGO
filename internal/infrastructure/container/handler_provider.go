@@ -18,6 +18,8 @@ type HandlerProvider interface {
 	DiscountHandler() *handler.DiscountHandler
 	ShippingHandler() *handler.ShippingHandler
 	CurrencyHandler() *handler.CurrencyHandler
+	HealthHandler() *handler.HealthHandler
+	EmailTestHandler() *handler.EmailTestHandler
 }
 
 // handlerProvider is the concrete implementation of HandlerProvider
@@ -25,16 +27,18 @@ type handlerProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	userHandler     *handler.UserHandler
-	productHandler  *handler.ProductHandler
-	categoryHandler *handler.CategoryHandler
-	checkoutHandler *handler.CheckoutHandler
-	orderHandler    *handler.OrderHandler
-	paymentHandler  *handler.PaymentHandler
-	webhookHandler  *handler.WebhookHandler
-	discountHandler *handler.DiscountHandler
-	shippingHandler *handler.ShippingHandler
-	currencyHandler *handler.CurrencyHandler
+	userHandler      *handler.UserHandler
+	productHandler   *handler.ProductHandler
+	categoryHandler  *handler.CategoryHandler
+	checkoutHandler  *handler.CheckoutHandler
+	orderHandler     *handler.OrderHandler
+	paymentHandler   *handler.PaymentHandler
+	webhookHandler   *handler.WebhookHandler
+	discountHandler  *handler.DiscountHandler
+	shippingHandler  *handler.ShippingHandler
+	currencyHandler  *handler.CurrencyHandler
+	healthHandler    *handler.HealthHandler
+	emailTestHandler *handler.EmailTestHandler
 }
 
 // NewHandlerProvider creates a new handler provider
@@ -189,4 +193,33 @@ func (p *handlerProvider) CurrencyHandler() *handler.CurrencyHandler {
 		)
 	}
 	return p.currencyHandler
+}
+
+// HealthHandler returns the health handler
+func (p *handlerProvider) HealthHandler() *handler.HealthHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.healthHandler == nil {
+		p.healthHandler = handler.NewHealthHandler(
+			p.container.DB(),
+			p.container.Logger(),
+		)
+	}
+	return p.healthHandler
+}
+
+// EmailTestHandler returns the email test handler
+func (p *handlerProvider) EmailTestHandler() *handler.EmailTestHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.emailTestHandler == nil {
+		p.emailTestHandler = handler.NewEmailTestHandler(
+			p.container.Services().EmailService(),
+			p.container.Logger(),
+			p.container.Config().Email,
+		)
+	}
+	return p.emailTestHandler
 }

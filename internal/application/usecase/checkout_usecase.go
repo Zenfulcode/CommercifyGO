@@ -81,7 +81,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Check if order is already paid
 	if order.Status == entity.OrderStatusPaid ||
 		order.Status == entity.OrderStatusShipped ||
-		order.Status == entity.OrderStatusDelivered {
+		order.Status == entity.OrderStatusCompleted {
 		return nil, errors.New("order is already paid")
 	}
 
@@ -101,6 +101,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	// Process payment
 	paymentResult, err := uc.paymentSvc.ProcessPayment(service.PaymentRequest{
 		OrderID:         order.ID,
+		OrderNumber:     order.OrderNumber,
 		Amount:          order.FinalAmount, // Use final amount (after discounts)
 		Currency:        order.Currency,
 		PaymentMethod:   input.PaymentMethod,
@@ -124,9 +125,8 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		if err := order.SetActionURL(paymentResult.ActionURL); err != nil {
 			return nil, err
 		}
-		if err := order.UpdateStatus(entity.OrderStatusPendingAction); err != nil {
-			return nil, err
-		}
+		// Payment requires action - keep order status as pending
+		// Payment status remains pending until action is completed
 
 		// Update order in repository
 		if err := uc.orderRepo.Update(order); err != nil {
@@ -185,7 +185,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New(paymentResult.Message)
 	}
 
-	// Update order with payment ID, provider, and status
+	// Update order with payment ID, provider, and payment status
 	if err := order.SetPaymentID(paymentResult.TransactionID); err != nil {
 		return nil, err
 	}
@@ -195,13 +195,33 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	if err := order.SetPaymentMethod(string(order.PaymentMethod)); err != nil {
 		return nil, err
 	}
-	if err := order.UpdateStatus(entity.OrderStatusPaid); err != nil {
+	// Update payment status to authorized, which will also update order status to paid
+	if err := order.UpdatePaymentStatus(entity.PaymentStatusAuthorized); err != nil {
 		return nil, err
 	}
 
 	// Update order in repository
 	if err := uc.orderRepo.Update(order); err != nil {
 		return nil, err
+	}
+
+	// Decrease stock when payment is authorized to reserve items
+	if err := uc.decreaseStockForOrder(order); err != nil {
+		// If stock update fails, we should consider the payment failed
+		// Try to update the order status to indicate the failure
+		log.Printf("Failed to decrease stock for order %d: %v", order.ID, err)
+
+		// Update payment status to failed since we can't fulfill the order
+		if updateErr := order.UpdatePaymentStatus(entity.PaymentStatusFailed); updateErr != nil {
+			log.Printf("Failed to update payment status to failed: %v", updateErr)
+		} else {
+			// Save the updated order status
+			if saveErr := uc.orderRepo.Update(order); saveErr != nil {
+				log.Printf("Failed to save failed payment status: %v", saveErr)
+			}
+		}
+
+		return nil, fmt.Errorf("unable to reserve stock for order: %w", err)
 	}
 
 	// Record the successful authorization transaction
@@ -471,25 +491,74 @@ func (uc *CheckoutUseCase) RemoveDiscountCode(checkout *entity.Checkout) (*entit
 	return checkout, nil
 }
 
-// ExpireOldCheckouts marks expired checkouts as expired
-func (uc *CheckoutUseCase) ExpireOldCheckouts() error {
-	// Get expired checkouts
-	expiredCheckouts, err := uc.checkoutRepo.GetExpiredCheckouts()
+// CheckoutCleanupResult represents the results of checkout cleanup operations
+type CheckoutCleanupResult struct {
+	AbandonedCount int `json:"abandoned_count"`
+	DeletedCount   int `json:"deleted_count"`
+	ExpiredCount   int `json:"expired_count"`
+}
+
+// ExpireOldCheckouts performs comprehensive checkout cleanup operations
+func (uc *CheckoutUseCase) ExpireOldCheckouts() (*CheckoutCleanupResult, error) {
+	result := &CheckoutCleanupResult{}
+
+	// 1. Mark checkouts with customer/shipping info as abandoned after 15 minutes
+	checkoutsToAbandon, err := uc.checkoutRepo.GetCheckoutsToAbandon()
 	if err != nil {
-		return err
+		return result, fmt.Errorf("failed to get checkouts to abandon: %w", err)
 	}
 
-	// Mark each as expired
+	for _, checkout := range checkoutsToAbandon {
+		checkout.MarkAsAbandoned()
+		err = uc.checkoutRepo.Update(checkout)
+		if err != nil {
+			log.Printf("Failed to mark checkout %d as abandoned: %v", checkout.ID, err)
+			continue
+		}
+		result.AbandonedCount++
+	}
+
+	// 2. Delete checkouts that should be deleted (empty > 24h or abandoned > 7 days)
+	checkoutsToDelete, err := uc.checkoutRepo.GetCheckoutsToDelete()
+	if err != nil {
+		return result, fmt.Errorf("failed to get checkouts to delete: %w", err)
+	}
+
+	for _, checkout := range checkoutsToDelete {
+		err = uc.checkoutRepo.Delete(checkout.ID)
+		if err != nil {
+			log.Printf("Failed to delete checkout %d: %v", checkout.ID, err)
+			continue
+		}
+		result.DeletedCount++
+	}
+
+	// 3. Mark remaining expired checkouts as expired (legacy support)
+	expiredCheckouts, err := uc.checkoutRepo.GetExpiredCheckouts()
+	if err != nil {
+		return result, fmt.Errorf("failed to get expired checkouts: %w", err)
+	}
+
 	for _, checkout := range expiredCheckouts {
 		checkout.MarkAsExpired()
 		err = uc.checkoutRepo.Update(checkout)
 		if err != nil {
-			// Continue despite errors
+			log.Printf("Failed to mark checkout %d as expired: %v", checkout.ID, err)
 			continue
 		}
+		result.ExpiredCount++
 	}
 
-	return nil
+	return result, nil
+}
+
+// ExpireOldCheckoutsLegacy returns only the total count for backward compatibility
+func (uc *CheckoutUseCase) ExpireOldCheckoutsLegacy() (int, error) {
+	result, err := uc.ExpireOldCheckouts()
+	if err != nil {
+		return 0, err
+	}
+	return result.AbandonedCount + result.DeletedCount + result.ExpiredCount, nil
 }
 
 // CreateOrderFromCheckout creates an order from a checkout
@@ -982,4 +1051,37 @@ func (uc *CheckoutUseCase) getPriceInCurrency(variant *entity.ProductVariant, ta
 	// Convert the price
 	convertedPrice := fromCurrency.ConvertAmount(variant.Price, toCurrency)
 	return convertedPrice, nil
+}
+
+// decreaseStockForOrder decreases stock for all items in an order when payment is authorized
+func (uc *CheckoutUseCase) decreaseStockForOrder(order *entity.Order) error {
+	for _, item := range order.Items {
+		// Skip items without variant ID (shouldn't happen, but safety check)
+		if item.ProductVariantID == 0 {
+			continue
+		}
+
+		// Get the variant
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return fmt.Errorf("failed to get variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Check if there's enough stock
+		if variant.Stock < item.Quantity {
+			return fmt.Errorf("insufficient stock for product %s (SKU: %s): available %d, required %d",
+				item.ProductName, item.SKU, variant.Stock, item.Quantity)
+		}
+
+		// Update stock
+		if err := variant.UpdateStock(variant.Stock - item.Quantity); err != nil {
+			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
+		}
+
+		// Save the updated variant
+		if err := uc.productVariantRepo.Update(variant); err != nil {
+			return fmt.Errorf("failed to save variant %d: %w", item.ProductVariantID, err)
+		}
+	}
+	return nil
 }

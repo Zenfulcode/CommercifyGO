@@ -6,6 +6,7 @@ import "github.com/zenfulcode/commercify/internal/domain/entity"
 type OrderRepository interface {
 	Create(order *entity.Order) error
 	GetByID(orderID uint) (*entity.Order, error)
+	GetByCheckoutSessionID(checkoutSessionID string) (*entity.Order, error)
 	Update(order *entity.Order) error
 	GetByUser(userID uint, offset, limit int) ([]*entity.Order, error)
 	ListByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error)

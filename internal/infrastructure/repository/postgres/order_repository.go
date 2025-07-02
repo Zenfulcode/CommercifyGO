@@ -55,12 +55,12 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 		// Add guest order fields
 		query = `
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-				total_weight, currency
+				total_weight, currency, checkout_session_id
 			)
-			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 			RETURNING id
 		`
 
@@ -68,6 +68,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			query,
 			order.TotalAmount,
 			order.Status,
+			order.PaymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			order.PaymentID,
@@ -85,17 +86,18 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingCost,
 			order.TotalWeight,
 			order.Currency,
+			order.CheckoutSessionID,
 		).Scan(&order.ID)
 	} else {
 		// Regular user order
 		query = `
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, final_amount,
 				customer_email, customer_phone, customer_full_name, shipping_method_id, shipping_cost, total_weight,
-				currency
+				currency, checkout_session_id
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 			RETURNING id
 		`
 
@@ -104,6 +106,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.UserID,
 			order.TotalAmount,
 			order.Status,
+			order.PaymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			order.PaymentID,
@@ -120,6 +123,7 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 			order.ShippingCost,
 			order.TotalWeight,
 			order.Currency,
+			order.CheckoutSessionID,
 		).Scan(&order.ID)
 	}
 
@@ -144,17 +148,21 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 	for i := range order.Items {
 		order.Items[i].OrderID = order.ID
 		query := `
-			INSERT INTO order_items (order_id, product_id, quantity, price, subtotal, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO order_items (order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			RETURNING id
 		`
 		err = tx.QueryRow(
 			query,
 			order.Items[i].OrderID,
 			order.Items[i].ProductID,
+			order.Items[i].ProductVariantID,
 			order.Items[i].Quantity,
 			order.Items[i].Price,
 			order.Items[i].Subtotal,
+			order.Items[i].Weight,
+			order.Items[i].ProductName,
+			order.Items[i].SKU,
 			order.CreatedAt,
 		).Scan(&order.Items[i].ID)
 		if err != nil {
@@ -169,11 +177,11 @@ func (r *OrderRepository) Create(order *entity.Order) error {
 func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	// Get order
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
-			total_weight, currency
+			total_weight, currency, checkout_session_id
 		FROM orders
 		WHERE id = $1
 	`
@@ -193,6 +201,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 
 	var discountID sql.NullInt64
 	var discountCode sql.NullString
+	var checkoutSessionID sql.NullString
 
 	err := r.db.QueryRow(query, orderID).Scan(
 		&order.ID,
@@ -200,6 +209,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		&userID,
 		&order.TotalAmount,
 		&order.Status,
+		&order.PaymentStatus,
 		&shippingAddrJSON,
 		&billingAddrJSON,
 		&order.PaymentID,
@@ -221,6 +231,7 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		&shippingCost,
 		&totalWeight,
 		&order.Currency,
+		&checkoutSessionID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -302,9 +313,14 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		order.TotalWeight = totalWeight.Float64
 	}
 
+	// Set checkout session ID if valid
+	if checkoutSessionID.Valid {
+		order.CheckoutSessionID = checkoutSessionID.String
+	}
+
 	// Get order items
 	query = `
-		SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.subtotal,
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
 			p.name as product_name, p.product_number as sku
 		FROM order_items oi
 		LEFT JOIN products p ON p.id = oi.product_id
@@ -321,18 +337,24 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 	for rows.Next() {
 		item := entity.OrderItem{}
 		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
 		err := rows.Scan(
 			&item.ID,
 			&item.OrderID,
 			&item.ProductID,
+			&productVariantID,
 			&item.Quantity,
 			&item.Price,
 			&item.Subtotal,
+			&item.Weight,
 			&productName,
 			&sku,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
 		}
 		if productName.Valid {
 			item.ProductName = productName.String
@@ -340,6 +362,199 @@ func (r *OrderRepository) GetByID(orderID uint) (*entity.Order, error) {
 		if sku.Valid {
 			item.SKU = sku.String
 		}
+		order.Items = append(order.Items, item)
+	}
+
+	return order, nil
+}
+
+// GetByCheckoutSessionID retrieves an order by checkout session ID
+func (r *OrderRepository) GetByCheckoutSessionID(checkoutSessionID string) (*entity.Order, error) {
+	// Get order
+	query := `
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
+			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
+			discount_amount, discount_id, discount_code, final_amount, action_url,
+			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
+			total_weight, currency, checkout_session_id
+		FROM orders
+		WHERE checkout_session_id = $1
+	`
+
+	order := &entity.Order{}
+	var shippingAddrJSON, billingAddrJSON []byte
+	var completedAt sql.NullTime
+	var paymentProvider sql.NullString
+	var orderNumber sql.NullString
+	var actionURL sql.NullString
+	var userID sql.NullInt64 // Use NullInt64 to handle NULL user_id
+	var customerEmail, customerPhone, customerFullName sql.NullString
+	var isGuestOrder sql.NullBool
+	var shippingMethodID sql.NullInt64
+	var shippingCost sql.NullInt64
+	var totalWeight sql.NullFloat64
+	var discountID sql.NullInt64
+	var discountCode sql.NullString
+	var checkoutSessionIDResult sql.NullString
+
+	err := r.db.QueryRow(query, checkoutSessionID).Scan(
+		&order.ID,
+		&orderNumber,
+		&userID,
+		&order.TotalAmount,
+		&order.Status,
+		&order.PaymentStatus,
+		&shippingAddrJSON,
+		&billingAddrJSON,
+		&order.PaymentID,
+		&paymentProvider,
+		&order.TrackingCode,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+		&completedAt,
+		&order.DiscountAmount,
+		&discountID,
+		&discountCode,
+		&order.FinalAmount,
+		&actionURL,
+		&customerEmail,
+		&customerPhone,
+		&customerFullName,
+		&isGuestOrder,
+		&shippingMethodID,
+		&shippingCost,
+		&totalWeight,
+		&order.Currency,
+		&checkoutSessionIDResult,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.New("order not found")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle user_id properly
+	if userID.Valid {
+		order.UserID = uint(userID.Int64)
+	} else {
+		order.UserID = 0 // Use 0 to represent NULL in our application
+	}
+
+	// Handle guest order fields
+	if isGuestOrder.Valid && isGuestOrder.Bool {
+		order.IsGuestOrder = true
+		order.CustomerDetails = &entity.CustomerDetails{}
+		if customerEmail.Valid {
+			order.CustomerDetails.Email = customerEmail.String
+		}
+		if customerPhone.Valid {
+			order.CustomerDetails.Phone = customerPhone.String
+		}
+		if customerFullName.Valid {
+			order.CustomerDetails.FullName = customerFullName.String
+		}
+	}
+
+	// Set order number if valid
+	if orderNumber.Valid {
+		order.OrderNumber = orderNumber.String
+	}
+
+	// Set payment provider if valid
+	if paymentProvider.Valid {
+		order.PaymentProvider = paymentProvider.String
+	}
+
+	// Set action URL if valid
+	if actionURL.Valid {
+		order.ActionURL = actionURL.String
+	}
+
+	// Set checkout session ID if valid
+	if checkoutSessionIDResult.Valid {
+		order.CheckoutSessionID = checkoutSessionIDResult.String
+	}
+
+	// Unmarshal addresses
+	if err := json.Unmarshal(shippingAddrJSON, &order.ShippingAddr); err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(billingAddrJSON, &order.BillingAddr); err != nil {
+		return nil, err
+	}
+
+	// Set completed at if valid
+	if completedAt.Valid {
+		order.CompletedAt = &completedAt.Time
+	}
+
+	// Set shipping method ID if valid
+	if shippingMethodID.Valid {
+		order.ShippingMethodID = uint(shippingMethodID.Int64)
+	}
+
+	// Set shipping cost if valid
+	if shippingCost.Valid {
+		order.ShippingCost = shippingCost.Int64
+	}
+
+	// Set total weight if valid
+	if totalWeight.Valid {
+		order.TotalWeight = totalWeight.Float64
+	}
+
+	// Get order items
+	query = `
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
+			p.name as product_name, p.product_number as sku
+		FROM order_items oi
+		LEFT JOIN products p ON p.id = oi.product_id
+		WHERE oi.order_id = $1
+	`
+
+	rows, err := r.db.Query(query, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	order.Items = []entity.OrderItem{}
+	for rows.Next() {
+		item := entity.OrderItem{}
+		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
+		err := rows.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ProductID,
+			&productVariantID,
+			&item.Quantity,
+			&item.Price,
+			&item.Subtotal,
+			&item.Weight,
+			&productName,
+			&sku,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
+		}
+
+		if productName.Valid {
+			item.ProductName = productName.String
+		}
+
+		if sku.Valid {
+			item.SKU = sku.String
+		}
+
 		order.Items = append(order.Items, item)
 	}
 
@@ -362,20 +577,20 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 	// Update order
 	query := `
 		UPDATE orders
-		SET status = $1, shipping_address = $2, billing_address = $3,
-			payment_id = $4, payment_provider = $5, tracking_code = $6, updated_at = $7, completed_at = $8, order_number = $9,
-			final_amount = $10,
-			discount_id = $11,
-			discount_amount = $12,
-			discount_code = $13,
-			action_url = $14,
-			shipping_method_id = $15,
-			shipping_cost = $16,
-			total_weight = $17,
-			customer_email = $18,
-			customer_phone = $19,
-			customer_full_name = $20
-		WHERE id = $21
+		SET status = $1, payment_status = $2, shipping_address = $3, billing_address = $4,
+			payment_id = $5, payment_provider = $6, tracking_code = $7, updated_at = $8, completed_at = $9, order_number = $10,
+			final_amount = $11,
+			discount_id = $12,
+			discount_amount = $13,
+			discount_code = $14,
+			action_url = $15,
+			shipping_method_id = $16,
+			shipping_cost = $17,
+			total_weight = $18,
+			customer_email = $19,
+			customer_phone = $20,
+			customer_full_name = $21
+		WHERE id = $22
 	`
 
 	var discountID sql.NullInt64
@@ -393,6 +608,7 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 	_, err = r.db.Exec(
 		query,
 		order.Status,
+		order.PaymentStatus,
 		shippingAddrJSON,
 		billingAddrJSON,
 		order.PaymentID,
@@ -421,7 +637,7 @@ func (r *OrderRepository) Update(order *entity.Order) error {
 // GetByUser retrieves orders for a user
 func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			customer_email, customer_phone, customer_full_name, is_guest_order, currency
 		FROM orders
@@ -453,6 +669,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 			&userIDNull,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&shippingAddrJSON,
 			&billingAddrJSON,
 			&order.PaymentID,
@@ -514,7 +731,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 
 		// Get order items
 		itemsQuery := `
-			SELECT id, order_id, product_id, quantity, price, subtotal
+			SELECT id, order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku
 			FROM order_items
 			WHERE order_id = $1
 		`
@@ -527,17 +744,32 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 		order.Items = []entity.OrderItem{}
 		for itemRows.Next() {
 			item := entity.OrderItem{}
+			var productVariantID sql.NullInt64
+			var productName, sku sql.NullString
 			err := itemRows.Scan(
 				&item.ID,
 				&item.OrderID,
 				&item.ProductID,
+				&productVariantID,
 				&item.Quantity,
 				&item.Price,
 				&item.Subtotal,
+				&item.Weight,
+				&productName,
+				&sku,
 			)
 			if err != nil {
 				itemRows.Close()
 				return nil, err
+			}
+			if productVariantID.Valid {
+				item.ProductVariantID = uint(productVariantID.Int64)
+			}
+			if productName.Valid {
+				item.ProductName = productName.String
+			}
+			if sku.Valid {
+				item.SKU = sku.String
 			}
 			order.Items = append(order.Items, item)
 		}
@@ -552,7 +784,7 @@ func (r *OrderRepository) GetByUser(userID uint, offset, limit int) ([]*entity.O
 // ListByStatus retrieves orders by status
 func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, created_at, updated_at, completed_at,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, created_at, updated_at, completed_at,
 			customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
 		WHERE status = $1
@@ -581,6 +813,7 @@ func (r *OrderRepository) ListByStatus(status entity.OrderStatus, offset, limit 
 			&userIDNull,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&order.CreatedAt,
 			&order.UpdatedAt,
 			&completedAt,
@@ -674,7 +907,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 
 	// Get order by payment_id
 	query := `
-		SELECT id, order_number, user_id, total_amount, status, shipping_address, billing_address,
+		SELECT id, order_number, user_id, total_amount, status, payment_status, shipping_address, billing_address,
 			payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at,
 			discount_amount, discount_id, discount_code, final_amount, action_url,
 			customer_email, customer_phone, customer_full_name, is_guest_order, shipping_method_id, shipping_cost,
@@ -705,6 +938,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 		&userID,
 		&order.TotalAmount,
 		&order.Status,
+		&order.PaymentStatus,
 		&shippingAddrJSON,
 		&billingAddrJSON,
 		&order.PaymentID,
@@ -811,7 +1045,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 
 	// Get order items
 	query = `
-		SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.subtotal,
+		SELECT oi.id, oi.order_id, oi.product_id, oi.product_variant_id, oi.quantity, oi.price, oi.subtotal, oi.weight,
 			p.name as product_name, p.product_number as sku
 		FROM order_items oi
 		LEFT JOIN products p ON p.id = oi.product_id
@@ -828,18 +1062,24 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 	for rows.Next() {
 		item := entity.OrderItem{}
 		var productName, sku sql.NullString
+		var productVariantID sql.NullInt64
 		err := rows.Scan(
 			&item.ID,
 			&item.OrderID,
 			&item.ProductID,
+			&productVariantID,
 			&item.Quantity,
 			&item.Price,
 			&item.Subtotal,
+			&item.Weight,
 			&productName,
 			&sku,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if productVariantID.Valid {
+			item.ProductVariantID = uint(productVariantID.Int64)
 		}
 		if productName.Valid {
 			item.ProductName = productName.String
@@ -856,7 +1096,7 @@ func (r *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 // ListAll lists all orders
 func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 	query := `
-		SELECT id, order_number, user_id, total_amount, status,
+		SELECT id, order_number, user_id, total_amount, status, payment_status,
 			payment_provider, created_at, updated_at, completed_at,
 			final_amount, customer_email, customer_full_name, is_guest_order, currency
 		FROM orders
@@ -884,6 +1124,7 @@ func (r *OrderRepository) ListAll(offset, limit int) ([]*entity.Order, error) {
 			&userID,
 			&order.TotalAmount,
 			&order.Status,
+			&order.PaymentStatus,
 			&order.PaymentProvider,
 			&order.CreatedAt,
 			&order.UpdatedAt,

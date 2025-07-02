@@ -214,8 +214,8 @@ export interface ResponseDTO<T extends any> {
 export interface ListResponseDTO<T extends any> {
   success: boolean;
   message?: string;
-  data?: T[];
-  pagination?: PaginationDTO;
+  data: T[];
+  pagination: PaginationDTO;
   error?: string;
 }
 /**
@@ -423,6 +423,7 @@ export interface OrderDTO {
   order_number: string;
   items: OrderItemDTO[];
   status: OrderStatus;
+  payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
   shipping_cost: number /* float64 */; // Shipping cost
   final_amount: number /* float64 */; // Total including shipping and discounts
@@ -433,15 +434,18 @@ export interface OrderDTO {
   shipping_details: ShippingOptionDTO;
   discount_details: AppliedDiscountDTO;
   customer: CustomerDetailsDTO;
-  checkout_id?: string;
+  checkout_id: string;
   created_at: string;
   updated_at: string;
 }
 export interface OrderSummaryDTO {
   id: number /* uint */;
   order_number: string;
+  checkout_id: string;
   user_id: number /* uint */;
+  customer: CustomerDetailsDTO;
   status: OrderStatus;
+  payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
   shipping_cost: number /* float64 */; // Shipping cost
   final_amount: number /* float64 */; // Total including shipping and discounts
@@ -472,6 +476,7 @@ export interface OrderItemDTO {
   quantity: number /* int */;
   unit_price: number /* float64 */;
   total_price: number /* float64 */;
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -516,26 +521,24 @@ export interface OrderSearchRequest {
   pagination: PaginationDTO;
 }
 /**
- * ProcessPaymentRequest represents the data needed to process a payment
- */
-export interface ProcessPaymentRequest {
-  payment_method: PaymentMethod;
-  payment_provider: PaymentProvider;
-  card_details?: any /* service.CardDetails */;
-  phone_number?: string;
-}
-/**
  * OrderStatus represents the status of an order
  */
 export type OrderStatus = string;
 export const OrderStatusPending: OrderStatus = "pending";
-export const OrderStatusPendingAction: OrderStatus = "pending_action"; // Requires user action (e.g., redirect to payment provider)
 export const OrderStatusPaid: OrderStatus = "paid";
-export const OrderStatusCaptured: OrderStatus = "captured"; // Payment captured
 export const OrderStatusShipped: OrderStatus = "shipped";
-export const OrderStatusDelivered: OrderStatus = "delivered";
 export const OrderStatusCancelled: OrderStatus = "cancelled";
-export const OrderStatusRefunded: OrderStatus = "refunded";
+export const OrderStatusCompleted: OrderStatus = "completed";
+/**
+ * PaymentStatus represents the status of a payment
+ */
+export type PaymentStatus = string;
+export const PaymentStatusPending: PaymentStatus = "pending";
+export const PaymentStatusAuthorized: PaymentStatus = "authorized";
+export const PaymentStatusCaptured: PaymentStatus = "captured";
+export const PaymentStatusRefunded: PaymentStatus = "refunded";
+export const PaymentStatusCancelled: PaymentStatus = "cancelled";
+export const PaymentStatusFailed: PaymentStatus = "failed";
 /**
  * PaymentMethod represents the payment method used for an order
  */

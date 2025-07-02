@@ -80,12 +80,19 @@ func (s *Server) setupRoutes() {
 	discountHandler := s.container.Handlers().DiscountHandler()
 	shippingHandler := s.container.Handlers().ShippingHandler()
 	currencyHandler := s.container.Handlers().CurrencyHandler()
+	healthHandler := s.container.Handlers().HealthHandler()
+	emailTestHandler := s.container.Handlers().EmailTestHandler()
 
 	// Extract middleware from container
 	authMiddleware := s.container.Middlewares().AuthMiddleware()
+	corsMiddleware := s.container.Middlewares().CorsMiddleware()
+
+	// Health check routes (no prefix, for load balancers and monitoring)
+	s.router.HandleFunc("/health", healthHandler.Health).Methods(http.MethodGet)
 
 	// Register routes
 	api := s.router.PathPrefix("/api").Subrouter()
+	api.Use(corsMiddleware.ApplyCors)
 
 	// Public routes
 	api.HandleFunc("/auth/register", userHandler.Register).Methods(http.MethodPost)
@@ -132,6 +139,11 @@ func (s *Server) setupRoutes() {
 	s.setupMobilePayWebhooks(api, webhookHandler)
 	s.setupStripeWebhooks(api, webhookHandler)
 
+	// Routes with optional authentication (accessible via auth or checkout session)
+	optionalAuth := api.PathPrefix("").Subrouter()
+	optionalAuth.Use(authMiddleware.OptionalAuthenticate)
+	optionalAuth.HandleFunc("/orders/{orderId:[0-9]+}", orderHandler.GetOrder).Methods(http.MethodGet)
+
 	// Protected routes
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(authMiddleware.Authenticate)
@@ -141,8 +153,7 @@ func (s *Server) setupRoutes() {
 	protected.HandleFunc("/users/me", userHandler.UpdateProfile).Methods(http.MethodPut)
 	protected.HandleFunc("/users/me/password", userHandler.ChangePassword).Methods(http.MethodPut)
 
-	// Order routes
-	protected.HandleFunc("/orders/{orderId:[0-9]+}", orderHandler.GetOrder).Methods(http.MethodGet)
+	// Order routes (authenticated users only)
 	protected.HandleFunc("/orders", orderHandler.ListOrders).Methods(http.MethodGet)
 
 	// Admin routes
@@ -163,6 +174,9 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/currencies", currencyHandler.UpdateCurrency).Methods(http.MethodPut)
 	admin.HandleFunc("/currencies", currencyHandler.DeleteCurrency).Methods(http.MethodDelete)
 	admin.HandleFunc("/currencies/default", currencyHandler.SetDefaultCurrency).Methods(http.MethodPut)
+
+	// Admin email test route
+	admin.HandleFunc("/test/email", emailTestHandler.TestEmail).Methods(http.MethodPost)
 
 	// Admin category routes
 	admin.HandleFunc("/categories", categoryHandler.CreateCategory).Methods(http.MethodPost)
@@ -221,6 +235,11 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.SetMultipleVariantPrices).Methods(http.MethodPut)
 	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices", productHandler.GetVariantPrices).Methods(http.MethodGet)
 	admin.HandleFunc("/variants/{variantId:[0-9]+}/prices/{currency}", productHandler.RemoveVariantPrice).Methods(http.MethodDelete)
+}
+
+// GetContainer returns the dependency injection container
+func (s *Server) GetContainer() container.Container {
+	return s.container
 }
 
 // setupStripeWebhooks configures Stripe webhooks

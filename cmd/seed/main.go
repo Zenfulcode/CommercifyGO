@@ -26,6 +26,7 @@ func main() {
 	productVariantsFlag := flag.Bool("product-variants", false, "Seed product variants data")
 	discountsFlag := flag.Bool("discounts", false, "Seed discounts data")
 	ordersFlag := flag.Bool("orders", false, "Seed orders data")
+	checkoutsFlag := flag.Bool("checkouts", false, "Seed checkouts data")
 	paymentTransactionsFlag := flag.Bool("payment-transactions", false, "Seed payment transactions data")
 	shippingFlag := flag.Bool("shipping", false, "Seed shipping data (methods, zones, rates)")
 	clearFlag := flag.Bool("clear", false, "Clear all data before seeding")
@@ -110,6 +111,20 @@ func main() {
 		fmt.Println("Shipping rates seeded successfully")
 	}
 
+	if *allFlag || *ordersFlag {
+		if err := seedOrders(db); err != nil {
+			log.Fatalf("Failed to seed orders: %v", err)
+		}
+		fmt.Println("Orders seeded successfully")
+	}
+
+	if *allFlag || *checkoutsFlag {
+		if err := seedCheckouts(db); err != nil {
+			log.Fatalf("Failed to seed checkouts: %v", err)
+		}
+		fmt.Println("Checkouts seeded successfully")
+	}
+
 	// if *allFlag || *paymentTransactionsFlag {
 	// 	if err := seedPaymentTransactions(db); err != nil {
 	// 		log.Fatalf("Failed to seed payment transactions: %v", err)
@@ -118,7 +133,7 @@ func main() {
 	// }
 
 	if !*allFlag && !*usersFlag && !*categoriesFlag && !*productsFlag && !*productVariantsFlag &&
-		!*ordersFlag && !*clearFlag && !*discountsFlag &&
+		!*ordersFlag && !*checkoutsFlag && !*clearFlag && !*discountsFlag &&
 		!*paymentTransactionsFlag && !*shippingFlag {
 		fmt.Println("No action specified")
 		fmt.Println("\nUsage:")
@@ -135,8 +150,15 @@ func clearData(db *sql.DB) error {
 
 	// Clear tables in reverse order of dependencies
 	tables := []string{
+		"checkout_items",
+		"checkouts",
 		"order_items",
 		"orders",
+		"shipping_rates",
+		"shipping_zones",
+		"shipping_methods",
+		"discounts",
+		"product_variants",
 		"products",
 		"categories",
 		"users",
@@ -728,22 +750,31 @@ func seedOrders(db *sql.DB) error {
 		return fmt.Errorf("no users found to create orders for")
 	}
 
-	// Get product data
-	productRows, err := db.Query("SELECT id, price FROM products")
+	// Get product data with their default variants
+	productRows, err := db.Query(`
+		SELECT p.id, p.name, pv.id as variant_id, pv.price, pv.sku, pv.stock 
+		FROM products p 
+		JOIN product_variants pv ON p.id = pv.product_id 
+		WHERE pv.is_default = true
+	`)
 	if err != nil {
 		return err
 	}
 	defer productRows.Close()
 
 	type productInfo struct {
-		id    int
-		price float64
+		id        int
+		name      string
+		variantID int
+		price     int64 // Price is stored as int64 (cents)
+		sku       string
+		stock     int
 	}
 
 	var products []productInfo
 	for productRows.Next() {
 		var p productInfo
-		if err := productRows.Scan(&p.id, &p.price); err != nil {
+		if err := productRows.Scan(&p.id, &p.name, &p.variantID, &p.price, &p.sku, &p.stock); err != nil {
 			return err
 		}
 		products = append(products, p)
@@ -786,7 +817,7 @@ func seedOrders(db *sql.DB) error {
 	}
 
 	// Order statuses
-	statuses := []string{"pending", "paid", "shipped", "delivered", "cancelled"}
+	statuses := []string{"pending", "paid", "shipped", "completed", "cancelled"}
 
 	// Payment providers
 	paymentProviders := []string{"stripe", "paypal", "mock"}
@@ -820,24 +851,24 @@ func seedOrders(db *sql.DB) error {
 		createdAt := now.Add(time.Duration(-i*24) * time.Hour) // Each order created a day apart
 		updatedAt := createdAt
 
-		// Set completed_at for delivered orders
+		// Set completed_at for completed orders
 		var completedAt *time.Time
-		if status == "delivered" {
+		if status == "completed" {
 			completedTime := updatedAt.Add(3 * 24 * time.Hour) // 3 days after creation
 			completedAt = &completedTime
 		}
 
-		// Set payment details for paid, shipped, or delivered orders
+		// Set payment details for paid, shipped, or completed orders
 		var paymentID string
 		var paymentProvider string
 		var trackingCode string
 
-		if status == "paid" || status == "shipped" || status == "delivered" {
+		if status == "paid" || status == "shipped" || status == "completed" {
 			paymentID = fmt.Sprintf("payment_%d_%s", i, time.Now().Format("20060102"))
 			paymentProvider = paymentProviders[i%len(paymentProviders)]
 		}
 
-		if status == "shipped" || status == "delivered" {
+		if status == "shipped" || status == "completed" {
 			trackingCode = fmt.Sprintf("TRACK%d%s", i, time.Now().Format("20060102"))
 		}
 
@@ -852,17 +883,31 @@ func seedOrders(db *sql.DB) error {
 
 		// Insert order
 		var orderID int
+		// Set payment status based on order status
+		var paymentStatus string
+		switch status {
+		case "pending":
+			paymentStatus = "pending"
+		case "paid", "shipped", "completed":
+			paymentStatus = "captured"
+		case "cancelled":
+			paymentStatus = "cancelled"
+		default:
+			paymentStatus = "pending"
+		}
+
 		err = tx.QueryRow(`
 			INSERT INTO orders (
-				user_id, total_amount, status, shipping_address, billing_address,
+				user_id, total_amount, status, payment_status, shipping_address, billing_address,
 				payment_id, payment_provider, tracking_code, created_at, updated_at, completed_at, order_number
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			RETURNING id
 		`,
 			userID,
 			0, // Total amount will be updated after adding items
 			status,
+			paymentStatus,
 			shippingAddrJSON,
 			billingAddrJSON,
 			paymentID,
@@ -895,22 +940,26 @@ func seedOrders(db *sql.DB) error {
 			// Random quantity between 1 and 3
 			quantity := (j % 3) + 1
 
-			// Calculate subtotal
-			subtotal := float64(quantity) * product.price
-			totalAmount += subtotal
+			// Calculate subtotal (price is already in cents)
+			subtotal := int64(quantity) * product.price
+			totalAmount += float64(subtotal)
 
 			// Insert order item
 			_, err = tx.Exec(`
 				INSERT INTO order_items (
-					order_id, product_id, quantity, price, subtotal, created_at
+					order_id, product_id, product_variant_id, quantity, price, subtotal, weight, product_name, sku, created_at
 				)
-				VALUES ($1, $2, $3, $4, $5, $6)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			`,
 				orderID,
 				product.id,
+				product.variantID,
 				quantity,
-				int64(product.price),
-				int64(subtotal),
+				product.price,
+				subtotal,
+				0.5, // Default weight for seeded items
+				product.name,
+				product.sku,
 				createdAt,
 			)
 
@@ -920,7 +969,7 @@ func seedOrders(db *sql.DB) error {
 			}
 		}
 
-		// Update order with total amount
+		// Update order with total amount (totalAmount is already in cents)
 		_, err = tx.Exec(`
 			UPDATE orders
 			SET total_amount = $1
@@ -1610,7 +1659,7 @@ func seedPaymentTransactions(db *sql.DB) error {
 		SELECT id, payment_id, payment_provider, total_amount, order_number 
 		FROM orders 
 		WHERE payment_provider IS NOT NULL 
-		AND status IN ('paid', 'shipped', 'delivered')
+		AND status IN ('paid', 'shipped', 'completed')
 	`)
 	if err != nil {
 		return err
@@ -1707,5 +1756,407 @@ func seedPaymentTransactions(db *sql.DB) error {
 	}
 
 	fmt.Printf("Seeded %d payment transactions\n", len(orders))
+	return nil
+}
+
+// seedCheckouts seeds checkout data for testing expiry and cleanup logic
+func seedCheckouts(db *sql.DB) error {
+	// Get user IDs
+	userRows, err := db.Query("SELECT id FROM users LIMIT 3")
+	if err != nil {
+		return err
+	}
+	defer userRows.Close()
+
+	var userIDs []int
+	for userRows.Next() {
+		var id int
+		if err := userRows.Scan(&id); err != nil {
+			return err
+		}
+		userIDs = append(userIDs, id)
+	}
+
+	if len(userIDs) == 0 {
+		// Create at least one guest checkout if no users exist
+		userIDs = []int{} // Empty slice, we'll use guest checkouts only
+	}
+
+	// Get product data with their default variants
+	productRows, err := db.Query(`
+		SELECT p.id, p.name, pv.id as variant_id, pv.price, pv.sku
+		FROM products p 
+		JOIN product_variants pv ON p.id = pv.product_id 
+		WHERE pv.is_default = true
+		LIMIT 5
+	`)
+	if err != nil {
+		return err
+	}
+	defer productRows.Close()
+
+	type productInfo struct {
+		id        int
+		name      string
+		variantID int
+		price     int64
+		sku       string
+	}
+
+	var products []productInfo
+	for productRows.Next() {
+		var p productInfo
+		if err := productRows.Scan(&p.id, &p.name, &p.variantID, &p.price, &p.sku); err != nil {
+			return err
+		}
+		products = append(products, p)
+	}
+
+	if len(products) == 0 {
+		return fmt.Errorf("no products found to create checkouts with")
+	}
+
+	now := time.Now()
+
+	// Sample addresses
+	addresses := []map[string]string{
+		{
+			"street":      "123 Main St",
+			"city":        "New York",
+			"state":       "NY",
+			"postal_code": "10001",
+			"country":     "USA",
+		},
+		{
+			"street":      "456 Oak Ave",
+			"city":        "Los Angeles",
+			"state":       "CA",
+			"postal_code": "90001",
+			"country":     "USA",
+		},
+		{
+			"street":      "789 Pine Rd",
+			"city":        "Chicago",
+			"state":       "IL",
+			"postal_code": "60601",
+			"country":     "USA",
+		},
+	}
+
+	// Sample customer details
+	customerDetails := []map[string]string{
+		{
+			"email":     "john.doe@example.com",
+			"phone":     "+1-555-0101",
+			"full_name": "John Doe",
+		},
+		{
+			"email":     "jane.smith@example.com",
+			"phone":     "+1-555-0102",
+			"full_name": "Jane Smith",
+		},
+		{
+			"email":     "bob.wilson@example.com",
+			"phone":     "+1-555-0103",
+			"full_name": "Bob Wilson",
+		},
+	}
+
+	// Create different types of checkouts for testing expiry logic
+	checkouts := []struct {
+		description        string
+		userID             *int
+		sessionID          string
+		status             string
+		hasCustomerDetails bool
+		hasShippingAddress bool
+		lastActivityAt     time.Time
+		createdAt          time.Time
+		expiresAt          time.Time
+		addItems           bool
+	}{
+		{
+			description: "Active checkout with customer info - should be abandoned (16 min old)",
+			userID: func() *int {
+				if len(userIDs) > 0 {
+					return &userIDs[0]
+				} else {
+					return nil
+				}
+			}(),
+			sessionID: func() string {
+				if len(userIDs) > 0 {
+					return ""
+				} else {
+					return "user_session_1"
+				}
+			}(),
+			status:             "active",
+			hasCustomerDetails: true,
+			hasShippingAddress: true,
+			lastActivityAt:     now.Add(-16 * time.Minute),
+			createdAt:          now.Add(-20 * time.Minute),
+			expiresAt:          now.Add(4 * time.Hour),
+			addItems:           true,
+		},
+		{
+			description: "Active checkout with customer info - still active (10 min old)",
+			userID: func() *int {
+				if len(userIDs) > 1 {
+					return &userIDs[1]
+				} else if len(userIDs) > 0 {
+					return &userIDs[0]
+				} else {
+					return nil
+				}
+			}(),
+			sessionID: func() string {
+				if len(userIDs) > 1 {
+					return ""
+				} else {
+					return "user_session_2"
+				}
+			}(),
+			status:             "active",
+			hasCustomerDetails: true,
+			hasShippingAddress: false,
+			lastActivityAt:     now.Add(-10 * time.Minute),
+			createdAt:          now.Add(-15 * time.Minute),
+			expiresAt:          now.Add(9 * time.Hour),
+			addItems:           true,
+		},
+		{
+			description:        "Empty guest checkout - should be deleted (25 hours old)",
+			userID:             nil,
+			sessionID:          "guest_session_old",
+			status:             "active",
+			hasCustomerDetails: false,
+			hasShippingAddress: false,
+			lastActivityAt:     now.Add(-25 * time.Hour),
+			createdAt:          now.Add(-25 * time.Hour),
+			expiresAt:          now.Add(-1 * time.Hour),
+			addItems:           false,
+		},
+		{
+			description:        "Empty guest checkout - still active (20 hours old)",
+			userID:             nil,
+			sessionID:          "guest_session_recent",
+			status:             "active",
+			hasCustomerDetails: false,
+			hasShippingAddress: false,
+			lastActivityAt:     now.Add(-20 * time.Hour),
+			createdAt:          now.Add(-20 * time.Hour),
+			expiresAt:          now.Add(4 * time.Hour),
+			addItems:           false,
+		},
+		{
+			description: "Abandoned checkout - should be deleted (8 days old)",
+			userID: func() *int {
+				if len(userIDs) > 2 {
+					return &userIDs[2]
+				} else if len(userIDs) > 0 {
+					return &userIDs[0]
+				} else {
+					return nil
+				}
+			}(),
+			sessionID: func() string {
+				if len(userIDs) > 2 {
+					return ""
+				} else {
+					return "user_session_3"
+				}
+			}(),
+			status:             "abandoned",
+			hasCustomerDetails: true,
+			hasShippingAddress: true,
+			lastActivityAt:     now.Add(-8 * 24 * time.Hour),
+			createdAt:          now.Add(-8 * 24 * time.Hour),
+			expiresAt:          now.Add(-4 * 24 * time.Hour),
+			addItems:           true,
+		},
+		{
+			description: "Abandoned checkout - still recoverable (5 days old)",
+			userID: func() *int {
+				if len(userIDs) > 0 {
+					return &userIDs[0]
+				} else {
+					return nil
+				}
+			}(),
+			sessionID: func() string {
+				if len(userIDs) > 0 {
+					return ""
+				} else {
+					return "user_session_4"
+				}
+			}(),
+			status:             "abandoned",
+			hasCustomerDetails: true,
+			hasShippingAddress: false,
+			lastActivityAt:     now.Add(-5 * 24 * time.Hour),
+			createdAt:          now.Add(-5 * 24 * time.Hour),
+			expiresAt:          now.Add(-1 * 24 * time.Hour),
+			addItems:           true,
+		},
+		{
+			description:        "Expired checkout - should be deleted",
+			userID:             nil,
+			sessionID:          "expired_session",
+			status:             "expired",
+			hasCustomerDetails: false,
+			hasShippingAddress: false,
+			lastActivityAt:     now.Add(-2 * 24 * time.Hour),
+			createdAt:          now.Add(-2 * 24 * time.Hour),
+			expiresAt:          now.Add(-1 * 24 * time.Hour),
+			addItems:           false,
+		},
+		{
+			description:        "Guest checkout with shipping info - should be abandoned (20 min old)",
+			userID:             nil,
+			sessionID:          "guest_with_shipping",
+			status:             "active",
+			hasCustomerDetails: false,
+			hasShippingAddress: true,
+			lastActivityAt:     now.Add(-20 * time.Minute),
+			createdAt:          now.Add(-25 * time.Minute),
+			expiresAt:          now.Add(23 * time.Hour),
+			addItems:           true,
+		},
+	}
+
+	// Insert checkouts
+	for i, checkout := range checkouts {
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction for checkout %d: %w", i, err)
+		}
+
+		// Prepare addresses and customer details
+		var shippingAddrJSON, billingAddrJSON, customerDetailsJSON []byte
+
+		if checkout.hasShippingAddress {
+			addr := addresses[i%len(addresses)]
+			shippingAddrJSON, _ = json.Marshal(addr)
+			billingAddrJSON = shippingAddrJSON // Use same address for billing
+		} else {
+			shippingAddrJSON, _ = json.Marshal(map[string]string{})
+			billingAddrJSON, _ = json.Marshal(map[string]string{})
+		}
+
+		if checkout.hasCustomerDetails {
+			details := customerDetails[i%len(customerDetails)]
+			customerDetailsJSON, _ = json.Marshal(details)
+		} else {
+			customerDetailsJSON, _ = json.Marshal(map[string]string{})
+		}
+
+		// Insert checkout
+		var checkoutID uint
+		var userID sql.NullInt64
+		if checkout.userID != nil {
+			userID.Int64 = int64(*checkout.userID)
+			userID.Valid = true
+		}
+
+		var sessionID sql.NullString
+		if checkout.sessionID != "" {
+			sessionID.String = checkout.sessionID
+			sessionID.Valid = true
+		}
+
+		err = tx.QueryRow(`
+			INSERT INTO checkouts (
+				user_id, session_id, status, shipping_address, billing_address,
+				customer_details, currency, total_amount, shipping_cost, discount_amount,
+				final_amount, created_at, updated_at, last_activity_at, expires_at
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			RETURNING id
+		`,
+			userID,
+			sessionID,
+			checkout.status,
+			shippingAddrJSON,
+			billingAddrJSON,
+			customerDetailsJSON,
+			"USD",
+			0, // Will be updated after adding items
+			0,
+			0,
+			0,
+			checkout.createdAt,
+			checkout.createdAt,
+			checkout.lastActivityAt,
+			checkout.expiresAt,
+		).Scan(&checkoutID)
+
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to insert checkout %d: %w", i, err)
+		}
+
+		// Add checkout items if specified
+		if checkout.addItems {
+			totalAmount := int64(0)
+			numItems := (i % 3) + 1 // 1-3 items per checkout
+
+			for j := 0; j < numItems; j++ {
+				product := products[j%len(products)]
+				quantity := (j % 2) + 1 // 1-2 quantity per item
+
+				itemTotal := int64(quantity) * product.price
+				totalAmount += itemTotal
+
+				_, err = tx.Exec(`
+					INSERT INTO checkout_items (
+						checkout_id, product_id, product_variant_id, quantity, price,
+						weight, product_name, sku, created_at, updated_at
+					)
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+				`,
+					checkoutID,
+					product.id,
+					product.variantID,
+					quantity,
+					product.price,
+					0.5, // Default weight
+					product.name,
+					product.sku,
+					checkout.createdAt,
+					checkout.createdAt,
+				)
+
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("failed to insert checkout item %d for checkout %d: %w", j, i, err)
+				}
+			}
+
+			// Update checkout with total amount
+			_, err = tx.Exec(`
+				UPDATE checkouts
+				SET total_amount = $1, final_amount = $2
+				WHERE id = $3
+			`,
+				totalAmount,
+				totalAmount,
+				checkoutID,
+			)
+
+			if err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to update checkout total for checkout %d: %w", i, err)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction for checkout %d: %w", i, err)
+		}
+
+		fmt.Printf("Created checkout: %s (ID: %d)\n", checkout.description, checkoutID)
+	}
+
+	fmt.Printf("Seeded %d checkouts for testing expiry logic\n", len(checkouts))
 	return nil
 }

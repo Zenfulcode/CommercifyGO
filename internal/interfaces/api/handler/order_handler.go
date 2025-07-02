@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zenfulcode/commercify/internal/application/usecase"
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
@@ -29,17 +30,8 @@ func NewOrderHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger) *
 
 // GetOrder handles getting an order by ID
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
-	// Get user ID from context
-	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
-	if !ok {
-		h.logger.Error("Unauthorized access attempt")
-		response := dto.ErrorResponse("Unauthorized")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
+	// Get user ID from context (optional for checkout session access)
+	userID, isAuthenticated := r.Context().Value(middleware.UserIDKey).(uint)
 	// Get order ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
@@ -60,17 +52,38 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the user is authorized to view this order
-	if order.UserID != userID {
-		role, ok := r.Context().Value(middleware.RoleKey).(string)
-		if !ok || role != string(entity.RoleAdmin) {
-			h.logger.Error("Unauthorized access to order %d by user %d", order.ID, userID)
-			response := dto.ErrorResponse("You are not authorized to view this order")
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(response)
-			return
+	// Check authorization: user owns the order, admin, or checkout session matches
+	authorized := false
+
+	// Check if authenticated user owns the order or is admin
+	if isAuthenticated {
+		if order.UserID == userID {
+			authorized = true
+		} else {
+			// Check if user is admin
+			role, ok := r.Context().Value(middleware.RoleKey).(string)
+			if ok && role == string(entity.RoleAdmin) {
+				authorized = true
+			}
 		}
+	}
+
+	// If not authorized by user auth, check checkout session cookie
+	if !authorized {
+		cookie, err := r.Cookie(common.CheckoutSessionCookie)
+		if err == nil && cookie.Value != "" && cookie.Value == order.CheckoutSessionID {
+			authorized = true
+			h.logger.Info("Order %d accessed via checkout session: %s", order.ID, cookie.Value)
+		}
+	}
+
+	if !authorized {
+		h.logger.Error("Unauthorized access to order %d", order.ID)
+		response := dto.ErrorResponse("You are not authorized to view this order")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(response)
+		return
 	}
 
 	orderDTO := dto.OrderDetailResponse(order)

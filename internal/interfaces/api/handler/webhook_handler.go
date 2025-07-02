@@ -184,15 +184,16 @@ func (h *WebhookHandler) HandleMobilePayAuthorized(event *models.WebhookEvent) e
 		return err
 	}
 
-	// Update the order status to paid
-	input := usecase.UpdateOrderStatusInput{
-		OrderID: orderID,
-		Status:  entity.OrderStatusPaid,
+	// Update payment status to authorized
+	input := usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusAuthorized,
+		TransactionID: event.Reference,
 	}
 
-	order, err := h.orderUseCase.UpdateOrderStatus(input)
+	order, err := h.orderUseCase.UpdatePaymentStatus(input)
 	if err != nil {
-		h.logger.Error("Failed to update order status for MobilePay payment: %v", err)
+		h.logger.Error("Failed to update payment status for MobilePay payment: %v", err)
 		return err
 	}
 
@@ -224,14 +225,15 @@ func (h *WebhookHandler) HandleMobilePayCaptured(event *models.WebhookEvent) err
 
 	h.logger.Info("MobilePay payment captured for order %d", orderID)
 
-	input := usecase.UpdateOrderStatusInput{
-		OrderID: orderID,
-		Status:  entity.OrderStatusCaptured,
+	// Update payment status to captured
+	input := usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusCaptured,
 	}
 
-	order, err := h.orderUseCase.UpdateOrderStatus(input)
+	order, err := h.orderUseCase.UpdatePaymentStatus(input)
 	if err != nil {
-		h.logger.Error("Failed to update order status for MobilePay payment: %v", err)
+		h.logger.Error("Failed to update payment status for MobilePay payment: %v", err)
 		return err
 	}
 
@@ -283,15 +285,15 @@ func (h *WebhookHandler) HandleMobilePayRefunded(event *models.WebhookEvent) err
 		return err
 	}
 
-	// Update order status to refunded
-	input := usecase.UpdateOrderStatusInput{
-		OrderID: orderID,
-		Status:  entity.OrderStatusRefunded,
+	// Update payment status to refunded
+	input := usecase.UpdatePaymentStatusInput{
+		OrderID:       orderID,
+		PaymentStatus: entity.PaymentStatusRefunded,
 	}
 
-	order, err2 := h.orderUseCase.UpdateOrderStatus(input)
+	order, err2 := h.orderUseCase.UpdatePaymentStatus(input)
 	if err2 != nil {
-		h.logger.Error("Failed to mark order as refunded for MobilePay payment: %v", err2)
+		h.logger.Error("Failed to update payment status to refunded for MobilePay payment: %v", err2)
 		return err2
 	}
 
@@ -793,16 +795,16 @@ func (h *WebhookHandler) handleRefund(event stripe.Event) {
 		}
 	}
 
-	// If the charge was fully refunded, update the order status
+	// If the charge was fully refunded, update the payment status
 	if charge.Refunded {
-		input := usecase.UpdateOrderStatusInput{
-			OrderID: order.ID,
-			Status:  entity.OrderStatusRefunded,
+		input := usecase.UpdatePaymentStatusInput{
+			OrderID:       order.ID,
+			PaymentStatus: entity.PaymentStatusRefunded,
 		}
 
-		_, err = h.orderUseCase.UpdateOrderStatus(input)
+		_, err = h.orderUseCase.UpdatePaymentStatus(input)
 		if err != nil {
-			h.logger.Error("Failed to update order status to refunded: %v", err)
+			h.logger.Error("Failed to update payment status to refunded: %v", err)
 			return
 		}
 	}

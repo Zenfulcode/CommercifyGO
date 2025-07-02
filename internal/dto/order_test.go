@@ -3,8 +3,6 @@ package dto
 import (
 	"testing"
 	"time"
-
-	"github.com/zenfulcode/commercify/internal/domain/service"
 )
 
 func TestOrderDTO(t *testing.T) {
@@ -78,6 +76,7 @@ func TestOrderDTO(t *testing.T) {
 		OrderNumber:     "ORD-001",
 		Items:           items,
 		Status:          OrderStatusPaid,
+		PaymentStatus:   PaymentStatusCaptured,
 		TotalAmount:     69.97,
 		FinalAmount:     59.97,
 		Currency:        "USD",
@@ -352,7 +351,7 @@ func TestOrderSearchRequest(t *testing.T) {
 	request := OrderSearchRequest{
 		UserID:        1,
 		Status:        OrderStatusPaid,
-		PaymentStatus: "completed",
+		PaymentStatus: string(PaymentStatusCaptured),
 		StartDate:     &startDate,
 		EndDate:       &endDate,
 		PaginationDTO: PaginationDTO{
@@ -368,8 +367,8 @@ func TestOrderSearchRequest(t *testing.T) {
 	if request.Status != OrderStatusPaid {
 		t.Errorf("Expected Status %s, got %s", OrderStatusPaid, request.Status)
 	}
-	if request.PaymentStatus != "completed" {
-		t.Errorf("Expected PaymentStatus 'completed', got %s", request.PaymentStatus)
+	if request.PaymentStatus != string(PaymentStatusCaptured) {
+		t.Errorf("Expected PaymentStatus '%s', got %s", PaymentStatusCaptured, request.PaymentStatus)
 	}
 	if request.StartDate == nil {
 		t.Error("Expected StartDate not nil")
@@ -382,60 +381,42 @@ func TestOrderSearchRequest(t *testing.T) {
 	}
 }
 
-func TestProcessPaymentRequest(t *testing.T) {
-	cardDetails := &service.CardDetails{
-		CardNumber:     "4111111111111111",
-		ExpiryMonth:    12,
-		ExpiryYear:     2025,
-		CVV:            "123",
-		CardholderName: "John Doe",
-	}
-
-	request := ProcessPaymentRequest{
-		PaymentMethod:   PaymentMethodCard,
-		PaymentProvider: PaymentProviderStripe,
-		CardDetails:     cardDetails,
-		PhoneNumber:     "+1-555-123-4567",
-	}
-
-	if request.PaymentMethod != PaymentMethodCard {
-		t.Errorf("Expected PaymentMethod %s, got %s", PaymentMethodCard, request.PaymentMethod)
-	}
-	if request.PaymentProvider != PaymentProviderStripe {
-		t.Errorf("Expected PaymentProvider %s, got %s", PaymentProviderStripe, request.PaymentProvider)
-	}
-	if request.CardDetails.CardNumber != "4111111111111111" {
-		t.Errorf("Expected CardDetails.CardNumber '4111111111111111', got %s", request.CardDetails.CardNumber)
-	}
-	if request.PhoneNumber != "+1-555-123-4567" {
-		t.Errorf("Expected PhoneNumber '+1-555-123-4567', got %s", request.PhoneNumber)
-	}
-}
-
 func TestOrderStatusConstants(t *testing.T) {
 	if OrderStatusPending != "pending" {
 		t.Errorf("Expected OrderStatusPending 'pending', got %s", OrderStatusPending)
 	}
-	if OrderStatusPendingAction != "pending_action" {
-		t.Errorf("Expected OrderStatusPendingAction 'pending_action', got %s", OrderStatusPendingAction)
-	}
 	if OrderStatusPaid != "paid" {
 		t.Errorf("Expected OrderStatusPaid 'paid', got %s", OrderStatusPaid)
-	}
-	if OrderStatusCaptured != "captured" {
-		t.Errorf("Expected OrderStatusCaptured 'captured', got %s", OrderStatusCaptured)
 	}
 	if OrderStatusShipped != "shipped" {
 		t.Errorf("Expected OrderStatusShipped 'shipped', got %s", OrderStatusShipped)
 	}
-	if OrderStatusDelivered != "delivered" {
-		t.Errorf("Expected OrderStatusDelivered 'delivered', got %s", OrderStatusDelivered)
-	}
 	if OrderStatusCancelled != "cancelled" {
 		t.Errorf("Expected OrderStatusCancelled 'cancelled', got %s", OrderStatusCancelled)
 	}
-	if OrderStatusRefunded != "refunded" {
-		t.Errorf("Expected OrderStatusRefunded 'refunded', got %s", OrderStatusRefunded)
+	if OrderStatusCompleted != "completed" {
+		t.Errorf("Expected OrderStatusCompleted 'completed', got %s", OrderStatusCompleted)
+	}
+}
+
+func TestPaymentStatusConstants(t *testing.T) {
+	if PaymentStatusPending != "pending" {
+		t.Errorf("Expected PaymentStatusPending 'pending', got %s", PaymentStatusPending)
+	}
+	if PaymentStatusAuthorized != "authorized" {
+		t.Errorf("Expected PaymentStatusAuthorized 'authorized', got %s", PaymentStatusAuthorized)
+	}
+	if PaymentStatusCaptured != "captured" {
+		t.Errorf("Expected PaymentStatusCaptured 'captured', got %s", PaymentStatusCaptured)
+	}
+	if PaymentStatusRefunded != "refunded" {
+		t.Errorf("Expected PaymentStatusRefunded 'refunded', got %s", PaymentStatusRefunded)
+	}
+	if PaymentStatusCancelled != "cancelled" {
+		t.Errorf("Expected PaymentStatusCancelled 'cancelled', got %s", PaymentStatusCancelled)
+	}
+	if PaymentStatusFailed != "failed" {
+		t.Errorf("Expected PaymentStatusFailed 'failed', got %s", PaymentStatusFailed)
 	}
 }
 
@@ -460,18 +441,20 @@ func TestPaymentProviderConstants(t *testing.T) {
 func TestOrderListResponse(t *testing.T) {
 	orders := []OrderSummaryDTO{
 		{
-			ID:          1,
-			OrderNumber: "ORD-001",
-			Status:      OrderStatusPaid,
-			TotalAmount: 99.99,
-			Currency:    "USD",
+			ID:            1,
+			OrderNumber:   "ORD-001",
+			Status:        OrderStatusPaid,
+			PaymentStatus: PaymentStatusCaptured,
+			TotalAmount:   99.99,
+			Currency:      "USD",
 		},
 		{
-			ID:          2,
-			OrderNumber: "ORD-002",
-			Status:      OrderStatusShipped,
-			TotalAmount: 149.99,
-			Currency:    "EUR",
+			ID:            2,
+			OrderNumber:   "ORD-002",
+			Status:        OrderStatusShipped,
+			PaymentStatus: PaymentStatusCaptured,
+			TotalAmount:   149.99,
+			Currency:      "EUR",
 		},
 	}
 

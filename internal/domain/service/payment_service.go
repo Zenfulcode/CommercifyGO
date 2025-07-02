@@ -31,6 +31,7 @@ type PaymentProvider struct {
 // PaymentRequest represents a request to process a payment
 type PaymentRequest struct {
 	OrderID         uint
+	OrderNumber     string
 	Amount          int64
 	Currency        string
 	PaymentMethod   PaymentMethod

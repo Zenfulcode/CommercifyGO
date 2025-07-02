@@ -363,6 +363,71 @@ func (c *Checkout) TotalItems() int {
 	return total
 }
 
+// HasCustomerInfo returns true if the checkout has customer information
+func (c *Checkout) HasCustomerInfo() bool {
+	return c.CustomerDetails.Email != "" ||
+		c.CustomerDetails.Phone != "" ||
+		c.CustomerDetails.FullName != ""
+}
+
+// HasShippingInfo returns true if the checkout has shipping address information
+func (c *Checkout) HasShippingInfo() bool {
+	return c.ShippingAddr.Street != "" ||
+		c.ShippingAddr.City != "" ||
+		c.ShippingAddr.State != "" ||
+		c.ShippingAddr.PostalCode != "" ||
+		c.ShippingAddr.Country != ""
+}
+
+// HasCustomerOrShippingInfo returns true if the checkout has either customer or shipping information
+func (c *Checkout) HasCustomerOrShippingInfo() bool {
+	return c.HasCustomerInfo() || c.HasShippingInfo()
+}
+
+// IsEmpty returns true if the checkout has no items and no customer/shipping information
+func (c *Checkout) IsEmpty() bool {
+	return len(c.Items) == 0 && !c.HasCustomerOrShippingInfo()
+}
+
+// ShouldBeAbandoned returns true if the checkout should be marked as abandoned
+// (has customer/shipping info and hasn't been active for 15 minutes)
+func (c *Checkout) ShouldBeAbandoned() bool {
+	if c.Status != CheckoutStatusActive {
+		return false
+	}
+
+	if !c.HasCustomerOrShippingInfo() {
+		return false
+	}
+
+	abandonThreshold := time.Now().Add(-15 * time.Minute)
+	return c.LastActivityAt.Before(abandonThreshold)
+}
+
+// ShouldBeDeleted returns true if the checkout should be deleted
+func (c *Checkout) ShouldBeDeleted() bool {
+	now := time.Now()
+
+	// Delete empty checkouts after 24 hours
+	if !c.HasCustomerOrShippingInfo() {
+		deleteThreshold := now.Add(-24 * time.Hour)
+		return c.LastActivityAt.Before(deleteThreshold)
+	}
+
+	// Delete abandoned checkouts after 7 days in abandoned state
+	if c.Status == CheckoutStatusAbandoned {
+		deleteThreshold := now.Add(-7 * 24 * time.Hour)
+		return c.UpdatedAt.Before(deleteThreshold)
+	}
+
+	// Delete all expired checkouts
+	if c.Status == CheckoutStatusExpired {
+		return true
+	}
+
+	return false
+}
+
 // recalculateTotals recalculates the total amount, weight, and final amount
 func (c *Checkout) recalculateTotals() {
 	// Calculate total amount and weight
@@ -387,13 +452,14 @@ func (c *Checkout) ToOrder() *Order {
 	items := make([]OrderItem, len(c.Items))
 	for i, item := range c.Items {
 		items[i] = OrderItem{
-			ProductID:   item.ProductID,
-			Quantity:    item.Quantity,
-			Price:       item.Price,
-			Subtotal:    item.Price * int64(item.Quantity),
-			Weight:      item.Weight,
-			ProductName: item.ProductName,
-			SKU:         item.SKU,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			Quantity:         item.Quantity,
+			Price:            item.Price,
+			Subtotal:         item.Price * int64(item.Quantity),
+			Weight:           item.Weight,
+			ProductName:      item.ProductName,
+			SKU:              item.SKU,
 		}
 	}
 
@@ -411,6 +477,7 @@ func (c *Checkout) ToOrder() *Order {
 		DiscountAmount:    c.DiscountAmount,
 		FinalAmount:       c.FinalAmount,
 		Status:            OrderStatusPending,
+		PaymentStatus:     PaymentStatusPending, // Initialize payment status
 		ShippingAddr:      c.ShippingAddr,
 		BillingAddr:       c.BillingAddr,
 		CustomerDetails:   &c.CustomerDetails,
@@ -436,13 +503,14 @@ func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem 
 	orderItems := make([]OrderItem, len(checkoutItems))
 	for i, item := range checkoutItems {
 		orderItems[i] = OrderItem{
-			ProductID:   item.ProductID,
-			Quantity:    item.Quantity,
-			Price:       item.Price,
-			Subtotal:    item.Price * int64(item.Quantity),
-			Weight:      item.Weight,
-			ProductName: item.ProductName,
-			SKU:         item.SKU,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			Quantity:         item.Quantity,
+			Price:            item.Price,
+			Subtotal:         item.Price * int64(item.Quantity),
+			Weight:           item.Weight,
+			ProductName:      item.ProductName,
+			SKU:              item.SKU,
 		}
 	}
 	return orderItems

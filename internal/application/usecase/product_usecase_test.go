@@ -952,8 +952,9 @@ func TestProductUseCase_DeleteProduct(t *testing.T) {
 					Subtotal:  19998,
 				},
 			},
-			TotalAmount: 19998,
-			Status:      entity.OrderStatusPaid,
+			TotalAmount:   19998,
+			Status:        entity.OrderStatusPaid,
+			PaymentStatus: entity.PaymentStatusCaptured,
 		}
 		orderRepo.Create(order)
 
