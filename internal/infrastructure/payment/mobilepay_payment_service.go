@@ -77,7 +77,14 @@ func (s *MobilePayPaymentService) GetAvailableProvidersForCurrency(currency stri
 
 // ProcessPayment processes a payment request using MobilePay
 func (s *MobilePayPaymentService) ProcessPayment(request service.PaymentRequest) (*service.PaymentResult, error) {
-	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, request.Currency) {
+	// Get supported currencies once to avoid multiple calls
+	supportedCurrencies := s.GetAvailableProviders()[0].SupportedCurrencies
+
+	// Log the check to help with debugging
+	s.logger.Debug("Checking if currency %s is supported by MobilePay. Supported: %v",
+		request.Currency, supportedCurrencies)
+
+	if !slices.Contains(supportedCurrencies, request.Currency) {
 		return nil, fmt.Errorf("currency %s is not supported by MobilePay", request.Currency)
 	}
 
@@ -156,7 +163,14 @@ func (s *MobilePayPaymentService) RefundPayment(transactionID, currency string, 
 		return nil, errors.New("invalid payment provider")
 	}
 
-	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, currency) {
+	// Get supported currencies once to avoid multiple calls
+	supportedCurrencies := s.GetAvailableProviders()[0].SupportedCurrencies
+
+	// Log the check to help with debugging
+	s.logger.Debug("Checking if currency %s is supported by MobilePay. Supported: %v",
+		currency, supportedCurrencies)
+
+	if !slices.Contains(supportedCurrencies, currency) {
 		return nil, fmt.Errorf("currency %s is not supported by MobilePay", currency)
 	}
 
@@ -194,7 +208,14 @@ func (s *MobilePayPaymentService) CapturePayment(transactionID, currency string,
 		return nil, errors.New("transaction ID is required")
 	}
 
-	if !slices.Contains(s.GetAvailableProviders()[0].SupportedCurrencies, currency) {
+	// Get supported currencies once to avoid multiple calls
+	supportedCurrencies := s.GetAvailableProviders()[0].SupportedCurrencies
+
+	// Log the check to help with debugging
+	s.logger.Debug("Checking if currency %s is supported by MobilePay. Supported: %v",
+		currency, supportedCurrencies)
+
+	if !slices.Contains(supportedCurrencies, currency) {
 		return nil, fmt.Errorf("currency %s is not supported by MobilePay", currency)
 	}
 

@@ -55,7 +55,7 @@ type Order struct {
 	PaymentProvider   string                              `gorm:"size:100"`
 	PaymentMethod     string                              `gorm:"size:100"`
 	TrackingCode      sql.NullString                      `gorm:"size:255"`
-	ActionURL         sql.NullString                      `gorm:"size:500"` // URL for redirect to payment provider
+	ActionURL         sql.NullString                      // URL for redirect to payment provider
 	CompletedAt       *time.Time
 	CheckoutSessionID string `gorm:"size:255"` // Tracks which checkout session created this order
 
@@ -137,6 +137,7 @@ func NewOrderFromCheckout(checkout *Checkout) (*Order, error) {
 
 	order.SetShippingMethod(checkout.GetShippingOption())
 	order.SetAppliedDiscount(checkout.GetAppliedDiscount())
+	order.CheckoutSessionID = checkout.SessionID
 
 	return order, nil
 }
@@ -523,6 +524,9 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 		Status:           dto.OrderStatus(o.Status),
 		PaymentStatus:    dto.PaymentStatus(o.PaymentStatus),
 		TotalAmount:      money.FromCents(o.TotalAmount),
+		FinalAmount:      money.FromCents(o.FinalAmount),
+		ShippingCost:     money.FromCents(o.ShippingCost),
+		DiscountAmount:   money.FromCents(o.DiscountAmount),
 		OrderLinesAmount: len(o.Items),
 		Currency:         o.Currency,
 		CreatedAt:        o.CreatedAt,
