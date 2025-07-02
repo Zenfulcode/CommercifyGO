@@ -93,6 +93,7 @@ func (h *StripeWebhookHandler) recordPaymentTransaction(orderID uint, transactio
 	txn, err := entity.NewPaymentTransaction(
 		orderID,
 		transactionID,
+		"", // No idempotency key for Stripe events currently
 		txnType,
 		status,
 		amount,

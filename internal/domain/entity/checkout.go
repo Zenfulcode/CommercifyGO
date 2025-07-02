@@ -1,12 +1,12 @@
 package entity
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -27,29 +27,29 @@ const (
 // Checkout represents a user's checkout session
 type Checkout struct {
 	gorm.Model
-	UserID              *uint           `gorm:"index"`
-	User                *User           `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
-	SessionID           string          `gorm:"index;not null;size:255"`
-	Items               []CheckoutItem  `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	Status              CheckoutStatus  `gorm:"not null;size:50;default:'active'"`
-	ShippingAddressJSON *string         `gorm:"column:shipping_address;type:text"`
-	BillingAddressJSON  *string         `gorm:"column:billing_address;type:text"`
-	ShippingOptionJSON  *string         `gorm:"column:shipping_option;type:text"`
-	PaymentProvider     string          `gorm:"size:100"`
-	TotalAmount         int64           `gorm:"default:0"`
-	ShippingCost        int64           `gorm:"default:0"`
-	TotalWeight         float64         `gorm:"default:0"`
-	CustomerDetails     CustomerDetails `gorm:"embedded;embeddedPrefix:customer_"`
-	Currency            string          `gorm:"not null;size:3"`
-	DiscountCode        string          `gorm:"size:100"`
-	DiscountAmount      int64           `gorm:"default:0"`
-	FinalAmount         int64           `gorm:"default:0"`
-	AppliedDiscountJSON *string         `gorm:"column:applied_discount;type:text"`
-	LastActivityAt      time.Time       `gorm:"index"`
-	ExpiresAt           time.Time       `gorm:"index"`
-	CompletedAt         *time.Time
-	ConvertedOrderID    *uint  `gorm:"index"`
-	ConvertedOrder      *Order `gorm:"foreignKey:ConvertedOrderID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	UserID           *uint                               `gorm:"index"`
+	User             *User                               `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	SessionID        string                              `gorm:"index;not null;size:255"`
+	Items            []CheckoutItem                      `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Status           CheckoutStatus                      `gorm:"not null;size:50;default:'active'"`
+	ShippingAddress  datatypes.JSONType[Address]         `gorm:"column:shipping_address"`
+	BillingAddress   datatypes.JSONType[Address]         `gorm:"column:billing_address"`
+	ShippingOption   datatypes.JSONType[ShippingOption]  `gorm:"column:shipping_option"`
+	PaymentProvider  string                              `gorm:"size:100"`
+	TotalAmount      int64                               `gorm:"default:0"`
+	ShippingCost     int64                               `gorm:"default:0"`
+	TotalWeight      float64                             `gorm:"default:0"`
+	CustomerDetails  CustomerDetails                     `gorm:"embedded;embeddedPrefix:customer_"`
+	Currency         string                              `gorm:"not null;size:3"`
+	DiscountCode     string                              `gorm:"size:100"`
+	DiscountAmount   int64                               `gorm:"default:0"`
+	FinalAmount      int64                               `gorm:"default:0"`
+	AppliedDiscount  datatypes.JSONType[AppliedDiscount] `gorm:"column:applied_discount"`
+	LastActivityAt   time.Time                           `gorm:"index"`
+	ExpiresAt        time.Time                           `gorm:"index"`
+	CompletedAt      *time.Time
+	ConvertedOrderID *uint  `gorm:"index"`
+	ConvertedOrder   *Order `gorm:"foreignKey:ConvertedOrderID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
 }
 
 func (c *Checkout) CalculateTotals() {
@@ -213,15 +213,13 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 
 // SetShippingAddress sets the shipping address for the checkout
 func (c *Checkout) SetShippingAddress(address Address) {
-	c.SetShippingAddressJSON(&address)
-
+	c.ShippingAddress = datatypes.NewJSONType(address)
 	c.LastActivityAt = time.Now()
 }
 
 // SetBillingAddress sets the billing address for the checkout
 func (c *Checkout) SetBillingAddress(address Address) {
-	c.SetBillingAddressJSON(&address)
-
+	c.BillingAddress = datatypes.NewJSONType(address)
 	c.LastActivityAt = time.Now()
 }
 
@@ -236,18 +234,15 @@ func (c *Checkout) SetCustomerDetails(details CustomerDetails) {
 func (c *Checkout) SetShippingMethod(option *ShippingOption) {
 	if option != nil {
 		c.ShippingCost = option.Cost
-
-		// Store shipping option as JSON
-		c.SetShippingOptionJSON(option)
+		// Store shipping option
+		c.ShippingOption = datatypes.NewJSONType(*option)
 	} else {
 		c.ShippingCost = 0
-
-		// Clear shipping option JSON
-		c.SetShippingOptionJSON(nil)
+		// Clear shipping option
+		c.ShippingOption = datatypes.NewJSONType(ShippingOption{})
 	}
 
 	c.recalculateTotals()
-
 	c.LastActivityAt = time.Now()
 }
 
@@ -290,7 +285,7 @@ func (c *Checkout) ApplyDiscount(discount *Discount) {
 		// Remove any existing discount
 		c.DiscountCode = ""
 		c.DiscountAmount = 0
-		c.SetAppliedDiscountJSON(nil)
+		c.AppliedDiscount = datatypes.JSONType[AppliedDiscount]{}
 	} else {
 		// Calculate discount amount
 		discountAmount := discount.CalculateDiscount(&Order{
@@ -302,17 +297,36 @@ func (c *Checkout) ApplyDiscount(discount *Discount) {
 		c.DiscountCode = discount.Code
 		c.DiscountAmount = discountAmount
 
-		// Store applied discount as JSON
-		appliedDiscount := &AppliedDiscount{
+		// Store applied discount
+		appliedDiscount := AppliedDiscount{
 			DiscountID:     discount.ID,
 			DiscountCode:   discount.Code,
 			DiscountAmount: discountAmount,
 		}
-		c.SetAppliedDiscountJSON(appliedDiscount)
+		c.AppliedDiscount = datatypes.NewJSONType(appliedDiscount)
 	}
 
 	c.recalculateTotals()
+	c.LastActivityAt = time.Now()
+}
 
+// TODO: COMBINE THIS WITH ApplyDiscount
+func (c *Checkout) SetAppliedDiscount(discount *AppliedDiscount) {
+	if discount == nil {
+		// Remove any existing discount
+		c.DiscountCode = ""
+		c.DiscountAmount = 0
+		c.AppliedDiscount = datatypes.JSONType[AppliedDiscount]{}
+	} else {
+		// Apply the discount
+		c.DiscountCode = discount.DiscountCode
+		c.DiscountAmount = discount.DiscountAmount
+
+		// Store applied discount
+		c.AppliedDiscount = datatypes.NewJSONType(*discount)
+	}
+
+	c.recalculateTotals()
 	c.LastActivityAt = time.Now()
 }
 
@@ -323,10 +337,10 @@ func (c *Checkout) Clear() {
 	c.TotalWeight = 0
 	c.DiscountAmount = 0
 	c.FinalAmount = 0
-	c.SetAppliedDiscountJSON(nil)
-	c.SetShippingAddressJSON(nil)
-	c.SetBillingAddressJSON(nil)
-	c.SetShippingOptionJSON(nil)
+	c.AppliedDiscount = datatypes.NewJSONType(AppliedDiscount{})
+	c.ShippingAddress = datatypes.NewJSONType(Address{})
+	c.BillingAddress = datatypes.NewJSONType(Address{})
+	c.ShippingOption = datatypes.NewJSONType(ShippingOption{})
 
 	c.LastActivityAt = time.Now()
 }
@@ -385,7 +399,7 @@ func (c *Checkout) HasCustomerInfo() bool {
 
 // HasShippingInfo returns true if the checkout has shipping address information
 func (c *Checkout) HasShippingInfo() bool {
-	shippingAddr := c.GetShippingAddress()
+	shippingAddr := c.ShippingAddress.Data()
 	return shippingAddr.Street1 != "" ||
 		shippingAddr.City != "" ||
 		shippingAddr.PostalCode != "" ||
@@ -459,83 +473,6 @@ func (c *Checkout) recalculateTotals() {
 	c.FinalAmount = max(totalAmount+c.ShippingCost-c.DiscountAmount, 0)
 }
 
-// ToOrder converts a checkout to an order
-func (c *Checkout) ToOrder() *Order {
-	// Create order items from checkout items
-	items := make([]OrderItem, len(c.Items))
-	for i, item := range c.Items {
-		items[i] = OrderItem{
-			ProductID:        item.ProductID,
-			ProductVariantID: item.ProductVariantID,
-			Quantity:         item.Quantity,
-			Price:            item.Price,
-			Subtotal:         item.Price * int64(item.Quantity),
-			Weight:           item.Weight,
-			ProductName:      item.ProductName,
-			SKU:              item.SKU,
-		}
-	}
-
-	// Determine if this is a guest order
-	isGuestOrder := c.UserID == nil
-
-	// For the order, use the UserID pointer directly (will be nil for guest orders)
-	var userIDPtr *uint
-	if c.UserID != nil {
-		userIDPtr = c.UserID
-	}
-
-	// Create the order
-	// Create ShippingOption from JSON if available
-	var shippingOption *ShippingOption
-	if storedOption := c.GetShippingOption(); storedOption != nil {
-		shippingOption = storedOption
-	}
-
-	// Create AppliedDiscount from JSON if available
-	var appliedDiscount *AppliedDiscount
-	if storedDiscount := c.GetAppliedDiscount(); storedDiscount != nil {
-		appliedDiscount = storedDiscount
-	}
-
-	order := &Order{
-		UserID:            userIDPtr, // This will be nil for guest orders
-		Items:             items,
-		Currency:          c.Currency,
-		TotalAmount:       c.TotalAmount,
-		TotalWeight:       c.TotalWeight,
-		ShippingCost:      c.ShippingCost,
-		DiscountAmount:    c.DiscountAmount,
-		FinalAmount:       c.FinalAmount,
-		Status:            OrderStatusPending,
-		PaymentStatus:     PaymentStatusPending, // Initialize payment status
-		CustomerDetails:   &c.CustomerDetails,
-		PaymentProvider:   c.PaymentProvider,
-		IsGuestOrder:      isGuestOrder,
-		PaymentMethod:     "wallet", // Default payment method
-		CheckoutSessionID: c.SessionID,
-	}
-
-	// Set addresses using JSON helper methods
-	shippingAddr := c.GetShippingAddress()
-	billingAddr := c.GetBillingAddress()
-	order.SetShippingAddressJSON(&shippingAddr)
-	order.SetBillingAddressJSON(&billingAddr)
-
-	// Set shipping option and applied discount using JSON helper methods
-	if shippingOption != nil {
-		order.SetShippingOptionJSON(shippingOption)
-	}
-	if appliedDiscount != nil {
-		order.SetAppliedDiscountJSON(appliedDiscount)
-	}
-
-	// Generate a friendly order number (will be replaced with actual ID after creation)
-	order.OrderNumber = generateOrderNumber()
-
-	return order
-}
-
 // convertCheckoutItemsToOrderItems is a helper function to convert checkout items to order items
 func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem {
 	orderItems := make([]OrderItem, len(checkoutItems))
@@ -554,9 +491,33 @@ func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem 
 	return orderItems
 }
 
-// generateOrderNumber generates a temporary order number
-func generateOrderNumber() string {
-	return "ORD-" + time.Now().Format("20060102") + "-TEMP"
+// GetAppliedDiscount retrieves the applied discount from JSON
+func (c *Checkout) GetAppliedDiscount() *AppliedDiscount {
+	data := c.AppliedDiscount.Data()
+	// Check if it's an empty/default value
+	if data.DiscountID == 0 && data.DiscountCode == "" {
+		return nil
+	}
+	return &data
+}
+
+func (c *Checkout) GetShippingOption() *ShippingOption {
+	data := c.ShippingOption.Data()
+	// Check if it's an empty/default value
+	if data.ShippingRateID == 0 && data.ShippingMethodID == 0 {
+		return nil
+	}
+	return &data
+}
+
+func (c *Checkout) GetShippingAddress() *Address {
+	data := c.ShippingAddress.Data()
+	return &data
+}
+
+func (c *Checkout) GetBillingAddress() *Address {
+	data := c.BillingAddress.Data()
+	return &data
 }
 
 func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
@@ -653,128 +614,6 @@ func (a *AppliedDiscount) ToAppliedDiscountDTO() *dto.AppliedDiscountDTO {
 		Value:  discountValue,
 		Amount: money.FromCents(a.DiscountAmount),
 	}
-}
-
-// GetShippingOption retrieves the shipping option from JSON
-func (c *Checkout) GetShippingOption() *ShippingOption {
-	if c.ShippingOptionJSON == nil || *c.ShippingOptionJSON == "" {
-		return nil
-	}
-
-	var option ShippingOption
-	if err := json.Unmarshal([]byte(*c.ShippingOptionJSON), &option); err != nil {
-		return nil
-	}
-
-	return &option
-}
-
-// SetShippingOptionJSON stores the shipping option as JSON
-func (c *Checkout) SetShippingOptionJSON(option *ShippingOption) error {
-	if option == nil {
-		c.ShippingOptionJSON = nil
-		return nil
-	}
-
-	data, err := json.Marshal(option)
-	if err != nil {
-		return err
-	}
-
-	jsonStr := string(data)
-	c.ShippingOptionJSON = &jsonStr
-	return nil
-}
-
-// GetAppliedDiscount retrieves the applied discount from JSON
-func (c *Checkout) GetAppliedDiscount() *AppliedDiscount {
-	if c.AppliedDiscountJSON == nil || *c.AppliedDiscountJSON == "" {
-		return nil
-	}
-
-	var discount AppliedDiscount
-	if err := json.Unmarshal([]byte(*c.AppliedDiscountJSON), &discount); err != nil {
-		return nil
-	}
-
-	return &discount
-}
-
-// SetAppliedDiscountJSON stores the applied discount as JSON
-func (c *Checkout) SetAppliedDiscountJSON(discount *AppliedDiscount) error {
-	if discount == nil {
-		c.AppliedDiscountJSON = nil
-		return nil
-	}
-
-	data, err := json.Marshal(discount)
-	if err != nil {
-		return err
-	}
-
-	jsonStr := string(data)
-	c.AppliedDiscountJSON = &jsonStr
-	return nil
-}
-
-// GetShippingAddress returns the shipping address from JSON
-func (c *Checkout) GetShippingAddress() Address {
-	if c.ShippingAddressJSON == nil || *c.ShippingAddressJSON == "" {
-		return Address{}
-	}
-
-	var address Address
-	if err := json.Unmarshal([]byte(*c.ShippingAddressJSON), &address); err != nil {
-		return Address{}
-	}
-	return address
-}
-
-// SetShippingAddressJSON sets the shipping address as JSON
-func (c *Checkout) SetShippingAddressJSON(address *Address) {
-	if address == nil {
-		c.ShippingAddressJSON = nil
-		return
-	}
-
-	jsonData, err := json.Marshal(address)
-	if err != nil {
-		c.ShippingAddressJSON = nil
-		return
-	}
-
-	jsonStr := string(jsonData)
-	c.ShippingAddressJSON = &jsonStr
-}
-
-// GetBillingAddress returns the billing address from JSON
-func (c *Checkout) GetBillingAddress() Address {
-	if c.BillingAddressJSON == nil || *c.BillingAddressJSON == "" {
-		return Address{}
-	}
-
-	var address Address
-	if err := json.Unmarshal([]byte(*c.BillingAddressJSON), &address); err != nil {
-		return Address{}
-	}
-	return address
-}
-
-// SetBillingAddressJSON sets the billing address as JSON
-func (c *Checkout) SetBillingAddressJSON(address *Address) {
-	if address == nil {
-		c.BillingAddressJSON = nil
-		return
-	}
-
-	jsonData, err := json.Marshal(address)
-	if err != nil {
-		c.BillingAddressJSON = nil
-		return
-	}
-
-	jsonStr := string(jsonData)
-	c.BillingAddressJSON = &jsonStr
 }
 
 // ToCheckoutItemDTO converts CheckoutItem to DTO

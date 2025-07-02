@@ -9,7 +9,6 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/zenfulcode/commercify/config"
-	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/infrastructure/database"
 	"gorm.io/gorm"
@@ -557,7 +556,7 @@ func seedProducts(db *gorm.DB) error {
 			Currency:    prodData.currency,
 			CategoryID:  prodData.categoryID,
 			Active:      prodData.active,
-			Images:      common.StringSlice(prodData.images),
+			Images:      prodData.images,
 		}
 
 		if err := db.Create(product).Error; err != nil {
@@ -866,8 +865,8 @@ func seedOrders(db *gorm.DB) error {
 		// For guest orders (userID = 0), UserID will remain nil
 
 		// Set addresses using JSON helper methods
-		order.SetShippingAddressJSON(&orderData.shippingAddr)
-		order.SetBillingAddressJSON(&orderData.billingAddr)
+		order.SetShippingAddress(&orderData.shippingAddr)
+		order.SetBillingAddress(&orderData.billingAddr)
 
 		// Set the creation time
 		order.CreatedAt = orderData.createdAt
@@ -1491,18 +1490,17 @@ func seedCheckouts(db *gorm.DB) error {
 		checkout.ExpiresAt = comprehensiveCheckout.expiresAt
 
 		// Set addresses using JSON methods
-		checkout.SetShippingAddressJSON(&comprehensiveCheckout.shippingAddress)
-		checkout.SetBillingAddressJSON(&comprehensiveCheckout.billingAddress)
+		checkout.SetShippingAddress(comprehensiveCheckout.shippingAddress)
+		checkout.SetBillingAddress(comprehensiveCheckout.billingAddress)
 
 		// Set shipping option if available
 		if comprehensiveCheckout.shippingOption != nil {
-			checkout.SetShippingOptionJSON(comprehensiveCheckout.shippingOption)
-			checkout.ShippingCost = comprehensiveCheckout.shippingOption.Cost
+			checkout.SetShippingMethod(comprehensiveCheckout.shippingOption)
 		}
 
 		// Set applied discount if available
 		if comprehensiveCheckout.appliedDiscount != nil {
-			checkout.SetAppliedDiscountJSON(comprehensiveCheckout.appliedDiscount)
+			checkout.SetAppliedDiscount(comprehensiveCheckout.appliedDiscount)
 			checkout.DiscountCode = comprehensiveCheckout.appliedDiscount.DiscountCode
 			checkout.DiscountAmount = comprehensiveCheckout.appliedDiscount.DiscountAmount
 		}
@@ -1693,8 +1691,8 @@ func seedCheckouts(db *gorm.DB) error {
 			checkout.ExpiresAt = dkkCheckout.expiresAt
 
 			// Set addresses using JSON methods
-			checkout.SetShippingAddressJSON(&dkkCheckout.shippingAddress)
-			checkout.SetBillingAddressJSON(&dkkCheckout.billingAddress)
+			checkout.SetShippingAddress(dkkCheckout.shippingAddress)
+			checkout.SetBillingAddress(dkkCheckout.billingAddress)
 
 			// Calculate totals
 			var totalAmount int64

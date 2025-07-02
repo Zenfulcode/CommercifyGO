@@ -2,8 +2,6 @@ package dto
 
 import (
 	"time"
-
-	"github.com/zenfulcode/commercify/internal/domain/common"
 )
 
 // ProductDTO represents a product in the system
@@ -27,17 +25,17 @@ type ProductDTO struct {
 
 // VariantDTO represents a product variant
 type VariantDTO struct {
-	ID          uint             `json:"id"`
-	ProductID   uint             `json:"product_id"`
-	VariantName string           `json:"variant_name"`
-	SKU         string           `json:"sku"`
-	Stock       int              `json:"stock"`
-	Attributes  common.StringMap `json:"attributes"`
-	Images      []string         `json:"images"`
-	IsDefault   bool             `json:"is_default"`
-	Weight      float64          `json:"weight"`
-	Price       float64          `json:"price"`
-	Currency    string           `json:"currency"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	ID          uint              `json:"id"`
+	ProductID   uint              `json:"product_id"`
+	VariantName string            `json:"variant_name"`
+	SKU         string            `json:"sku"`
+	Stock       int               `json:"stock"`
+	Attributes  map[string]string `json:"attributes"`
+	Images      []string          `json:"images"`
+	IsDefault   bool              `json:"is_default"`
+	Weight      float64           `json:"weight"`
+	Price       float64           `json:"price"`
+	Currency    string            `json:"currency"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }

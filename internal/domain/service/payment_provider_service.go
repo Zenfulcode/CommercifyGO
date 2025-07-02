@@ -29,7 +29,7 @@ type PaymentProviderService interface {
 	GetWebhookInfo(providerType common.PaymentProviderType) (*entity.PaymentProvider, error)
 
 	// UpdateProviderConfiguration updates the configuration for a payment provider
-	UpdateProviderConfiguration(providerType common.PaymentProviderType, config common.JSONB) error
+	UpdateProviderConfiguration(providerType common.PaymentProviderType, config map[string]interface{}) error
 
 	// EnableProvider enables a payment provider
 	EnableProvider(providerType common.PaymentProviderType) error

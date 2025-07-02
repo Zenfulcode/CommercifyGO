@@ -72,10 +72,12 @@ func (s *MultiProviderPaymentService) GetAvailableProviders() []service.PaymentP
 			Name:                provider.Name,
 			Description:         provider.Description,
 			IconURL:             provider.IconURL,
-			Methods:             provider.Methods,
+			Methods:             provider.GetMethods(),
 			Enabled:             provider.Enabled,
 			SupportedCurrencies: provider.SupportedCurrencies,
 		}
+
+		fmt.Println("Provider1:", provider.Type, "Methods:", provider.GetMethods(), "Enabled:", provider.Enabled, "Currencies:", provider.SupportedCurrencies)
 	}
 
 	return result
@@ -98,7 +100,7 @@ func (s *MultiProviderPaymentService) GetAvailableProvidersForCurrency(currency 
 			Name:                provider.Name,
 			Description:         provider.Description,
 			IconURL:             provider.IconURL,
-			Methods:             provider.Methods,
+			Methods:             provider.GetMethods(),
 			Enabled:             provider.Enabled,
 			SupportedCurrencies: provider.SupportedCurrencies,
 		}

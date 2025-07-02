@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +30,7 @@ func TestProductVariant(t *testing.T) {
 		assert.Equal(t, 10, variant.Stock)
 		assert.Equal(t, int64(9999), variant.Price)
 		assert.Equal(t, 1.5, variant.Weight)
-		assert.Equal(t, attributes, variant.Attributes)
+		assert.Equal(t, attributes, variant.Attributes.Data())
 		assert.Equal(t, images, []string(variant.Images))
 		assert.True(t, variant.IsDefault)
 	})
@@ -111,7 +110,7 @@ func TestProductVariant(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, variant.Attributes)
-		assert.Empty(t, variant.Attributes)
+		assert.Empty(t, variant.Attributes.Data())
 	})
 
 	t.Run("Update method", func(t *testing.T) {
@@ -143,7 +142,7 @@ func TestProductVariant(t *testing.T) {
 		assert.Equal(t, int64(19999), variant.Price)
 		assert.Equal(t, 2.5, variant.Weight)
 		assert.Equal(t, []string{"new-image.jpg"}, []string(variant.Images))
-		assert.Equal(t, VariantAttributes{"color": "blue"}, variant.Attributes)
+		assert.Equal(t, VariantAttributes{"color": "blue"}, variant.Attributes.Data())
 	})
 
 	t.Run("Update method with no changes", func(t *testing.T) {
@@ -230,56 +229,5 @@ func TestProductVariant(t *testing.T) {
 		assert.Contains(t, actualName, "blue")
 		assert.Contains(t, actualName, "medium")
 		assert.Contains(t, actualName, " / ")
-	})
-}
-
-func TestVariantAttributes(t *testing.T) {
-	t.Run("Value method", func(t *testing.T) {
-		attrs := VariantAttributes{
-			"color": "red",
-			"size":  "large",
-		}
-
-		value, err := attrs.Value()
-		require.NoError(t, err)
-
-		// Should return valid JSON
-		// Note: JSON marshaling might change order, so we unmarshal to compare
-		var result map[string]string
-		err = json.Unmarshal(value.([]byte), &result)
-		require.NoError(t, err)
-		assert.Equal(t, map[string]string{"color": "red", "size": "large"}, result)
-	})
-
-	t.Run("Scan method with valid JSON", func(t *testing.T) {
-		var attrs VariantAttributes
-		jsonData := []byte(`{"color":"blue","size":"medium"}`)
-
-		err := attrs.Scan(jsonData)
-		require.NoError(t, err)
-		assert.Equal(t, "blue", attrs["color"])
-		assert.Equal(t, "medium", attrs["size"])
-	})
-
-	t.Run("Scan method with nil value", func(t *testing.T) {
-		var attrs VariantAttributes
-		err := attrs.Scan(nil)
-		require.NoError(t, err)
-		assert.NotNil(t, attrs)
-		assert.Empty(t, attrs)
-	})
-
-	t.Run("Scan method with invalid type", func(t *testing.T) {
-		var attrs VariantAttributes
-		err := attrs.Scan("invalid")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "type assertion to []byte failed")
-	})
-
-	t.Run("Scan method with invalid JSON", func(t *testing.T) {
-		var attrs VariantAttributes
-		invalidJSON := []byte(`{"invalid json"}`)
-		err := attrs.Scan(invalidJSON)
-		assert.Error(t, err)
 	})
 }

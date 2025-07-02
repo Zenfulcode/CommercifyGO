@@ -25,12 +25,8 @@ type CheckoutDTO struct {
 	DiscountAmount   float64             `json:"discount_amount"`
 	FinalAmount      float64             `json:"final_amount"`
 	AppliedDiscount  *AppliedDiscountDTO `json:"applied_discount,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
 	LastActivityAt   time.Time           `json:"last_activity_at"`
 	ExpiresAt        time.Time           `json:"expires_at"`
-	CompletedAt      *time.Time          `json:"completed_at,omitempty"`
-	ConvertedOrderID uint                `json:"converted_order_id,omitempty"`
 }
 
 // CheckoutItemDTO represents an item in a checkout

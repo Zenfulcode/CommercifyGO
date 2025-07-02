@@ -38,9 +38,10 @@ type OrderSummaryDTO struct {
 	Customer         CustomerDetailsDTO `json:"customer"`
 	Status           OrderStatus        `json:"status"`
 	PaymentStatus    PaymentStatus      `json:"payment_status"`
-	TotalAmount      float64            `json:"total_amount"`  // Subtotal (items only)
-	ShippingCost     float64            `json:"shipping_cost"` // Shipping cost
-	FinalAmount      float64            `json:"final_amount"`  // Total including shipping and discounts
+	TotalAmount      float64            `json:"total_amount"`    // Subtotal (items only)
+	ShippingCost     float64            `json:"shipping_cost"`   // Shipping cost
+	DiscountAmount   float64            `json:"discount_amount"` // Discount applied amount
+	FinalAmount      float64            `json:"final_amount"`    // Total including shipping and discounts
 	OrderLinesAmount int                `json:"order_lines_amount"`
 	Currency         string             `json:"currency"`
 	CreatedAt        time.Time          `json:"created_at"`

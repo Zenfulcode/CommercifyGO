@@ -16,3 +16,13 @@ const (
 	PaymentMethodCreditCard PaymentMethod = "credit_card"
 	PaymentMethodWallet     PaymentMethod = "wallet"
 )
+
+// IsValidPaymentMethod checks if the payment method is valid
+func IsValidPaymentMethod(method string) bool {
+	switch PaymentMethod(method) {
+	case PaymentMethodCreditCard, PaymentMethodWallet:
+		return true
+	default:
+		return false
+	}
+}

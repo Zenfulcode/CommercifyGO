@@ -104,8 +104,8 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set addresses using JSON helper methods
-	mockOrder.SetShippingAddressJSON(&testShippingAddr)
-	mockOrder.SetBillingAddressJSON(&testBillingAddr)
+	mockOrder.SetShippingAddress(&testShippingAddr)
+	mockOrder.SetBillingAddress(&testBillingAddr)
 
 	// Add test applied discount
 	testDiscount := &entity.AppliedDiscount{
@@ -113,7 +113,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		DiscountCode:   "TEST15",
 		DiscountAmount: 1500, // $15.00 in cents
 	}
-	mockOrder.SetAppliedDiscountJSON(testDiscount)
+	mockOrder.SetAppliedDiscount(testDiscount)
 
 	var errors []string
 

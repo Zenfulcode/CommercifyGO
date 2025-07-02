@@ -713,7 +713,8 @@ func (h *CheckoutHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) 
 	processedOrder, err := h.checkoutUseCase.ProcessPayment(order, processInput)
 	if err != nil {
 		// print order
-		h.logger.Debug("Order details: %+v", order)
+		h.logger.Debug("Order ID: %d, Items: %v, Total: %.2f",
+			order.ID, order.Items, order.FinalAmount)
 
 		h.orderUseCase.FailOrder(order)
 

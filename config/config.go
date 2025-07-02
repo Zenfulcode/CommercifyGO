@@ -81,7 +81,6 @@ type MobilePayConfig struct {
 	ReturnURL            string
 	WebhookURL           string
 	PaymentDescription   string
-	Market               string // NOK, DKK, EUR
 	Enabled              bool
 	IsTestMode           bool
 }
@@ -192,7 +191,6 @@ func LoadConfig() (*Config, error) {
 			ReturnURL:            getEnv("RETURN_URL", ""),
 			WebhookURL:           getEnv("MOBILEPAY_WEBHOOK_URL", ""),
 			PaymentDescription:   getEnv("MOBILEPAY_PAYMENT_DESCRIPTION", "Commercify Store Purchase"),
-			Market:               getEnv("MOBILEPAY_MARKET", "DKK"), // Default to DKK
 			Enabled:              mobilePayEnabled,
 			IsTestMode:           mobilePayTestMode,
 		},

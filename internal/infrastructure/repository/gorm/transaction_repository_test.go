@@ -1,56 +1,27 @@
 package gorm
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/testutil"
 )
 
-// setupTestDB creates an in-memory SQLite database for testing
-func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	// Auto-migrate the payment_transactions table
-	err = db.AutoMigrate(&entity.PaymentTransaction{}, &entity.Order{})
-	require.NoError(t, err)
-
-	return db
-}
-
-// createTestOrder creates a test order in the database
-func createTestOrder(t *testing.T, db *gorm.DB, orderID uint) *entity.Order {
-	order := &entity.Order{
-		Model:         gorm.Model{ID: orderID},
-		OrderNumber:   fmt.Sprintf("ORD-%d", orderID), // Make order number unique
-		TotalAmount:   10000,
-		Currency:      "USD",
-		Status:        entity.OrderStatusPending,
-		PaymentStatus: entity.PaymentStatusPending,
-		IsGuestOrder:  true,
-	}
-	err := db.Create(order).Error
-	require.NoError(t, err)
-	return order
-}
-
 func TestTransactionRepository_Create(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Create new transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -69,6 +40,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn1, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_duplicate",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			5000,
@@ -78,7 +50,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		require.NoError(t, err)
 		txn1.RawResponse = "original response"
 
-		err = repo.Create(txn1)
+		err = repo.CreateOrUpdate(txn1) // Use CreateOrUpdate for upsert behavior
 		require.NoError(t, err)
 		originalID := txn1.ID
 		originalTransactionID := txn1.TransactionID
@@ -86,7 +58,8 @@ func TestTransactionRepository_Create(t *testing.T) {
 		// Create "identical" transaction (same order + type) with different status and external ID
 		txn2, err := entity.NewPaymentTransaction(
 			1,
-			"external_id_updated",              // Different external ID
+			"external_id_updated", // Different external ID
+			"test-idempotency-key-2",
 			entity.TransactionTypeAuthorize,    // Same type (this will trigger update)
 			entity.TransactionStatusSuccessful, // Different status
 			5000,                               // Same amount
@@ -97,7 +70,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn2.RawResponse = "updated response"
 		txn2.AddMetadata("webhook_id", "wh_123")
 
-		err = repo.Create(txn2)
+		err = repo.CreateOrUpdate(txn2) // Use CreateOrUpdate for upsert behavior
 		assert.NoError(t, err)
 
 		// Verify that the existing transaction was updated, not a new one created
@@ -118,6 +91,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn1, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_amount_test",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusSuccessful,
 			5000,
@@ -126,7 +100,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = repo.Create(txn1)
+		err = repo.CreateOrUpdate(txn1) // Use CreateOrUpdate for upsert behavior
 		require.NoError(t, err)
 		originalID := txn1.ID
 		originalTransactionID := txn1.TransactionID
@@ -135,6 +109,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn2, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_amount_updated",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture, // Same type, so will update
 			entity.TransactionStatusSuccessful,
 			3000, // Different amount
@@ -143,7 +118,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = repo.Create(txn2)
+		err = repo.CreateOrUpdate(txn2) // Use CreateOrUpdate for upsert behavior
 		assert.NoError(t, err)
 
 		// Verify the existing transaction was updated
@@ -159,10 +134,14 @@ func TestTransactionRepository_Create(t *testing.T) {
 	})
 
 	t.Run("Create multiple transactions with different types should create separate records", func(t *testing.T) {
+		// Create a new test order specifically for this test to avoid conflicts with previous tests
+		testutil.CreateTestOrder(t, db, 99)
+
 		// Create authorization transaction
 		txn1, err := entity.NewPaymentTransaction(
-			1,
+			99, // Use order 99 to avoid conflicts
 			"external_id_auth",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -176,8 +155,9 @@ func TestTransactionRepository_Create(t *testing.T) {
 
 		// Create capture transaction (different type, so should create new record)
 		txn2, err := entity.NewPaymentTransaction(
-			1,
+			99, // Use order 99 to avoid conflicts
 			"external_id_capture",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture, // Different type
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -191,12 +171,12 @@ func TestTransactionRepository_Create(t *testing.T) {
 
 		// Verify both transactions exist (different types)
 		var authCount int64
-		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 1, entity.TransactionTypeAuthorize).Count(&authCount).Error
+		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 99, entity.TransactionTypeAuthorize).Count(&authCount).Error
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), authCount)
 
 		var captureCount int64
-		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 1, entity.TransactionTypeCapture).Count(&captureCount).Error
+		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 99, entity.TransactionTypeCapture).Count(&captureCount).Error
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), captureCount)
 
@@ -207,16 +187,17 @@ func TestTransactionRepository_Create(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get existing transaction", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_get_by_id",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -246,16 +227,17 @@ func TestTransactionRepository_GetByID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByTransactionID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get existing transaction by transaction ID", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_123", // This is the external ID
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusSuccessful,
 			5000,
@@ -285,27 +267,27 @@ func TestTransactionRepository_GetByTransactionID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByOrderID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create test orders
-	createTestOrder(t, db, 1)
-	createTestOrder(t, db, 2)
+	testutil.CreateTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 2)
 
 	t.Run("Get transactions for order with multiple transactions", func(t *testing.T) {
 		// Create multiple transactions for order 1
-		txn1, err := entity.NewPaymentTransaction(1, "txn_order_1_auth", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "txn_order_1_auth", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		txn2, err := entity.NewPaymentTransaction(1, "txn_order_1_capture", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(1, "txn_order_1_capture", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
 
 		// Create transaction for order 2
-		txn3, err := entity.NewPaymentTransaction(2, "txn_order_2_auth", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn3, err := entity.NewPaymentTransaction(2, "txn_order_2_auth", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn3)
 		require.NoError(t, err)
@@ -320,7 +302,7 @@ func TestTransactionRepository_GetByOrderID(t *testing.T) {
 	})
 
 	t.Run("Get transactions for order with no transactions", func(t *testing.T) {
-		createTestOrder(t, db, 3)
+		testutil.CreateTestOrder(t, db, 3)
 		transactions, err := repo.GetByOrderID(3)
 		assert.NoError(t, err)
 		assert.Empty(t, transactions)
@@ -328,21 +310,21 @@ func TestTransactionRepository_GetByOrderID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get latest transaction of specific type", func(t *testing.T) {
 		// Create authorization transaction
-		txn1, err := entity.NewPaymentTransaction(1, "external_auth_1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "external_auth_1", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
 		// Create a capture transaction (different type)
-		txn2, err := entity.NewPaymentTransaction(1, "external_capture_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(1, "external_capture_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
@@ -355,7 +337,7 @@ func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Get latest transaction when none exist of that type", func(t *testing.T) {
-		createTestOrder(t, db, 4)
+		testutil.CreateTestOrder(t, db, 4)
 		_, err := repo.GetLatestByOrderIDAndType(4, entity.TransactionTypeRefund)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no payment transaction of type")
@@ -363,30 +345,30 @@ func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Count successful transactions", func(t *testing.T) {
 		// Create test orders
-		createTestOrder(t, db, 10)
-		createTestOrder(t, db, 11)
+		testutil.CreateTestOrder(t, db, 10)
+		testutil.CreateTestOrder(t, db, 11)
 
 		// Create successful capture transactions for different orders
-		txn1, err := entity.NewPaymentTransaction(10, "external_success_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(10, "external_success_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		txn2, err := entity.NewPaymentTransaction(11, "external_success_2", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 3000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(11, "external_success_2", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 3000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
 
 		// Create failed capture transaction for order 1
-		txn3, err := entity.NewPaymentTransaction(1, "external_failed_1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 2000, "USD", "stripe")
+		txn3, err := entity.NewPaymentTransaction(1, "external_failed_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 2000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn3)
 		require.NoError(t, err)
@@ -402,7 +384,7 @@ func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Count when no successful transactions exist", func(t *testing.T) {
-		createTestOrder(t, db, 5)
+		testutil.CreateTestOrder(t, db, 5)
 		count, err := repo.CountSuccessfulByOrderIDAndType(5, entity.TransactionTypeRefund)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, count)
@@ -410,28 +392,28 @@ func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Sum amounts for successful transactions", func(t *testing.T) {
 		// Create a successful capture transaction for order 1
-		txn1, err := entity.NewPaymentTransaction(1, "external_sum_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "external_sum_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		// Since we can only have one transaction per type per order, let's test the sum of that one transaction
+		// Test the sum of that one transaction
 		total, err := repo.SumAmountByOrderIDAndType(1, entity.TransactionTypeCapture)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(5000), total)
 
-		// Now update the transaction with a failed status - should not be included in sum
-		txn_update, err := entity.NewPaymentTransaction(1, "external_sum_updated", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 3000, "USD", "stripe")
+		// Now update the transaction with a failed status using CreateOrUpdate - should not be included in sum
+		txn_update, err := entity.NewPaymentTransaction(1, "external_sum_updated", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 3000, "USD", "stripe")
 		require.NoError(t, err)
-		err = repo.Create(txn_update) // This will update the existing capture transaction
+		err = repo.CreateOrUpdate(txn_update) // Use CreateOrUpdate to update the existing capture transaction
 		require.NoError(t, err)
 
 		// Sum should now be 0 since the transaction is failed
@@ -441,7 +423,7 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Sum when no successful transactions exist", func(t *testing.T) {
-		createTestOrder(t, db, 6)
+		testutil.CreateTestOrder(t, db, 6)
 		total, err := repo.SumAmountByOrderIDAndType(6, entity.TransactionTypeRefund)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(0), total)
@@ -449,16 +431,17 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_Update(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Update transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_update",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			10000,
@@ -486,16 +469,17 @@ func TestTransactionRepository_Update(t *testing.T) {
 }
 
 func TestTransactionRepository_Delete(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Delete transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_delete",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
