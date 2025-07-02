@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,9 +20,13 @@ func TestPaymentTransaction(t *testing.T) {
 			"stripe",
 		)
 
+		fmt.Printf("orderID: %d, transactionID: %s, type: %s, status: %s, amount: %d, currency: %s, provider: %s\n",
+			txn.OrderID, txn.ExternalID, txn.Type, txn.Status, txn.Amount,
+			txn.Currency, txn.Provider)
+
 		require.NoError(t, err)
 		assert.Equal(t, uint(1), txn.OrderID)
-		assert.Equal(t, "txn_123", txn.TransactionID)
+		assert.Equal(t, "txn_123", txn.ExternalID)
 		assert.Equal(t, TransactionTypeAuthorize, txn.Type)
 		assert.Equal(t, TransactionStatusSuccessful, txn.Status)
 		assert.Equal(t, int64(10000), txn.Amount)
@@ -35,7 +40,7 @@ func TestPaymentTransaction(t *testing.T) {
 		tests := []struct {
 			name          string
 			orderID       uint
-			transactionID string
+			externalID    string
 			txnType       TransactionType
 			status        TransactionStatus
 			amount        int64
@@ -46,7 +51,7 @@ func TestPaymentTransaction(t *testing.T) {
 			{
 				name:          "zero orderID",
 				orderID:       0,
-				transactionID: "txn_123",
+				externalID:    "txn_123",
 				txnType:       TransactionTypeAuthorize,
 				status:        TransactionStatusSuccessful,
 				amount:        10000,
@@ -55,20 +60,9 @@ func TestPaymentTransaction(t *testing.T) {
 				expectedError: "orderID cannot be zero",
 			},
 			{
-				name:          "empty transactionID",
-				orderID:       1,
-				transactionID: "",
-				txnType:       TransactionTypeAuthorize,
-				status:        TransactionStatusSuccessful,
-				amount:        10000,
-				currency:      "USD",
-				provider:      "stripe",
-				expectedError: "transactionID cannot be empty",
-			},
-			{
 				name:          "empty transactionType",
 				orderID:       1,
-				transactionID: "txn_123",
+				externalID:    "txn_123",
 				txnType:       "",
 				status:        TransactionStatusSuccessful,
 				amount:        10000,
@@ -79,7 +73,7 @@ func TestPaymentTransaction(t *testing.T) {
 			{
 				name:          "empty status",
 				orderID:       1,
-				transactionID: "txn_123",
+				externalID:    "txn_123",
 				txnType:       TransactionTypeAuthorize,
 				status:        "",
 				amount:        10000,
@@ -90,7 +84,7 @@ func TestPaymentTransaction(t *testing.T) {
 			{
 				name:          "empty currency",
 				orderID:       1,
-				transactionID: "txn_123",
+				externalID:    "txn_123",
 				txnType:       TransactionTypeAuthorize,
 				status:        TransactionStatusSuccessful,
 				amount:        10000,
@@ -101,7 +95,7 @@ func TestPaymentTransaction(t *testing.T) {
 			{
 				name:          "empty provider",
 				orderID:       1,
-				transactionID: "txn_123",
+				externalID:    "txn_123",
 				txnType:       TransactionTypeAuthorize,
 				status:        TransactionStatusSuccessful,
 				amount:        10000,
@@ -115,7 +109,7 @@ func TestPaymentTransaction(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				txn, err := NewPaymentTransaction(
 					tt.orderID,
-					tt.transactionID,
+					tt.externalID,
 					tt.txnType,
 					tt.status,
 					tt.amount,

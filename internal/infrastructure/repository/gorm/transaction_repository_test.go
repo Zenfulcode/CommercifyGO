@@ -1,51 +1,21 @@
 package gorm
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/testutil"
 )
 
-// setupTestDB creates an in-memory SQLite database for testing
-func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	// Auto-migrate the payment_transactions table
-	err = db.AutoMigrate(&entity.PaymentTransaction{}, &entity.Order{})
-	require.NoError(t, err)
-
-	return db
-}
-
-// createTestOrder creates a test order in the database
-func createTestOrder(t *testing.T, db *gorm.DB, orderID uint) *entity.Order {
-	order := &entity.Order{
-		Model:         gorm.Model{ID: orderID},
-		OrderNumber:   fmt.Sprintf("ORD-%d", orderID), // Make order number unique
-		TotalAmount:   10000,
-		Currency:      "USD",
-		Status:        entity.OrderStatusPending,
-		PaymentStatus: entity.PaymentStatusPending,
-		IsGuestOrder:  true,
-	}
-	err := db.Create(order).Error
-	require.NoError(t, err)
-	return order
-}
-
 func TestTransactionRepository_Create(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Create new transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
@@ -160,7 +130,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 
 	t.Run("Create multiple transactions with different types should create separate records", func(t *testing.T) {
 		// Create a new test order specifically for this test to avoid conflicts with previous tests
-		createTestOrder(t, db, 99)
+		testutil.CreateTestOrder(t, db, 99)
 
 		// Create authorization transaction
 		txn1, err := entity.NewPaymentTransaction(
@@ -210,11 +180,11 @@ func TestTransactionRepository_Create(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get existing transaction", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
@@ -249,11 +219,11 @@ func TestTransactionRepository_GetByID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByTransactionID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get existing transaction by transaction ID", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
@@ -288,12 +258,12 @@ func TestTransactionRepository_GetByTransactionID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetByOrderID(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create test orders
-	createTestOrder(t, db, 1)
-	createTestOrder(t, db, 2)
+	testutil.CreateTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 2)
 
 	t.Run("Get transactions for order with multiple transactions", func(t *testing.T) {
 		// Create multiple transactions for order 1
@@ -323,7 +293,7 @@ func TestTransactionRepository_GetByOrderID(t *testing.T) {
 	})
 
 	t.Run("Get transactions for order with no transactions", func(t *testing.T) {
-		createTestOrder(t, db, 3)
+		testutil.CreateTestOrder(t, db, 3)
 		transactions, err := repo.GetByOrderID(3)
 		assert.NoError(t, err)
 		assert.Empty(t, transactions)
@@ -331,11 +301,11 @@ func TestTransactionRepository_GetByOrderID(t *testing.T) {
 }
 
 func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Get latest transaction of specific type", func(t *testing.T) {
 		// Create authorization transaction
@@ -358,7 +328,7 @@ func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Get latest transaction when none exist of that type", func(t *testing.T) {
-		createTestOrder(t, db, 4)
+		testutil.CreateTestOrder(t, db, 4)
 		_, err := repo.GetLatestByOrderIDAndType(4, entity.TransactionTypeRefund)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no payment transaction of type")
@@ -366,16 +336,16 @@ func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Count successful transactions", func(t *testing.T) {
 		// Create test orders
-		createTestOrder(t, db, 10)
-		createTestOrder(t, db, 11)
+		testutil.CreateTestOrder(t, db, 10)
+		testutil.CreateTestOrder(t, db, 11)
 
 		// Create successful capture transactions for different orders
 		txn1, err := entity.NewPaymentTransaction(10, "external_success_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
@@ -405,7 +375,7 @@ func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Count when no successful transactions exist", func(t *testing.T) {
-		createTestOrder(t, db, 5)
+		testutil.CreateTestOrder(t, db, 5)
 		count, err := repo.CountSuccessfulByOrderIDAndType(5, entity.TransactionTypeRefund)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, count)
@@ -413,11 +383,11 @@ func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Sum amounts for successful transactions", func(t *testing.T) {
 		// Create a successful capture transaction for order 1
@@ -444,7 +414,7 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 	})
 
 	t.Run("Sum when no successful transactions exist", func(t *testing.T) {
-		createTestOrder(t, db, 6)
+		testutil.CreateTestOrder(t, db, 6)
 		total, err := repo.SumAmountByOrderIDAndType(6, entity.TransactionTypeRefund)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(0), total)
@@ -452,11 +422,11 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 }
 
 func TestTransactionRepository_Update(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Update transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
@@ -489,11 +459,11 @@ func TestTransactionRepository_Update(t *testing.T) {
 }
 
 func TestTransactionRepository_Delete(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	createTestOrder(t, db, 1)
+	testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Delete transaction successfully", func(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(

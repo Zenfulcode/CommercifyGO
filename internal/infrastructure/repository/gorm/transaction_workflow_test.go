@@ -7,16 +7,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/testutil"
 )
 
 // TestPaymentCaptureWorkflow tests the complete payment workflow
 // to ensure that each action (authorize, capture) creates a separate transaction record
 func TestPaymentCaptureWorkflow(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	order := createTestOrder(t, db, 1)
+	order := testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Complete payment workflow with separate transactions", func(t *testing.T) {
 		// Step 1: Create authorization transaction (initial payment processing)
@@ -91,7 +92,7 @@ func TestPaymentCaptureWorkflow(t *testing.T) {
 
 	t.Run("Partial capture workflow", func(t *testing.T) {
 		// Create another order for partial capture testing
-		order2 := createTestOrder(t, db, 2)
+		order2 := testutil.CreateTestOrder(t, db, 2)
 
 		// Step 1: Authorization for $100
 		authTxn, err := entity.NewPaymentTransaction(
@@ -176,11 +177,11 @@ func TestPaymentCaptureWorkflow(t *testing.T) {
 
 // TestWebhookDuplicationHandling tests scenarios where the same webhook might be received multiple times
 func TestWebhookDuplicationHandling(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	repo := NewTransactionRepository(db)
 
 	// Create a test order
-	order := createTestOrder(t, db, 1)
+	order := testutil.CreateTestOrder(t, db, 1)
 
 	t.Run("Same webhook received multiple times creates multiple records", func(t *testing.T) {
 		// This demonstrates the current behavior - each create call will create a new record

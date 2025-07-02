@@ -34,17 +34,17 @@ const (
 // Each transaction represents a specific event in the payment lifecycle
 type PaymentTransaction struct {
 	gorm.Model
-	OrderID       uint              `gorm:"index;not null"`              // Foreign key to order (indexed for performance)
+	OrderID       uint              `gorm:"index;not null"` // Foreign key to order (indexed for performance)
 	Order         Order             `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	TransactionID string            `gorm:"uniqueIndex;not null;size:100"`                     // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
-	ExternalID    string            `gorm:"index;size:255"`                                    // External transaction ID from payment provider (can be empty for some providers)
-	Type          TransactionType   `gorm:"not null;size:50;index:idx_order_type"`            // Type of transaction (authorize, capture, refund, cancel)
-	Status        TransactionStatus `gorm:"not null;size:50"`                                  // Status of the transaction (pending -> successful/failed)
-	Amount        int64             `gorm:"not null"`                                          // Amount of the transaction
-	Currency      string            `gorm:"not null;size:3"`                                   // Currency of the transaction
-	Provider      string            `gorm:"not null;size:100"`                                 // Payment provider (stripe, paypal, etc.)
-	RawResponse   string            `gorm:"type:text"`                                         // Raw response from payment provider (JSON)
-	Metadata      datatypes.JSONMap `gorm:"type:text"`                                         // Additional metadata stored as JSON
+	TransactionID string            `gorm:"uniqueIndex;not null;size:100"`         // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
+	ExternalID    string            `gorm:"index;size:255"`                        // External transaction ID from payment provider (can be empty for some providers)
+	Type          TransactionType   `gorm:"not null;size:50;index:idx_order_type"` // Type of transaction (authorize, capture, refund, cancel)
+	Status        TransactionStatus `gorm:"not null;size:50"`                      // Status of the transaction (pending -> successful/failed)
+	Amount        int64             `gorm:"not null"`                              // Amount of the transaction
+	Currency      string            `gorm:"not null;size:3"`                       // Currency of the transaction
+	Provider      string            `gorm:"not null;size:100"`                     // Payment provider (stripe, paypal, etc.)
+	RawResponse   string            `gorm:"type:text"`                             // Raw response from payment provider (JSON)
+	Metadata      datatypes.JSONMap `gorm:"type:text"`                             // Additional metadata stored as JSON
 }
 
 // NewPaymentTransaction creates a new payment transaction
