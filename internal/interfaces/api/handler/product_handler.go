@@ -126,7 +126,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		}
 
 		response := contracts.ErrorResponse(errorMessage)
@@ -195,7 +195,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 			errorMessage = "Not authorized to update this product"
 		} else if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
 			statusCode = http.StatusConflict
 			errorMessage = "Product with this SKU already exists"
@@ -256,7 +256,7 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		} else if strings.Contains(err.Error(), "has orders") || strings.Contains(err.Error(), "cannot delete") {
 			statusCode = http.StatusConflict
 			errorMessage = "Cannot delete product with existing orders"
@@ -572,7 +572,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		} else if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "already exists") {
 			statusCode = http.StatusConflict
 			errorMessage = "Variant with this SKU already exists"
@@ -655,7 +655,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
 			errorMessage = "Variant not found"
@@ -726,7 +726,7 @@ func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 
 		if err.Error() == errors.ProductNotFoundError {
 			statusCode = http.StatusNotFound
-			errorMessage = "Product not found"
+			errorMessage = err.Error()
 		} else if strings.Contains(err.Error(), "variant") && strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
 			errorMessage = "Variant not found"

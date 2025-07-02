@@ -138,7 +138,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		txn, err := entity.NewPaymentTransaction(
 			order.ID,
 			paymentResult.TransactionID,
-			"",  // Idempotency key
+			"", // Idempotency key
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			order.FinalAmount,
@@ -168,7 +168,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		txn, err := entity.NewPaymentTransaction(
 			order.ID,
 			paymentResult.TransactionID,
-			"",  // Idempotency key
+			"", // Idempotency key
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusFailed,
 			order.FinalAmount,
@@ -231,7 +231,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	txn, err := entity.NewPaymentTransaction(
 		order.ID,
 		paymentResult.TransactionID,
-		"",  // Idempotency key
+		"", // Idempotency key
 		entity.TransactionTypeAuthorize,
 		entity.TransactionStatusSuccessful,
 		order.FinalAmount,
@@ -585,6 +585,18 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("checkout has no items")
 	}
 
+	// Validate stock availability for all items before creating order
+	for _, item := range checkout.Items {
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get variant for stock validation: %w", err)
+		}
+
+		if !variant.IsAvailable(item.Quantity) {
+			return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Required: %d", variant.SKU, variant.Stock, item.Quantity)
+		}
+	}
+
 	shippingAddr := checkout.GetShippingAddress()
 	billingAddr := checkout.GetBillingAddress()
 
@@ -853,6 +865,21 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("product is not available")
 	}
 
+	// Check stock availability
+	// If the item is already in the checkout, we need to check the total quantity (existing + new)
+	existingQuantity := 0
+	for _, item := range checkout.Items {
+		if item.ProductID == variant.ProductID && item.ProductVariantID == variant.ID {
+			existingQuantity = item.Quantity
+			break
+		}
+	}
+	totalQuantity := existingQuantity + input.Quantity
+
+	if !variant.IsAvailable(totalQuantity) {
+		return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Total requested: %d (existing: %d + new: %d)", variant.SKU, variant.Stock, totalQuantity, existingQuantity, input.Quantity)
+	}
+
 	// Handle currency mismatch
 	if product.Currency != checkout.Currency {
 		// If the checkout is empty, change the checkout currency to match the product
@@ -929,6 +956,11 @@ func (uc *CheckoutUseCase) UpdateCheckoutItemBySKU(checkoutID uint, input Update
 	// Check if product is active
 	if !product.Active {
 		return nil, errors.New("product is not available")
+	}
+
+	// Check stock availability for the new quantity
+	if !variant.IsAvailable(input.Quantity) {
+		return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Requested: %d", variant.SKU, variant.Stock, input.Quantity)
 	}
 
 	productID := variant.ProductID

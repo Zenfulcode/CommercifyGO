@@ -129,10 +129,8 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 			// Update quantity if product already exists
 			c.Items[i].Quantity += quantity
 
-			// Update checkout
-			c.recalculateTotals()
-
 			c.LastActivityAt = time.Now()
+			c.recalculateTotals()
 
 			return nil
 		}
