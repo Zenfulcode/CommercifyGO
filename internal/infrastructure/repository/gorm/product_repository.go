@@ -92,10 +92,22 @@ func (r *ProductRepository) Update(product *entity.Product) error {
 	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(product).Error
 }
 
-// Delete deletes a product by ID (cascade will handle variants)
+// Delete deletes a product by ID and its associated variants (hard deletion)
 func (r *ProductRepository) Delete(productID uint) error {
-	// GORM cascade will automatically delete associated variants
-	return r.db.Delete(&entity.Product{}, productID).Error
+	// Use a transaction to ensure data consistency
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// First, hard delete all variants for this product
+		if err := tx.Unscoped().Where("product_id = ?", productID).Delete(&entity.ProductVariant{}).Error; err != nil {
+			return fmt.Errorf("failed to delete product variants: %w", err)
+		}
+
+		// Then hard delete the product itself
+		if err := tx.Unscoped().Delete(&entity.Product{}, productID).Error; err != nil {
+			return fmt.Errorf("failed to delete product: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // List retrieves products with filtering and pagination
