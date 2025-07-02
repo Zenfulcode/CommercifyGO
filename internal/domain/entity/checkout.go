@@ -3,6 +3,11 @@ package entity
 import (
 	"errors"
 	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // CheckoutStatus represents the current status of a checkout
@@ -21,31 +26,30 @@ const (
 
 // Checkout represents a user's checkout session
 type Checkout struct {
-	ID               uint             `json:"id"`
-	UserID           uint             `json:"user_id,omitempty"`
-	SessionID        string           `json:"session_id,omitempty"`
-	Items            []CheckoutItem   `json:"items"`
-	Status           CheckoutStatus   `json:"status"`
-	ShippingAddr     Address          `json:"shipping_address"`
-	BillingAddr      Address          `json:"billing_address"`
-	ShippingMethodID uint             `json:"shipping_method_id,omitempty"`
-	ShippingOption   *ShippingOption  `json:"shipping_option,omitempty"`
-	PaymentProvider  string           `json:"payment_provider,omitempty"`
-	TotalAmount      int64            `json:"total_amount"`  // stored in cents
-	ShippingCost     int64            `json:"shipping_cost"` // stored in cents
-	TotalWeight      float64          `json:"total_weight"`
-	CustomerDetails  CustomerDetails  `json:"customer_details"`
-	Currency         string           `json:"currency"`
-	DiscountCode     string           `json:"discount_code,omitempty"`
-	DiscountAmount   int64            `json:"discount_amount"` // stored in cents
-	FinalAmount      int64            `json:"final_amount"`    // stored in cents
-	AppliedDiscount  *AppliedDiscount `json:"applied_discount,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
-	LastActivityAt   time.Time        `json:"last_activity_at"`
-	ExpiresAt        time.Time        `json:"expires_at"`
-	CompletedAt      *time.Time       `json:"completed_at,omitempty"`
-	ConvertedOrderID uint             `json:"converted_order_id,omitempty"`
+	gorm.Model
+	UserID           *uint                               `gorm:"index"`
+	User             *User                               `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	SessionID        string                              `gorm:"index;not null;size:255"`
+	Items            []CheckoutItem                      `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Status           CheckoutStatus                      `gorm:"not null;size:50;default:'active'"`
+	ShippingAddress  datatypes.JSONType[Address]         `gorm:"column:shipping_address"`
+	BillingAddress   datatypes.JSONType[Address]         `gorm:"column:billing_address"`
+	ShippingOption   datatypes.JSONType[ShippingOption]  `gorm:"column:shipping_option"`
+	PaymentProvider  string                              `gorm:"size:100"`
+	TotalAmount      int64                               `gorm:"default:0"`
+	ShippingCost     int64                               `gorm:"default:0"`
+	TotalWeight      float64                             `gorm:"default:0"`
+	CustomerDetails  CustomerDetails                     `gorm:"embedded;embeddedPrefix:customer_"`
+	Currency         string                              `gorm:"not null;size:3"`
+	DiscountCode     string                              `gorm:"size:100"`
+	DiscountAmount   int64                               `gorm:"default:0"`
+	FinalAmount      int64                               `gorm:"default:0"`
+	AppliedDiscount  datatypes.JSONType[AppliedDiscount] `gorm:"column:applied_discount"`
+	LastActivityAt   time.Time                           `gorm:"index"`
+	ExpiresAt        time.Time                           `gorm:"index"`
+	CompletedAt      *time.Time
+	ConvertedOrderID *uint  `gorm:"index"`
+	ConvertedOrder   *Order `gorm:"foreignKey:ConvertedOrderID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
 }
 
 func (c *Checkout) CalculateTotals() {
@@ -54,26 +58,28 @@ func (c *Checkout) CalculateTotals() {
 
 // CheckoutItem represents an item in a checkout
 type CheckoutItem struct {
-	ID               uint      `json:"id"`
-	CheckoutID       uint      `json:"checkout_id"`
-	ProductID        uint      `json:"product_id"`
-	ProductVariantID uint      `json:"product_variant_id,omitempty"`
-	ImageURL         string    `json:"image_url,omitempty"`
-	Quantity         int       `json:"quantity"`
-	Price            int64     `json:"price"` // stored in cents
-	Weight           float64   `json:"weight"`
-	ProductName      string    `json:"product_name"`
-	VariantName      string    `json:"variant_name,omitempty"`
-	SKU              string    `json:"sku,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	gorm.Model
+	CheckoutID       uint           `gorm:"index;not null"`
+	Checkout         Checkout       `gorm:"foreignKey:CheckoutID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ProductID        uint           `gorm:"index;not null"`
+	Product          Product        `gorm:"foreignKey:ProductID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	ProductVariantID uint           `gorm:"index;not null"`
+	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	ImageURL         string         `gorm:"size:500"`
+	Quantity         int            `gorm:"not null"`
+	Price            int64          `gorm:"not null"` // Price at time of adding to cart
+	Weight           float64        `gorm:"default:0"`
+	ProductName      string         `gorm:"not null;size:255"`
+	VariantName      string         `gorm:"size:255"`
+	SKU              string         `gorm:"not null;size:100"`
 }
 
 // AppliedDiscount represents a discount applied to a checkout
 type AppliedDiscount struct {
-	DiscountID     uint   `json:"discount_id"`
-	DiscountCode   string `json:"discount_code"`
-	DiscountAmount int64  `json:"discount_amount"` // stored in cents
+	DiscountID     uint      `gorm:"index"`
+	Discount       *Discount `gorm:"foreignKey:DiscountID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE"`
+	DiscountCode   string    `gorm:"size:100"`
+	DiscountAmount int64     `gorm:"default:0"`
 }
 
 // NewCheckout creates a new checkout for a guest user
@@ -98,8 +104,6 @@ func NewCheckout(sessionID string, currency string) (*Checkout, error) {
 		ShippingCost:   0,
 		DiscountAmount: 0,
 		FinalAmount:    0,
-		CreatedAt:      now,
-		UpdatedAt:      now,
 		LastActivityAt: now,
 		ExpiresAt:      expiresAt,
 	}, nil
@@ -124,12 +128,9 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 			(variantID == 0 || item.ProductVariantID == variantID) {
 			// Update quantity if product already exists
 			c.Items[i].Quantity += quantity
-			c.Items[i].UpdatedAt = time.Now()
 
-			// Update checkout
-			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
 			c.LastActivityAt = time.Now()
+			c.recalculateTotals()
 
 			return nil
 		}
@@ -138,6 +139,7 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 	// Add new item if product doesn't exist in checkout
 	now := time.Now()
 	c.Items = append(c.Items, CheckoutItem{
+		CheckoutID:       c.ID, // Set the checkout ID for the foreign key
 		ProductID:        productID,
 		ProductVariantID: variantID,
 		Quantity:         quantity,
@@ -146,13 +148,10 @@ func (c *Checkout) AddItem(productID uint, variantID uint, quantity int, price i
 		ProductName:      productName,
 		VariantName:      variantName,
 		SKU:              sku,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	})
 
 	// Update checkout
 	c.recalculateTotals()
-	c.UpdatedAt = now
 	c.LastActivityAt = now
 
 	return nil
@@ -172,11 +171,10 @@ func (c *Checkout) UpdateItem(productID uint, variantID uint, quantity int) erro
 		if item.ProductID == productID &&
 			(variantID == 0 || item.ProductVariantID == variantID) {
 			c.Items[i].Quantity = quantity
-			c.Items[i].UpdatedAt = time.Now()
 
 			// Update checkout
 			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
+
 			c.LastActivityAt = time.Now()
 
 			return nil
@@ -201,7 +199,7 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 
 			// Update checkout
 			c.recalculateTotals()
-			c.UpdatedAt = time.Now()
+
 			c.LastActivityAt = time.Now()
 
 			return nil
@@ -213,41 +211,43 @@ func (c *Checkout) RemoveItem(productID uint, variantID uint) error {
 
 // SetShippingAddress sets the shipping address for the checkout
 func (c *Checkout) SetShippingAddress(address Address) {
-	c.ShippingAddr = address
-	c.UpdatedAt = time.Now()
+	c.ShippingAddress = datatypes.NewJSONType(address)
 	c.LastActivityAt = time.Now()
 }
 
 // SetBillingAddress sets the billing address for the checkout
 func (c *Checkout) SetBillingAddress(address Address) {
-	c.BillingAddr = address
-	c.UpdatedAt = time.Now()
+	c.BillingAddress = datatypes.NewJSONType(address)
 	c.LastActivityAt = time.Now()
 }
 
 // SetCustomerDetails sets the customer details for the checkout
 func (c *Checkout) SetCustomerDetails(details CustomerDetails) {
 	c.CustomerDetails = details
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
 // SetShippingMethod sets the shipping method for the checkout
 func (c *Checkout) SetShippingMethod(option *ShippingOption) {
-	c.ShippingMethodID = option.ShippingMethodID
-	c.ShippingCost = option.Cost
-	c.ShippingOption = option
+	if option != nil {
+		c.ShippingCost = option.Cost
+		// Store shipping option
+		c.ShippingOption = datatypes.NewJSONType(*option)
+	} else {
+		c.ShippingCost = 0
+		// Clear shipping option
+		c.ShippingOption = datatypes.NewJSONType(ShippingOption{})
+	}
 
 	c.recalculateTotals()
-
-	c.UpdatedAt = time.Now()
 	c.LastActivityAt = time.Now()
 }
 
 // SetPaymentProvider sets the payment provider for the checkout
 func (c *Checkout) SetPaymentProvider(provider string) {
 	c.PaymentProvider = provider
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -273,7 +273,7 @@ func (c *Checkout) SetCurrency(newCurrency string, fromCurrency *Currency, toCur
 
 	// Recalculate totals with new currency prices
 	c.recalculateTotals()
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -283,7 +283,7 @@ func (c *Checkout) ApplyDiscount(discount *Discount) {
 		// Remove any existing discount
 		c.DiscountCode = ""
 		c.DiscountAmount = 0
-		c.AppliedDiscount = nil
+		c.AppliedDiscount = datatypes.JSONType[AppliedDiscount]{}
 	} else {
 		// Calculate discount amount
 		discountAmount := discount.CalculateDiscount(&Order{
@@ -294,15 +294,37 @@ func (c *Checkout) ApplyDiscount(discount *Discount) {
 		// Apply the discount
 		c.DiscountCode = discount.Code
 		c.DiscountAmount = discountAmount
-		c.AppliedDiscount = &AppliedDiscount{
+
+		// Store applied discount
+		appliedDiscount := AppliedDiscount{
 			DiscountID:     discount.ID,
 			DiscountCode:   discount.Code,
 			DiscountAmount: discountAmount,
 		}
+		c.AppliedDiscount = datatypes.NewJSONType(appliedDiscount)
 	}
 
 	c.recalculateTotals()
-	c.UpdatedAt = time.Now()
+	c.LastActivityAt = time.Now()
+}
+
+// TODO: COMBINE THIS WITH ApplyDiscount
+func (c *Checkout) SetAppliedDiscount(discount *AppliedDiscount) {
+	if discount == nil {
+		// Remove any existing discount
+		c.DiscountCode = ""
+		c.DiscountAmount = 0
+		c.AppliedDiscount = datatypes.JSONType[AppliedDiscount]{}
+	} else {
+		// Apply the discount
+		c.DiscountCode = discount.DiscountCode
+		c.DiscountAmount = discount.DiscountAmount
+
+		// Store applied discount
+		c.AppliedDiscount = datatypes.NewJSONType(*discount)
+	}
+
+	c.recalculateTotals()
 	c.LastActivityAt = time.Now()
 }
 
@@ -313,15 +335,18 @@ func (c *Checkout) Clear() {
 	c.TotalWeight = 0
 	c.DiscountAmount = 0
 	c.FinalAmount = 0
-	c.AppliedDiscount = nil
-	c.UpdatedAt = time.Now()
+	c.AppliedDiscount = datatypes.NewJSONType(AppliedDiscount{})
+	c.ShippingAddress = datatypes.NewJSONType(Address{})
+	c.BillingAddress = datatypes.NewJSONType(Address{})
+	c.ShippingOption = datatypes.NewJSONType(ShippingOption{})
+
 	c.LastActivityAt = time.Now()
 }
 
 // MarkAsCompleted marks the checkout as completed and sets the completed_at timestamp
 func (c *Checkout) MarkAsCompleted(orderID uint) {
 	c.Status = CheckoutStatusCompleted
-	c.ConvertedOrderID = orderID
+	c.ConvertedOrderID = &orderID
 	now := time.Now()
 	c.CompletedAt = &now
 	c.UpdatedAt = now
@@ -331,14 +356,14 @@ func (c *Checkout) MarkAsCompleted(orderID uint) {
 // MarkAsAbandoned marks the checkout as abandoned
 func (c *Checkout) MarkAsAbandoned() {
 	c.Status = CheckoutStatusAbandoned
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
 // MarkAsExpired marks the checkout as expired
 func (c *Checkout) MarkAsExpired() {
 	c.Status = CheckoutStatusExpired
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -350,7 +375,7 @@ func (c *Checkout) IsExpired() bool {
 // ExtendExpiry extends the expiry time of the checkout
 func (c *Checkout) ExtendExpiry(duration time.Duration) {
 	c.ExpiresAt = time.Now().Add(duration)
-	c.UpdatedAt = time.Now()
+
 	c.LastActivityAt = time.Now()
 }
 
@@ -372,11 +397,11 @@ func (c *Checkout) HasCustomerInfo() bool {
 
 // HasShippingInfo returns true if the checkout has shipping address information
 func (c *Checkout) HasShippingInfo() bool {
-	return c.ShippingAddr.Street != "" ||
-		c.ShippingAddr.City != "" ||
-		c.ShippingAddr.State != "" ||
-		c.ShippingAddr.PostalCode != "" ||
-		c.ShippingAddr.Country != ""
+	shippingAddr := c.ShippingAddress.Data()
+	return shippingAddr.Street1 != "" ||
+		shippingAddr.City != "" ||
+		shippingAddr.PostalCode != "" ||
+		shippingAddr.Country != ""
 }
 
 // HasCustomerOrShippingInfo returns true if the checkout has either customer or shipping information
@@ -446,58 +471,6 @@ func (c *Checkout) recalculateTotals() {
 	c.FinalAmount = max(totalAmount+c.ShippingCost-c.DiscountAmount, 0)
 }
 
-// ToOrder converts a checkout to an order
-func (c *Checkout) ToOrder() *Order {
-	// Create order items from checkout items
-	items := make([]OrderItem, len(c.Items))
-	for i, item := range c.Items {
-		items[i] = OrderItem{
-			ProductID:        item.ProductID,
-			ProductVariantID: item.ProductVariantID,
-			Quantity:         item.Quantity,
-			Price:            item.Price,
-			Subtotal:         item.Price * int64(item.Quantity),
-			Weight:           item.Weight,
-			ProductName:      item.ProductName,
-			SKU:              item.SKU,
-		}
-	}
-
-	// Determine if this is a guest order
-	isGuestOrder := c.UserID == 0
-
-	// Create the order
-	order := &Order{
-		UserID:            c.UserID, // This will be 0 for guest orders
-		Items:             items,
-		Currency:          c.Currency,
-		TotalAmount:       c.TotalAmount,
-		TotalWeight:       c.TotalWeight,
-		ShippingCost:      c.ShippingCost,
-		DiscountAmount:    c.DiscountAmount,
-		FinalAmount:       c.FinalAmount,
-		Status:            OrderStatusPending,
-		PaymentStatus:     PaymentStatusPending, // Initialize payment status
-		ShippingAddr:      c.ShippingAddr,
-		BillingAddr:       c.BillingAddr,
-		CustomerDetails:   &c.CustomerDetails,
-		ShippingMethodID:  c.ShippingMethodID,
-		ShippingOption:    c.ShippingOption,
-		PaymentProvider:   c.PaymentProvider,
-		IsGuestOrder:      isGuestOrder,
-		PaymentMethod:     "wallet", // Default payment method
-		AppliedDiscount:   c.AppliedDiscount,
-		CheckoutSessionID: c.SessionID,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	// Generate a friendly order number (will be replaced with actual ID after creation)
-	order.OrderNumber = generateOrderNumber()
-
-	return order
-}
-
 // convertCheckoutItemsToOrderItems is a helper function to convert checkout items to order items
 func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem {
 	orderItems := make([]OrderItem, len(checkoutItems))
@@ -516,7 +489,146 @@ func convertCheckoutItemsToOrderItems(checkoutItems []CheckoutItem) []OrderItem 
 	return orderItems
 }
 
-// generateOrderNumber generates a temporary order number
-func generateOrderNumber() string {
-	return "ORD-" + time.Now().Format("20060102") + "-TEMP"
+// GetAppliedDiscount retrieves the applied discount from JSON
+func (c *Checkout) GetAppliedDiscount() *AppliedDiscount {
+	data := c.AppliedDiscount.Data()
+	// Check if it's an empty/default value
+	if data.DiscountID == 0 && data.DiscountCode == "" {
+		return nil
+	}
+	return &data
+}
+
+func (c *Checkout) GetShippingOption() *ShippingOption {
+	data := c.ShippingOption.Data()
+	// Check if it's an empty/default value
+	if data.ShippingRateID == 0 && data.ShippingMethodID == 0 {
+		return nil
+	}
+	return &data
+}
+
+func (c *Checkout) GetShippingAddress() *Address {
+	data := c.ShippingAddress.Data()
+	return &data
+}
+
+func (c *Checkout) GetBillingAddress() *Address {
+	data := c.BillingAddress.Data()
+	return &data
+}
+
+func (c *Checkout) ToCheckoutDTO() *dto.CheckoutDTO {
+	var userID uint
+	if c.UserID != nil {
+		userID = *c.UserID
+	}
+
+	var shippingMethodID uint
+	var shippingOption *dto.ShippingOptionDTO
+	if storedOption := c.GetShippingOption(); storedOption != nil {
+		shippingMethodID = storedOption.ShippingMethodID
+		shippingOption = &dto.ShippingOptionDTO{
+			ShippingRateID:        storedOption.ShippingRateID,
+			ShippingMethodID:      storedOption.ShippingMethodID,
+			Name:                  storedOption.Name,
+			Description:           storedOption.Description,
+			EstimatedDeliveryDays: storedOption.EstimatedDeliveryDays,
+			Cost:                  money.FromCents(storedOption.Cost),
+			FreeShipping:          storedOption.FreeShipping,
+		}
+	}
+
+	shippingAddr := c.GetShippingAddress()
+	billingAddr := c.GetBillingAddress()
+
+	// Convert addresses - use empty DTO if address is empty
+	var shippingAddressDTO dto.AddressDTO
+	if shippingAddr.Street1 != "" || shippingAddr.City != "" || shippingAddr.Country != "" {
+		shippingAddressDTO = *shippingAddr.ToAddressDTO()
+	}
+
+	var billingAddressDTO dto.AddressDTO
+	if billingAddr.Street1 != "" || billingAddr.City != "" || billingAddr.Country != "" {
+		billingAddressDTO = *billingAddr.ToAddressDTO()
+	}
+
+	// Convert customer details - use empty DTO if customer details is empty
+	var customerDetailsDTO dto.CustomerDetailsDTO
+	if c.CustomerDetails.Email != "" || c.CustomerDetails.FullName != "" {
+		customerDetailsDTO = *c.CustomerDetails.ToCustomerDetailsDTO()
+	}
+
+	// Convert items
+	var itemDTOs []dto.CheckoutItemDTO
+	for _, item := range c.Items {
+		itemDTOs = append(itemDTOs, item.ToCheckoutItemDTO())
+	}
+
+	return &dto.CheckoutDTO{
+		ID:               c.ID,
+		SessionID:        c.SessionID,
+		UserID:           userID,
+		Status:           string(c.Status),
+		Items:            itemDTOs,
+		ShippingAddress:  shippingAddressDTO,
+		BillingAddress:   billingAddressDTO,
+		ShippingMethodID: shippingMethodID,
+		ShippingOption:   shippingOption,
+		CustomerDetails:  customerDetailsDTO,
+		PaymentProvider:  c.PaymentProvider,
+		TotalAmount:      money.FromCents(c.TotalAmount),
+		ShippingCost:     money.FromCents(c.ShippingCost),
+		TotalWeight:      c.TotalWeight,
+		Currency:         c.Currency,
+		DiscountCode:     c.DiscountCode,
+		DiscountAmount:   money.FromCents(c.DiscountAmount),
+		FinalAmount:      money.FromCents(c.FinalAmount),
+		LastActivityAt:   c.LastActivityAt,
+		ExpiresAt:        c.ExpiresAt,
+	}
+}
+
+// ToAppliedDiscountDTO converts AppliedDiscount to DTO
+func (a *AppliedDiscount) ToAppliedDiscountDTO() *dto.AppliedDiscountDTO {
+	if a == nil {
+		return nil
+	}
+
+	var discountType, discountMethod string
+	var discountValue float64
+
+	if a.Discount != nil {
+		discountType = string(a.Discount.Type)
+		discountMethod = string(a.Discount.Method)
+		discountValue = a.Discount.Value
+	}
+
+	return &dto.AppliedDiscountDTO{
+		ID:     a.DiscountID,
+		Code:   a.DiscountCode,
+		Type:   discountType,
+		Method: discountMethod,
+		Value:  discountValue,
+		Amount: money.FromCents(a.DiscountAmount),
+	}
+}
+
+// ToCheckoutItemDTO converts CheckoutItem to DTO
+func (c *CheckoutItem) ToCheckoutItemDTO() dto.CheckoutItemDTO {
+	return dto.CheckoutItemDTO{
+		ID:          c.ID,
+		ProductID:   c.ProductID,
+		VariantID:   c.ProductVariantID,
+		ProductName: c.ProductName,
+		VariantName: c.VariantName,
+		ImageURL:    c.ImageURL,
+		SKU:         c.SKU,
+		Price:       money.FromCents(c.Price),
+		Quantity:    c.Quantity,
+		Weight:      c.Weight,
+		Subtotal:    money.FromCents(c.Price * int64(c.Quantity)),
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+	}
 }

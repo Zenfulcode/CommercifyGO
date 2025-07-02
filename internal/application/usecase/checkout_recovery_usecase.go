@@ -115,6 +115,12 @@ func (uc *CheckoutRecoveryUseCase) SendRecoveryEmail(checkout *entity.Checkout) 
 	// Create unsubscribe URL
 	unsubscribeURL := fmt.Sprintf("%s/unsubscribe?email=%s", uc.storeURL, checkout.CustomerDetails.Email)
 
+	// Create AppliedDiscount for email template if discount is applied
+	var appliedDiscount *entity.AppliedDiscount
+	if storedDiscount := checkout.GetAppliedDiscount(); storedDiscount != nil {
+		appliedDiscount = storedDiscount
+	}
+
 	// Create recovery data
 	data := CheckoutRecoveryData{
 		StoreName:           uc.storeName,
@@ -126,7 +132,7 @@ func (uc *CheckoutRecoveryUseCase) SendRecoveryEmail(checkout *entity.Checkout) 
 		FormattedDiscount:   formattedDiscount,
 		FormattedFinalTotal: formattedFinalTotal,
 		CheckoutURL:         checkoutURL,
-		AppliedDiscount:     checkout.AppliedDiscount,
+		AppliedDiscount:     appliedDiscount,
 		DiscountOffer:       createDiscountOffer(),
 		CurrentYear:         time.Now().Year(),
 		UnsubscribeURL:      unsubscribeURL,

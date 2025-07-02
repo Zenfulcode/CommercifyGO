@@ -99,14 +99,12 @@ type CreateShippingZoneInput struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Countries   []string `json:"countries"`
-	States      []string `json:"states"`
-	ZipCodes    []string `json:"zip_codes"`
 }
 
 // CreateShippingZone creates a new shipping zone
 func (uc *ShippingUseCase) CreateShippingZone(input CreateShippingZoneInput) (*entity.ShippingZone, error) {
 	// Create shipping zone
-	zone, err := entity.NewShippingZone(input.Name, input.Description)
+	zone, err := entity.NewShippingZone(input.Name, input.Description, input.Countries)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +150,6 @@ func (uc *ShippingUseCase) UpdateShippingZone(input UpdateShippingZoneInput) (*e
 	zone.Name = input.Name
 	zone.Description = input.Description
 	zone.Countries = input.Countries
-	zone.States = input.States
-	zone.ZipCodes = input.ZipCodes
 	zone.Active = input.Active
 	zone.UpdatedAt = time.Now()
 
@@ -203,8 +199,6 @@ func (uc *ShippingUseCase) CreateShippingRate(input CreateShippingRateInput) (*e
 		MinOrderValue:         minOrderValueCents,
 		FreeShippingThreshold: freeShippingThresholdCents,
 		Active:                input.Active,
-		CreatedAt:             time.Now(),
-		UpdatedAt:             time.Now(),
 	}
 
 	// Save to repository
@@ -331,10 +325,16 @@ type ShippingOptions struct {
 	Options []*entity.ShippingOption `json:"options"`
 }
 
+type CalculateShippingOptionsInput struct {
+	Address     entity.Address `json:"address"`
+	OrderValue  int64          `json:"order_value"`  // in cents
+	OrderWeight float64        `json:"order_weight"` // in kg
+}
+
 // CalculateShippingOptions calculates available shipping options for an order
-func (uc *ShippingUseCase) CalculateShippingOptions(address entity.Address, orderValue int64, orderWeight float64) (*ShippingOptions, error) {
+func (uc *ShippingUseCase) CalculateShippingOptions(input CalculateShippingOptionsInput) (*ShippingOptions, error) {
 	// Get available shipping rates for address and order value
-	rates, err := uc.shippingRateRepo.GetAvailableRatesForAddress(address, orderValue)
+	rates, err := uc.shippingRateRepo.GetAvailableRatesForAddress(input.Address, input.OrderValue)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (uc *ShippingUseCase) CalculateShippingOptions(address entity.Address, orde
 	}
 
 	for _, rate := range rates {
-		cost, err := rate.CalculateShippingCost(orderValue, orderWeight)
+		cost, err := rate.CalculateShippingCost(input.OrderValue, input.OrderWeight)
 		if err != nil {
 			continue // Skip this rate if there's an error calculating cost
 		}

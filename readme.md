@@ -16,7 +16,7 @@ A robust, scalable e-commerce backend API built with Go, following clean archite
 ## Technology Stack
 
 - **Language**: Go 1.20+
-- **Database**: PostgreSQL
+- **Database**: SQLite (development) / PostgreSQL (production)
 - **Authentication**: JWT
 - **Payment Processing**: Stripe, MobilePay
 - **Email**: SMTP integration
@@ -46,7 +46,7 @@ The project follows clean architecture principles with clear separation of conce
 ### Prerequisites
 
 - Go 1.20+
-- PostgreSQL 15 (Only tested on v15)
+- SQLite (for local development) or PostgreSQL 15+ (for production)
 - Docker (optional)
 
 ### Docker Setup
@@ -101,28 +101,101 @@ cp .env.example .env
 
 ### Database Setup
 
-1. Create a PostgreSQL user (optional):
+The application supports both SQLite for local development and PostgreSQL for production.
+
+#### Option 1: SQLite (Recommended for Local Development)
+
+SQLite is the easiest way to get started with local development:
+
+1. Copy the local development environment file:
+
+```bash
+cp .env.local .env
+```
+
+2. Run the application:
+
+```bash
+make dev-sqlite
+# or
+go run cmd/api/main.go
+```
+
+The SQLite database file (`commercify.db`) will be created automatically in the project root.
+
+#### Option 2: PostgreSQL (Production Setup)
+
+For production or if you prefer PostgreSQL for development:
+
+1. **Using Docker (Recommended):**
+
+```bash
+# Start PostgreSQL with Docker
+make db-start
+
+# Setup database with migrations and seed data
+make dev-setup
+```
+
+2. **Manual PostgreSQL Setup:**
+
+Create a PostgreSQL user (optional):
 
 ```bash
 createuser -s newuser
 ```
 
-2. Create a PostgreSQL database:
+Create a PostgreSQL database:
 
 ```bash
 createdb -U newuser commercify
 ```
 
-3. Run migrations:
+Copy and configure environment file:
+
+```bash
+cp .env.example .env
+# Edit .env and set:
+# DB_DRIVER=postgres
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_USER=your_user
+# DB_PASSWORD=your_password
+# DB_NAME=commercify
+```
+
+Run migrations:
 
 ```bash
 go run cmd/migrate/main.go -up
 ```
 
-4. Seed the database with sample data (optional):
+Seed the database with sample data (optional):
 
 ```bash
 go run cmd/seed/main.go -all
+```
+
+#### Database Commands
+
+The project includes helpful Make commands for database management:
+
+```bash
+# SQLite Development
+make dev-sqlite              # Start with SQLite
+make dev-setup-sqlite         # Setup SQLite environment
+make dev-reset-sqlite         # Reset SQLite database
+
+# PostgreSQL Development
+make dev-postgres             # Start with PostgreSQL
+make dev-setup               # Setup PostgreSQL environment
+make dev-reset               # Reset PostgreSQL environment
+
+# Database Operations (PostgreSQL)
+make db-start                # Start PostgreSQL container
+make db-stop                 # Stop PostgreSQL container
+make db-logs                 # View database logs
+make db-clean                # Clean database and volumes
 ```
 
 ### Running the Application

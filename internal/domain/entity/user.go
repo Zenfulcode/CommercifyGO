@@ -2,21 +2,20 @@ package entity
 
 import (
 	"errors"
-	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // User represents a user in the system
 type User struct {
-	ID        uint      `json:"id"`
-	Email     string    `json:"email"`
-	Password  string    `json:"-"` // Never expose password in JSON
-	FirstName string    `json:"first_name"`
-	LastName  string    `json:"last_name"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	gorm.Model
+	Email     string `gorm:"uniqueIndex;not null;size:255"`
+	Password  string `gorm:"not null;size:255"`
+	FirstName string `gorm:"not null;size:100"`
+	LastName  string `gorm:"not null;size:100"`
+	Role      string `gorm:"not null;size:50;default:'user'"`
 }
 
 // UserRole defines the available roles for users
@@ -42,20 +41,38 @@ func NewUser(email, password, firstName, lastName string, role UserRole) (*User,
 		return nil, err
 	}
 
-	now := time.Now()
 	return &User{
 		Email:     email,
 		Password:  string(hashedPassword),
 		FirstName: firstName,
 		LastName:  lastName,
 		Role:      string(role),
-		CreatedAt: now,
-		UpdatedAt: now,
 	}, nil
+}
+
+func (u *User) Update(firstName string, lastName string) error {
+	if firstName == "" {
+		return errors.New("first name cannot be empty")
+	}
+	if lastName == "" {
+		return errors.New("last name cannot be empty")
+	}
+
+	u.FirstName = firstName
+	u.LastName = lastName
+
+	return nil
 }
 
 // ComparePassword checks if the provided password matches the stored hash
 func (u *User) ComparePassword(password string) error {
+	if password == "" {
+		return errors.New("password cannot be empty")
+	}
+	if u.Password == "" {
+		return errors.New("user password is not set")
+	}
+
 	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 }
 
@@ -71,7 +88,6 @@ func (u *User) UpdatePassword(password string) error {
 	}
 
 	u.Password = string(hashedPassword)
-	u.UpdatedAt = time.Now()
 	return nil
 }
 
@@ -83,4 +99,14 @@ func (u *User) FullName() string {
 // IsAdmin checks if the user has admin role
 func (u *User) IsAdmin() bool {
 	return u.Role == string(RoleAdmin)
+}
+
+func (u *User) ToUserDTO() *dto.UserDTO {
+	return &dto.UserDTO{
+		ID:        u.ID,
+		Email:     u.Email,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		Role:      u.Role,
+	}
 }

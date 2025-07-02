@@ -6,8 +6,12 @@ import (
 
 // PaymentTransactionRepository defines the interface for payment transaction persistence
 type PaymentTransactionRepository interface {
-	// Create creates a new payment transaction
+	// Create creates a new payment transaction (always creates a new record)
 	Create(transaction *entity.PaymentTransaction) error
+
+	// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
+	// of the same type already exists for the order (upsert behavior)
+	CreateOrUpdate(transaction *entity.PaymentTransaction) error
 
 	// GetByID retrieves a payment transaction by ID
 	GetByID(id uint) (*entity.PaymentTransaction, error)
@@ -32,4 +36,16 @@ type PaymentTransactionRepository interface {
 
 	// SumAmountByOrderIDAndType sums the amount of transactions of a specific type for an order
 	SumAmountByOrderIDAndType(orderID uint, transactionType entity.TransactionType) (int64, error)
+
+	// SumAuthorizedAmountByOrderID sums all authorized amounts for an order
+	SumAuthorizedAmountByOrderID(orderID uint) (int64, error)
+
+	// SumCapturedAmountByOrderID sums all captured amounts for an order
+	SumCapturedAmountByOrderID(orderID uint) (int64, error)
+
+	// SumRefundedAmountByOrderID sums all refunded amounts for an order
+	SumRefundedAmountByOrderID(orderID uint) (int64, error)
+
+	// GetByIdempotencyKey retrieves a payment transaction by idempotency key from metadata
+	GetByIdempotencyKey(idempotencyKey string) (*entity.PaymentTransaction, error)
 }

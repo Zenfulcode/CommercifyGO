@@ -3,82 +3,72 @@ package entity
 import (
 	"errors"
 	"fmt"
-	"time"
+	"slices"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // Product represents a product in the system
-// Note: All products must have at least one variant. ProductNumber is deprecated in favor of variant SKUs.
+// All products must have at least one variant as per the database schema
 type Product struct {
-	ID            uint              `json:"id"`
-	ProductNumber string            `json:"product_number,omitempty"` // Deprecated: Use variant SKUs instead
-	Name          string            `json:"name"`
-	Description   string            `json:"description"`
-	Price         int64             `json:"price"` // Stored as cents (default variant price)
-	CurrencyCode  string            `json:"currency_code,omitempty"`
-	Stock         int               `json:"stock"`  // Aggregate stock from variants
-	Weight        float64           `json:"weight"` // Weight in kg
-	CategoryID    uint              `json:"category_id"`
-	Images        []string          `json:"images"`
-	HasVariants   bool              `json:"has_variants"` // Always true, kept for backward compatibility
-	Variants      []*ProductVariant `json:"variants,omitempty"`
-	Prices        []ProductPrice    `json:"prices,omitempty"` // Prices in different currencies
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-	Active        bool              `json:"active"`
+	gorm.Model
+	Name        string                      `gorm:"not null;size:255"`
+	Description string                      `gorm:"type:text"`
+	Currency    string                      `gorm:"not null;size:3"`
+	CategoryID  uint                        `gorm:"not null;index"`
+	Category    Category                    `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Images      datatypes.JSONSlice[string] `gorm:"type:text[];default:'[]'"`
+	Active      bool                        `gorm:"default:true"`
+	Variants    []*ProductVariant           `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
 
-// NewProduct creates a new product with the given details (price in cents)
-// Note: This creates a product structure, but at least one variant must be added before saving
-func NewProduct(name, description string, currencyCode string, categoryID uint, images []string) (*Product, error) {
+// NewProduct creates a new product with the given details
+// Note: At least one variant must be added before the product can be considered complete
+func NewProduct(name, description, currency string, categoryID uint, images []string, variants []*ProductVariant, isActive bool) (*Product, error) {
 	if name == "" {
 		return nil, errors.New("product name cannot be empty")
 	}
 
-	now := time.Now()
+	if categoryID == 0 {
+		return nil, errors.New("category ID cannot be zero")
+	}
 
-	// Generate a temporary product number (deprecated, variants will have SKUs)
-	productNumber := "PROD-TEMP"
+	if len(variants) == 0 {
+		return nil, errors.New("at least one variant must be provided")
+	}
+
+	// Copy variants to ensure product has its own slice
+	productVariants := make([]*ProductVariant, len(variants))
+	copy(productVariants, variants)
 
 	return &Product{
-		Name:          name,
-		ProductNumber: productNumber,
-		Description:   description,
-		Price:         0, // Already in cents
-		CurrencyCode:  currencyCode,
-		Stock:         0,
-		Weight:        0.0,
-		CategoryID:    categoryID,
-		Images:        images,
-		HasVariants:   false,
-		Active:        false,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		Name:        name,
+		Description: description,
+		Currency:    currency,
+		CategoryID:  categoryID,
+		Images:      images,
+		Variants:    productVariants,
+		Active:      isActive,
 	}, nil
 }
 
-func (p *Product) IsComplete() bool {
-	// A product is complete if it has a name, description, and at least one variant
-	if p.Name == "" || p.Description == "" || len(p.Variants) == 0 {
-		return false
+// IsAvailable checks if the product is available in the requested quantity
+// For products with variants, this checks if any variant has sufficient stock
+func (p *Product) IsAvailable(quantity int) bool {
+	if !p.HasVariants() {
+		return false // Product must have variants
 	}
 
-	// Ensure at least one variant has a SKU and price
+	// Check if any variant has sufficient stock
 	for _, variant := range p.Variants {
-		if variant.SKU == "" || variant.Price <= 0 {
-			return false
+		if variant.IsAvailable(quantity) {
+			return true
 		}
 	}
-
-	return true
-}
-
-// IsAvailable checks if the product is available in the requested quantity
-func (p *Product) IsAvailable(quantity int) bool {
-	if p.HasVariants {
-		// For products with variants, availability depends on variants
-		return true
-	}
-	return p.Stock >= quantity
+	return false
 }
 
 // AddVariant adds a variant to the product
@@ -87,29 +77,10 @@ func (p *Product) AddVariant(variant *ProductVariant) error {
 		return errors.New("variant cannot be nil")
 	}
 
-	// Ensure variant belongs to this product
-	if variant.ProductID != p.ID {
-		return errors.New("variant does not belong to this product")
-	}
-
-	// If this is the first variant and it's the default, set product price to match
-	if len(p.Variants) == 0 && variant.IsDefault {
-		p.Price = variant.Price
-		p.Stock = variant.Stock
-	}
-
-	variant.CurrencyCode = p.CurrencyCode
+	variant.ProductID = p.ID
 
 	// Add variant to product
 	p.Variants = append(p.Variants, variant)
-
-	// Only set has_variants=true if there are now multiple variants
-	p.HasVariants = len(p.Variants) > 1
-
-	p.CalculateStock()
-
-	p.UpdatedAt = time.Now()
-
 	return nil
 }
 
@@ -123,8 +94,6 @@ func (p *Product) RemoveVariant(variantID uint) error {
 		if variant.ID == variantID {
 			// Remove the variant from the slice
 			p.Variants = append(p.Variants[:i], p.Variants[i+1:]...)
-			p.CalculateStock()
-			p.UpdatedAt = time.Now()
 			return nil
 		}
 	}
@@ -178,34 +147,18 @@ func (p *Product) GetVariantBySKU(sku string) *ProductVariant {
 	return nil
 }
 
-// SetProductNumber sets the product number
-func (p *Product) SetProductNumber(id uint) {
-	// Format: PROD-000001
-	p.ProductNumber = fmt.Sprintf("PROD-%06d", id)
-}
-
-// GetTotalWeight calculates the total weight for a quantity of this product
+// GetTotalWeight calculates the total weight for a quantity of the default variant
 func (p *Product) GetTotalWeight(quantity int) float64 {
 	if quantity <= 0 {
 		return 0
 	}
-	return p.Weight * float64(quantity)
-}
 
-// GetPriceInCurrency returns the price for a specific currency
-func (p *Product) GetPriceInCurrency(currencyCode string) (int64, bool) {
-	variant := p.GetDefaultVariant()
-	if variant != nil {
-		return variant.GetPriceInCurrency(currencyCode)
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant == nil {
+		return 0
 	}
 
-	for _, productPrice := range p.Prices {
-		if productPrice.CurrencyCode == currencyCode {
-			return productPrice.Price, true
-		}
-	}
-
-	return p.Price, false
+	return defaultVariant.Weight * float64(quantity)
 }
 
 func (p *Product) GetStockForVariant(variantID uint) (int, error) {
@@ -222,36 +175,115 @@ func (p *Product) GetStockForVariant(variantID uint) (int, error) {
 	return 0, fmt.Errorf("variant with ID %d not found", variantID)
 }
 
-func (p *Product) CalculateStock() {
+// GetTotalStock calculates the total stock across all variants
+func (p *Product) GetTotalStock() int {
 	totalStock := 0
 	for _, variant := range p.Variants {
 		totalStock += variant.Stock
 	}
-	p.Stock = totalStock
+	return totalStock
 }
 
-// Category represents a product category
-type Category struct {
-	ID          uint      `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	ParentID    *uint     `json:"parent_id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+func (p *Product) HasVariants() bool {
+	return len(p.Variants) > 0
 }
 
-// NewCategory creates a new category
-func NewCategory(name, description string, parentID *uint) (*Category, error) {
-	if name == "" {
-		return nil, errors.New("category name cannot be empty")
+func (p *Product) Update(name *string, description *string, images *[]string, active *bool) bool {
+	updated := false
+	if name != nil && *name != "" && p.Name != *name {
+		p.Name = *name
+		updated = true
+	}
+	if description != nil && *description != "" && p.Description != *description {
+		p.Description = *description
+		updated = true
+	}
+	if images != nil && len(*images) > 0 && !slices.Equal(p.Images, *images) {
+		p.Images = *images
+		updated = true
+	}
+	if active != nil && p.Active != *active {
+		p.Active = *active
+		updated = true
 	}
 
-	now := time.Now()
-	return &Category{
-		Name:        name,
-		Description: description,
-		ParentID:    parentID,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}, nil
+	return updated
+}
+
+func (p *Product) GetProdNumber() string {
+	if p == nil || len(p.Variants) == 0 {
+		return ""
+	}
+
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant != nil {
+		return defaultVariant.SKU
+	}
+
+	return ""
+}
+
+func (p *Product) GetPrice() int64 {
+	if p == nil || len(p.Variants) == 0 {
+		return 0
+	}
+
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant != nil {
+		return defaultVariant.Price
+	}
+
+	return 0
+}
+
+func (p *Product) ToProductDTO() *dto.ProductDTO {
+	if p == nil {
+		return nil
+	}
+
+	variantsDTO := make([]dto.VariantDTO, len(p.Variants))
+	for i, v := range p.Variants {
+		variantsDTO[i] = *v.ToVariantDTO()
+	}
+
+	defaultVariant := p.GetDefaultVariant()
+	if defaultVariant == nil {
+
+	}
+
+	return &dto.ProductDTO{
+		ID:          p.ID,
+		Name:        p.Name,
+		SKU:         p.GetProdNumber(),
+		Description: p.Description,
+		Currency:    p.Currency,
+		TotalStock:  p.GetTotalStock(),
+		Price:       money.FromCents(p.GetPrice()),
+		Category:    p.Category.Name,
+		CategoryID:  p.CategoryID,
+		Images:      p.Images,
+		HasVariants: p.HasVariants(),
+		Active:      p.Active,
+		Variants:    variantsDTO,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+	}
+}
+
+func (p *Product) ToProductSummaryDTO() *dto.ProductDTO {
+	return &dto.ProductDTO{
+		ID:          p.ID,
+		Name:        p.Name,
+		SKU:         p.GetProdNumber(),
+		Description: p.Description,
+		Currency:    p.Currency,
+		TotalStock:  p.GetTotalStock(),
+		Price:       money.FromCents(p.GetPrice()),
+		Category:    p.Category.Name,
+		Images:      p.Images,
+		HasVariants: p.HasVariants(),
+		Active:      p.Active,
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+	}
 }

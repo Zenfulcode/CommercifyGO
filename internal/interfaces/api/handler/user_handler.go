@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/zenfulcode/commercify/internal/application/usecase"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/auth"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 )
 
@@ -30,9 +30,9 @@ func NewUserHandler(userUseCase *usecase.UserUseCase, jwtService *auth.JWTServic
 
 // Register handles user registration
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var request dto.CreateUserRequest
+	var request contracts.CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Invalid request body",
 		}
@@ -43,17 +43,12 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert DTO to usecase input
-	input := usecase.RegisterInput{
-		Email:     request.Email,
-		Password:  request.Password,
-		FirstName: request.FirstName,
-		LastName:  request.LastName,
-	}
+	input := request.ToUseCaseInput()
 
 	user, err := h.userUseCase.Register(input)
 	if err != nil {
 		h.logger.Error("Failed to register user: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   err.Error(),
 		}
@@ -64,10 +59,10 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate JWT token
-	token, err := h.jwtService.GenerateToken(user)
+	token, expirationTime, err := h.jwtService.GenerateToken(user)
 	if err != nil {
 		h.logger.Error("Failed to generate token: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Failed to generate token",
 		}
@@ -77,40 +72,19 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert domain user to DTO
-	userDTO := dto.UserDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
 	// Create login response
-	loginResponse := dto.UserLoginResponse{
-		User:         userDTO,
-		AccessToken:  token,
-		RefreshToken: "",   // TODO: Implement refresh token
-		ExpiresIn:    3600, // TODO: Make this configurable
-	}
-
-	response := dto.ResponseDTO[dto.UserLoginResponse]{
-		Success: true,
-		Data:    loginResponse,
-	}
+	loginResponse := contracts.CreateUserLoginResponse(user.ToUserDTO(), token, "", expirationTime)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(loginResponse)
 }
 
 // Login handles user login
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var request dto.UserLoginRequest
+	var request contracts.UserLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Invalid request body",
 		}
@@ -129,7 +103,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userUseCase.Login(input)
 	if err != nil {
 		h.logger.Error("Login failed: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Invalid email or password",
 		}
@@ -140,10 +114,10 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate JWT token
-	token, err := h.jwtService.GenerateToken(user)
+	token, expiresIn, err := h.jwtService.GenerateToken(user)
 	if err != nil {
 		h.logger.Error("Failed to generate token: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Failed to generate token",
 		}
@@ -154,28 +128,12 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert domain user to DTO
-	userDTO := dto.UserDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
-	// Create login response
-	loginResponse := dto.UserLoginResponse{
-		User:         userDTO,
-		AccessToken:  token,
-		RefreshToken: "",   // TODO: Implement refresh token
-		ExpiresIn:    3600, // TODO: Make this configurable
-	}
-
-	response := dto.ResponseDTO[dto.UserLoginResponse]{
-		Success: true,
-		Data:    loginResponse,
-	}
+	response := contracts.CreateUserLoginResponse(
+		user.ToUserDTO(),
+		token,
+		"", // Refresh token not implemented
+		expiresIn,
+	)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -187,7 +145,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok || userID == 0 {
 		h.logger.Error("Unauthorized access attempt in CreateProduct")
-		response := dto.ErrorResponse("Unauthorized")
+		response := contracts.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -197,25 +155,14 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userUseCase.GetUserByID(userID)
 	if err != nil {
 		h.logger.Error("Failed to get user profile: %v", err)
-		response := dto.ErrorResponse("Failed to get user profile")
+		response := contracts.ErrorResponse("Failed to get user profile")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// Convert domain user to DTO
-	userDTO := dto.UserDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
-	response := dto.SuccessResponse(userDTO)
+	response := contracts.SuccessResponse(user.ToUserDTO())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -227,7 +174,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Unauthorized",
 		}
@@ -237,9 +184,9 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request dto.UpdateUserRequest
+	var request contracts.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Invalid request body",
 		}
@@ -258,7 +205,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userUseCase.UpdateUser(userID, input)
 	if err != nil {
 		h.logger.Error("Failed to update user profile: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Failed to update user profile",
 		}
@@ -268,21 +215,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert domain user to DTO
-	userDTO := dto.UserDTO{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
-	response := dto.ResponseDTO[dto.UserDTO]{
-		Success: true,
-		Data:    userDTO,
-	}
+	response := contracts.SuccessResponse(user.ToUserDTO())
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -301,7 +234,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.userUseCase.ListUsers(offset, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to list users: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Failed to list users",
 		}
@@ -311,34 +244,10 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert domain users to DTOs
-	userDTOs := make([]dto.UserDTO, len(users))
-	for i, user := range users {
-		userDTOs[i] = dto.UserDTO{
-			ID:        user.ID,
-			Email:     user.Email,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Role:      user.Role,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-		}
-	}
-
 	// TODO: Get total count from repository
 	total := len(users)
 
-	response := dto.UserListResponse{
-		ListResponseDTO: dto.ListResponseDTO[dto.UserDTO]{
-			Success: true,
-			Data:    userDTOs,
-			Pagination: dto.PaginationDTO{
-				Page:     page,
-				PageSize: pageSize,
-				Total:    total,
-			},
-		},
-	}
+	response := contracts.CreateUserListResponse(users, total, page, pageSize)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -349,7 +258,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Unauthorized",
 		}
@@ -359,9 +268,9 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request dto.ChangePasswordRequest
+	var request contracts.ChangePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Invalid request body",
 		}
@@ -380,7 +289,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	err := h.userUseCase.ChangePassword(userID, input)
 	if err != nil {
 		h.logger.Error("Failed to change password: %v", err)
-		response := dto.ResponseDTO[any]{
+		response := contracts.ResponseDTO[any]{
 			Success: false,
 			Error:   "Failed to change password",
 		}
@@ -390,7 +299,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.ResponseDTO[any]{
+	response := contracts.ResponseDTO[any]{
 		Success: true,
 		Message: "Password changed successfully",
 	}

@@ -15,7 +15,6 @@ type Config struct {
 	Payment         PaymentConfig
 	Email           EmailConfig
 	Stripe          StripeConfig
-	PayPal          PayPalConfig
 	MobilePay       MobilePayConfig
 	CORS            CORSConfig
 	DefaultCurrency string // Default currency for the store
@@ -30,12 +29,14 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database-specific configuration
 type DatabaseConfig struct {
+	Driver   string // Database driver: "sqlite" or "postgres"
 	Host     string
 	Port     string
 	User     string
 	Password string
 	DBName   string
 	SSLMode  string
+	Debug    string // Silent, Info, Warn, Error
 }
 
 // AuthConfig holds authentication-specific configuration
@@ -71,15 +72,6 @@ type StripeConfig struct {
 	Enabled            bool
 }
 
-// PayPalConfig holds PayPal-specific configuration
-type PayPalConfig struct {
-	ClientID     string
-	ClientSecret string
-	ReturnURL    string
-	Sandbox      bool
-	Enabled      bool
-}
-
 // MobilePayConfig holds MobilePay-specific configuration
 type MobilePayConfig struct {
 	MerchantSerialNumber string
@@ -89,7 +81,6 @@ type MobilePayConfig struct {
 	ReturnURL            string
 	WebhookURL           string
 	PaymentDescription   string
-	Market               string // NOK, DKK, EUR
 	Enabled              bool
 	IsTestMode           bool
 }
@@ -132,16 +123,6 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid STRIPE_ENABLED: %w", err)
 	}
 
-	paypalEnabled, err := strconv.ParseBool(getEnv("PAYPAL_ENABLED", "false"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid PAYPAL_ENABLED: %w", err)
-	}
-
-	paypalSandbox, err := strconv.ParseBool(getEnv("PAYPAL_SANDBOX", "true"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid PAYPAL_SANDBOX: %w", err)
-	}
-
 	mobilePayEnabled, err := strconv.ParseBool(getEnv("MOBILEPAY_ENABLED", "false"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid MOBILEPAY_ENABLED: %w", err)
@@ -157,9 +138,6 @@ func LoadConfig() (*Config, error) {
 	if stripeEnabled {
 		enabledProviders = append(enabledProviders, "stripe")
 	}
-	if paypalEnabled {
-		enabledProviders = append(enabledProviders, "paypal")
-	}
 	if mobilePayEnabled {
 		enabledProviders = append(enabledProviders, "mobilepay")
 	}
@@ -171,12 +149,14 @@ func LoadConfig() (*Config, error) {
 			WriteTimeout: writeTimeout,
 		},
 		Database: DatabaseConfig{
+			Driver:   getEnv("DB_DRIVER", "sqlite"),
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
-			DBName:   getEnv("DB_NAME", "commercify"),
+			DBName:   getEnv("DB_NAME", "commercify.db"),
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			Debug:    getEnv("DB_DEBUG", "false"),
 		},
 		Auth: AuthConfig{
 			JWTSecret:     getEnv("AUTH_JWT_SECRET", "your-secret-key"),
@@ -203,13 +183,6 @@ func LoadConfig() (*Config, error) {
 			ReturnURL:          getEnv("RETURN_URL", ""),
 			Enabled:            stripeEnabled,
 		},
-		PayPal: PayPalConfig{
-			ClientID:     getEnv("PAYPAL_CLIENT_ID", ""),
-			ClientSecret: getEnv("PAYPAL_CLIENT_SECRET", ""),
-			ReturnURL:    getEnv("RETURN_URL", ""),
-			Sandbox:      paypalSandbox,
-			Enabled:      paypalEnabled,
-		},
 		MobilePay: MobilePayConfig{
 			MerchantSerialNumber: getEnv("MOBILEPAY_MERCHANT_SERIAL_NUMBER", ""),
 			SubscriptionKey:      getEnv("MOBILEPAY_SUBSCRIPTION_KEY", ""),
@@ -218,7 +191,6 @@ func LoadConfig() (*Config, error) {
 			ReturnURL:            getEnv("RETURN_URL", ""),
 			WebhookURL:           getEnv("MOBILEPAY_WEBHOOK_URL", ""),
 			PaymentDescription:   getEnv("MOBILEPAY_PAYMENT_DESCRIPTION", "Commercify Store Purchase"),
-			Market:               getEnv("MOBILEPAY_MARKET", "DKK"), // Default to DKK
 			Enabled:              mobilePayEnabled,
 			IsTestMode:           mobilePayTestMode,
 		},

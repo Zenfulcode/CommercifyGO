@@ -89,9 +89,7 @@ func (uc *UserUseCase) UpdateUser(id uint, input UpdateUserInput) (*entity.User,
 		return nil, err
 	}
 
-	user.FirstName = input.FirstName
-	user.LastName = input.LastName
-	user.UpdatedAt = entity.TimeNow()
+	user.Update(input.FirstName, input.LastName)
 
 	if err := uc.userRepo.Update(user); err != nil {
 		return nil, err

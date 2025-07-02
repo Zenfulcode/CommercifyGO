@@ -9,6 +9,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"gorm.io/gorm"
 )
 
 // EmailTestHandler handles email testing endpoints
@@ -33,19 +34,20 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Create a mock user (but we'll send emails to admin address)
 	mockUser := &entity.User{
-		ID:        1,
 		Email:     "customer@example.com", // This is just for the mock data
 		FirstName: "John",
 		LastName:  "Doe",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
 	// Create a mock order
 	mockOrder := &entity.Order{
-		ID:                12345,
+		Model: gorm.Model{
+			ID:        12345, // Mock order ID
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
 		OrderNumber:       "ORD-12345",
-		UserID:            mockUser.ID,
+		UserID:            &mockUser.ID,
 		Status:            entity.OrderStatusCompleted,
 		PaymentStatus:     entity.PaymentStatusCaptured,
 		TotalAmount:       9950, // $99.50 in cents (subtotal before shipping/discounts)
@@ -54,20 +56,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		FinalAmount:       8300, // $83.00 final amount (99.50 + 8.50 - 15.00)
 		Currency:          "USD",
 		CheckoutSessionID: "test-checkout-session-12345", // Add checkout session ID for testing
-		ShippingAddr: entity.Address{
-			Street:     "123 Test Street",
-			City:       "Test City",
-			State:      "Test State",
-			PostalCode: "12345",
-			Country:    "US",
-		},
-		BillingAddr: entity.Address{
-			Street:     "123 Test Street",
-			City:       "Test City",
-			State:      "Test State",
-			PostalCode: "12345",
-			Country:    "US",
-		},
 		CustomerDetails: &entity.CustomerDetails{
 			Email:    mockUser.Email,
 			Phone:    "+1234567890",
@@ -76,14 +64,8 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		IsGuestOrder:    false,
 		PaymentProvider: "stripe",
 		PaymentMethod:   "card",
-		AppliedDiscount: &entity.AppliedDiscount{
-			DiscountID:     1,
-			DiscountCode:   "SUMMER25",
-			DiscountAmount: 1500, // $15.00 discount
-		},
 		Items: []entity.OrderItem{
 			{
-				ID:          1,
 				ProductID:   1,
 				Quantity:    2,
 				Price:       2500, // $25.00 in cents
@@ -92,7 +74,6 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 				SKU:         "TEST-001",
 			},
 			{
-				ID:          2,
 				ProductID:   2,
 				Quantity:    1,
 				Price:       4950, // $49.50 in cents
@@ -101,20 +82,46 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 				SKU:         "TEST-002",
 			},
 		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
+
+	// Add test address data to mock order
+	testShippingAddr := entity.Address{
+		Street1:    "123 Test Street",
+		Street2:    "Apt 4B",
+		City:       "Test City",
+		State:      "Test State",
+		PostalCode: "12345",
+		Country:    "Test Country",
+	}
+
+	testBillingAddr := entity.Address{
+		Street1:    "456 Billing Ave",
+		Street2:    "",
+		City:       "Billing City",
+		State:      "Billing State",
+		PostalCode: "67890",
+		Country:    "Billing Country",
+	}
+
+	// Set addresses using JSON helper methods
+	mockOrder.SetShippingAddress(&testShippingAddr)
+	mockOrder.SetBillingAddress(&testBillingAddr)
+
+	// Add test applied discount
+	testDiscount := &entity.AppliedDiscount{
+		DiscountID:     1,
+		DiscountCode:   "TEST15",
+		DiscountAmount: 1500, // $15.00 in cents
+	}
+	mockOrder.SetAppliedDiscount(testDiscount)
 
 	var errors []string
 
 	// Override email addresses to send both emails to admin for testing
 	adminUser := &entity.User{
-		ID:        mockUser.ID,
 		Email:     h.config.AdminEmail, // Send to admin email
 		FirstName: mockUser.FirstName,
 		LastName:  mockUser.LastName,
-		CreatedAt: mockUser.CreatedAt,
-		UpdatedAt: mockUser.UpdatedAt,
 	}
 
 	// Also update the order's customer details to use admin email for testing
@@ -147,7 +154,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	if len(errors) > 0 {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"success": false,
 			"errors":  errors,
 		})
@@ -155,7 +162,7 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
 		"message": "Both order confirmation and notification emails sent successfully",
 		"details": map[string]string{

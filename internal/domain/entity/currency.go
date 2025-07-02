@@ -3,39 +3,20 @@ package entity
 import (
 	"errors"
 	"strings"
-	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"gorm.io/gorm"
 )
 
 // Currency represents a currency in the system
 type Currency struct {
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	Symbol       string    `json:"symbol"`
-	ExchangeRate float64   `json:"exchange_rate"`
-	IsEnabled    bool      `json:"is_enabled"`
-	IsDefault    bool      `json:"is_default"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-// ProductPrice represents a price for a product in a specific currency
-type ProductPrice struct {
-	ID           uint      `json:"id"`
-	ProductID    uint      `json:"product_id"`
-	CurrencyCode string    `json:"currency_code"`
-	Price        int64     `json:"price"` // Price in cents
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-// ProductVariantPrice represents a price for a product variant in a specific currency
-type ProductVariantPrice struct {
-	ID           uint      `json:"id"`
-	VariantID    uint      `json:"variant_id"`
-	CurrencyCode string    `json:"currency_code"`
-	Price        int64     `json:"price"` // Price in cents
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	gorm.Model           // Includes ID, CreatedAt, UpdatedAt, DeletedAt
+	Code         string  `gorm:"primaryKey;size:3"`
+	Name         string  `gorm:"size:100;not null"`
+	Symbol       string  `gorm:"size:10;not null"`
+	ExchangeRate float64 `gorm:"not null;default:1.0"`
+	IsEnabled    bool    `gorm:"not null;default:true"`
+	IsDefault    bool    `gorm:"not null;default:false"`
 }
 
 // NewCurrency creates a new Currency
@@ -57,7 +38,6 @@ func NewCurrency(code, name, symbol string, exchangeRate float64, isEnabled bool
 		return nil, errors.New("exchange rate must be positive")
 	}
 
-	now := time.Now()
 	return &Currency{
 		Code:         strings.ToUpper(code),
 		Name:         name,
@@ -65,8 +45,6 @@ func NewCurrency(code, name, symbol string, exchangeRate float64, isEnabled bool
 		ExchangeRate: exchangeRate,
 		IsEnabled:    isEnabled,
 		IsDefault:    isDefault,
-		CreatedAt:    now,
-		UpdatedAt:    now,
 	}, nil
 }
 
@@ -76,14 +54,14 @@ func (c *Currency) SetExchangeRate(rate float64) error {
 		return errors.New("exchange rate must be positive")
 	}
 	c.ExchangeRate = rate
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 
 // Enable enables the currency
 func (c *Currency) Enable() {
 	c.IsEnabled = true
-	c.UpdatedAt = time.Now()
+
 }
 
 // Disable disables the currency
@@ -92,7 +70,7 @@ func (c *Currency) Disable() error {
 		return errors.New("cannot disable the default currency")
 	}
 	c.IsEnabled = false
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -100,13 +78,13 @@ func (c *Currency) Disable() error {
 func (c *Currency) SetAsDefault() {
 	c.IsDefault = true
 	c.IsEnabled = true // Default currency must be enabled
-	c.UpdatedAt = time.Now()
+
 }
 
 // UnsetAsDefault unsets this currency as the default currency
 func (c *Currency) UnsetAsDefault() error {
 	c.IsDefault = false
-	c.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -124,4 +102,15 @@ func (c *Currency) ConvertAmount(amount int64, targetCurrency *Currency) int64 {
 
 	// Round to nearest cent instead of truncating
 	return int64(targetAmount)
+}
+
+func (c Currency) ToCurrencyDTO() *dto.CurrencyDTO {
+	return &dto.CurrencyDTO{
+		Code:         c.Code,
+		Name:         c.Name,
+		Symbol:       c.Symbol,
+		ExchangeRate: c.ExchangeRate,
+		IsEnabled:    c.IsEnabled,
+		IsDefault:    c.IsDefault,
+	}
 }
