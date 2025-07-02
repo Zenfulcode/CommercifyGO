@@ -78,7 +78,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		require.NoError(t, err)
 		txn1.RawResponse = "original response"
 
-		err = repo.Create(txn1)
+		err = repo.CreateOrUpdate(txn1) // Use CreateOrUpdate for upsert behavior
 		require.NoError(t, err)
 		originalID := txn1.ID
 		originalTransactionID := txn1.TransactionID
@@ -97,7 +97,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn2.RawResponse = "updated response"
 		txn2.AddMetadata("webhook_id", "wh_123")
 
-		err = repo.Create(txn2)
+		err = repo.CreateOrUpdate(txn2) // Use CreateOrUpdate for upsert behavior
 		assert.NoError(t, err)
 
 		// Verify that the existing transaction was updated, not a new one created
@@ -126,7 +126,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = repo.Create(txn1)
+		err = repo.CreateOrUpdate(txn1) // Use CreateOrUpdate for upsert behavior
 		require.NoError(t, err)
 		originalID := txn1.ID
 		originalTransactionID := txn1.TransactionID
@@ -143,7 +143,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = repo.Create(txn2)
+		err = repo.CreateOrUpdate(txn2) // Use CreateOrUpdate for upsert behavior
 		assert.NoError(t, err)
 
 		// Verify the existing transaction was updated
@@ -159,9 +159,12 @@ func TestTransactionRepository_Create(t *testing.T) {
 	})
 
 	t.Run("Create multiple transactions with different types should create separate records", func(t *testing.T) {
+		// Create a new test order specifically for this test to avoid conflicts with previous tests
+		createTestOrder(t, db, 99)
+
 		// Create authorization transaction
 		txn1, err := entity.NewPaymentTransaction(
-			1,
+			99, // Use order 99 to avoid conflicts
 			"external_id_auth",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
@@ -176,7 +179,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 
 		// Create capture transaction (different type, so should create new record)
 		txn2, err := entity.NewPaymentTransaction(
-			1,
+			99, // Use order 99 to avoid conflicts
 			"external_id_capture",
 			entity.TransactionTypeCapture, // Different type
 			entity.TransactionStatusSuccessful,
@@ -191,12 +194,12 @@ func TestTransactionRepository_Create(t *testing.T) {
 
 		// Verify both transactions exist (different types)
 		var authCount int64
-		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 1, entity.TransactionTypeAuthorize).Count(&authCount).Error
+		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 99, entity.TransactionTypeAuthorize).Count(&authCount).Error
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), authCount)
 
 		var captureCount int64
-		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 1, entity.TransactionTypeCapture).Count(&captureCount).Error
+		err = db.Model(&entity.PaymentTransaction{}).Where("order_id = ? AND type = ?", 99, entity.TransactionTypeCapture).Count(&captureCount).Error
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), captureCount)
 
@@ -423,15 +426,15 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		// Since we can only have one transaction per type per order, let's test the sum of that one transaction
+		// Test the sum of that one transaction
 		total, err := repo.SumAmountByOrderIDAndType(1, entity.TransactionTypeCapture)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(5000), total)
 
-		// Now update the transaction with a failed status - should not be included in sum
+		// Now update the transaction with a failed status using CreateOrUpdate - should not be included in sum
 		txn_update, err := entity.NewPaymentTransaction(1, "external_sum_updated", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 3000, "USD", "stripe")
 		require.NoError(t, err)
-		err = repo.Create(txn_update) // This will update the existing capture transaction
+		err = repo.CreateOrUpdate(txn_update) // Use CreateOrUpdate to update the existing capture transaction
 		require.NoError(t, err)
 
 		// Sum should now be 0 since the transaction is failed

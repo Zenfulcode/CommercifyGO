@@ -1,53 +1,29 @@
 package entity
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"errors"
-	"maps"
 	"slices"
 
-	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// VariantAttributes represents JSONB attributes for a product variant
-type VariantAttributes map[string]string
-
-// Value implements the driver.Valuer interface for database storage
-func (va VariantAttributes) Value() (driver.Value, error) {
-	return json.Marshal(va)
-}
-
-// Scan implements the sql.Scanner interface for database retrieval
-func (va *VariantAttributes) Scan(value any) error {
-	if value == nil {
-		*va = make(VariantAttributes)
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
-	}
-
-	return json.Unmarshal(bytes, va)
-}
+type VariantAttributes = map[string]string
 
 // ProductVariant represents a specific variant of a product
 type ProductVariant struct {
 	gorm.Model
-	ProductID  uint               `gorm:"index;not null"`
-	Product    Product            `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	SKU        string             `gorm:"uniqueIndex;size:100;not null"`
-	Stock      int                `gorm:"default:0"`
-	Attributes VariantAttributes  `gorm:"type:jsonb;not null"`
-	Images     common.StringSlice `gorm:"type:json;default:'[]'"`
-	IsDefault  bool               `gorm:"default:false"`
-	Weight     float64            `gorm:"default:0"`
-	Price      int64              `gorm:"not null"`
+	ProductID  uint                                  `gorm:"index;not null"`
+	Product    Product                               `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	SKU        string                                `gorm:"uniqueIndex;size:100;not null"`
+	Stock      int                                   `gorm:"default:0"`
+	Attributes datatypes.JSONType[VariantAttributes] `gorm:"not null"`
+	IsDefault  bool                                  `gorm:"default:false"`
+	Weight     float64                               `gorm:"default:0"`
+	Price      int64                                 `gorm:"not null"`
+	Images     datatypes.JSONSlice[string]
 }
 
 // NewProductVariant creates a new product variant
@@ -72,8 +48,8 @@ func NewProductVariant(sku string, stock int, price int64, weight float64, attri
 	return &ProductVariant{
 		SKU:        sku,
 		Stock:      stock,
-		Attributes: attributes,
-		Images:     common.StringSlice(images),
+		Attributes: datatypes.NewJSONType(attributes),
+		Images:     images,
 		IsDefault:  isDefault,
 		Weight:     weight,
 		Price:      price,
@@ -100,17 +76,12 @@ func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float
 	}
 
 	if len(images) > 0 && !slices.Equal([]string(v.Images), images) {
-		v.Images = common.StringSlice(images)
+		v.Images = images
 		updated = true
 	}
 	if len(attributes) > 0 {
-		// Convert slice of maps to VariantAttributes map
-		newAttributes := make(VariantAttributes)
-		maps.Copy(newAttributes, attributes)
-		if !maps.Equal(v.Attributes, newAttributes) {
-			v.Attributes = newAttributes
-			updated = true
-		}
+		v.Attributes = datatypes.NewJSONType(attributes)
+		updated = true
 	}
 
 	return updated, nil
@@ -135,7 +106,7 @@ func (v *ProductVariant) IsAvailable(quantity int) bool {
 func (v *ProductVariant) Name() string {
 	// Combine all attribute values to form a name
 	name := ""
-	for _, value := range v.Attributes {
+	for _, value := range v.Attributes.Data() {
 		if name == "" {
 			name = value
 		} else {
@@ -157,7 +128,7 @@ func (variant *ProductVariant) ToVariantDTO() *dto.VariantDTO {
 		VariantName: variant.Name(),
 		SKU:         variant.SKU,
 		Stock:       variant.Stock,
-		Attributes:  common.StringMap(variant.Attributes),
+		Attributes:  variant.Attributes.Data(),
 		Images:      variant.Images,
 		IsDefault:   variant.IsDefault,
 		Weight:      variant.Weight,

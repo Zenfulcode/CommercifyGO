@@ -66,12 +66,12 @@ func TestPaymentCaptureWorkflow(t *testing.T) {
 		// Verify we can get the latest transaction of each type
 		latestAuth, err := repo.GetLatestByOrderIDAndType(order.ID, entity.TransactionTypeAuthorize)
 		require.NoError(t, err)
-		assert.Equal(t, "pi_1234567890", latestAuth.TransactionID)
+		assert.Equal(t, "pi_1234567890", latestAuth.ExternalID) // Check ExternalID instead of TransactionID
 		assert.Equal(t, "pi_1234567890", latestAuth.Metadata["payment_intent_id"])
 
 		latestCapture, err := repo.GetLatestByOrderIDAndType(order.ID, entity.TransactionTypeCapture)
 		require.NoError(t, err)
-		assert.Equal(t, "ch_1234567890", latestCapture.TransactionID)
+		assert.Equal(t, "ch_1234567890", latestCapture.ExternalID) // Check ExternalID instead of TransactionID
 		assert.Equal(t, "ch_1234567890", latestCapture.Metadata["charge_id"])
 		assert.Equal(t, "we_1234567890", latestCapture.Metadata["webhook_id"])
 

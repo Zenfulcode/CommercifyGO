@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zenfulcode/commercify/internal/domain/common"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -30,21 +30,21 @@ const (
 )
 
 // PaymentTransaction represents a payment transaction record
-// Each order can have only one transaction per type (authorize, capture, refund, cancel)
-// The status of the transaction changes as it progresses through its lifecycle
+// Each order can have multiple transactions per type (for scenarios like partial captures, retries, webhooks, etc.)
+// Each transaction represents a specific event in the payment lifecycle
 type PaymentTransaction struct {
 	gorm.Model
-	OrderID       uint              `gorm:"uniqueIndex:idx_order_transaction_type;not null"` // Part of composite unique key
+	OrderID       uint              `gorm:"index;not null"`              // Foreign key to order (indexed for performance)
 	Order         Order             `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	TransactionID string            `gorm:"uniqueIndex;not null;size:100"`                           // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
-	ExternalID    string            `gorm:"index;size:255"`                                          // External transaction ID from payment provider (can be empty for some providers)
-	Type          TransactionType   `gorm:"uniqueIndex:idx_order_transaction_type;not null;size:50"` // Type of transaction (authorize, capture, refund, cancel)
-	Status        TransactionStatus `gorm:"not null;size:50"`                                        // Status of the transaction (pending -> successful/failed)
-	Amount        int64             `gorm:"not null"`                                                // Amount of the transaction
-	Currency      string            `gorm:"not null;size:3"`                                         // Currency of the transaction
-	Provider      string            `gorm:"not null;size:100"`                                       // Payment provider (stripe, paypal, etc.)
-	RawResponse   string            `gorm:"type:text"`                                               // Raw response from payment provider (JSON)
-	Metadata      common.StringMap  `gorm:"type:text"`                                               // Additional metadata stored as JSON
+	TransactionID string            `gorm:"uniqueIndex;not null;size:100"`                     // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
+	ExternalID    string            `gorm:"index;size:255"`                                    // External transaction ID from payment provider (can be empty for some providers)
+	Type          TransactionType   `gorm:"not null;size:50;index:idx_order_type"`            // Type of transaction (authorize, capture, refund, cancel)
+	Status        TransactionStatus `gorm:"not null;size:50"`                                  // Status of the transaction (pending -> successful/failed)
+	Amount        int64             `gorm:"not null"`                                          // Amount of the transaction
+	Currency      string            `gorm:"not null;size:3"`                                   // Currency of the transaction
+	Provider      string            `gorm:"not null;size:100"`                                 // Payment provider (stripe, paypal, etc.)
+	RawResponse   string            `gorm:"type:text"`                                         // Raw response from payment provider (JSON)
+	Metadata      datatypes.JSONMap `gorm:"type:text"`                                         // Additional metadata stored as JSON
 }
 
 // NewPaymentTransaction creates a new payment transaction
@@ -81,7 +81,7 @@ func NewPaymentTransaction(
 		Amount:     amount,
 		Currency:   currency,
 		Provider:   provider,
-		Metadata:   make(common.StringMap),
+		Metadata:   make(datatypes.JSONMap),
 		// TransactionID will be set when the transaction is saved to get the sequence number
 	}, nil
 }
@@ -89,7 +89,7 @@ func NewPaymentTransaction(
 // AddMetadata adds metadata to the transaction
 func (pt *PaymentTransaction) AddMetadata(key, value string) {
 	if pt.Metadata == nil {
-		pt.Metadata = make(common.StringMap)
+		pt.Metadata = make(datatypes.JSONMap)
 	}
 	pt.Metadata[key] = value
 }

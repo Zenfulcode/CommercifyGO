@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -15,14 +15,14 @@ import (
 // All products must have at least one variant as per the database schema
 type Product struct {
 	gorm.Model
-	Name        string             `gorm:"not null;size:255"`
-	Description string             `gorm:"type:text"`
-	Currency    string             `gorm:"not null;size:3"`
-	CategoryID  uint               `gorm:"not null;index"`
-	Category    Category           `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
-	Images      common.StringSlice `gorm:"type:json;default:'[]'"`
-	Active      bool               `gorm:"default:true"`
-	Variants    []*ProductVariant  `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Name        string                      `gorm:"not null;size:255"`
+	Description string                      `gorm:"type:text"`
+	Currency    string                      `gorm:"not null;size:3"`
+	CategoryID  uint                        `gorm:"not null;index"`
+	Category    Category                    `gorm:"foreignKey:CategoryID;constraint:OnDelete:RESTRICT,OnUpdate:CASCADE"`
+	Images      datatypes.JSONSlice[string] `gorm:"type:text[];default:'[]'"`
+	Active      bool                        `gorm:"default:true"`
+	Variants    []*ProductVariant           `gorm:"foreignKey:ProductID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 }
 
 // NewProduct creates a new product with the given details
@@ -49,7 +49,7 @@ func NewProduct(name, description, currency string, categoryID uint, images []st
 		Description: description,
 		Currency:    currency,
 		CategoryID:  categoryID,
-		Images:      common.StringSlice(images),
+		Images:      images,
 		Variants:    productVariants,
 		Active:      isActive,
 	}, nil

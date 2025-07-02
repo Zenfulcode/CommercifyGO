@@ -9,6 +9,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"gorm.io/datatypes"
 )
 
 // PaymentProviderServiceImpl implements service.PaymentProviderService
@@ -182,7 +183,7 @@ func (s *PaymentProviderServiceImpl) GetWebhookInfo(providerType common.PaymentP
 }
 
 // UpdateProviderConfiguration implements service.PaymentProviderService.
-func (s *PaymentProviderServiceImpl) UpdateProviderConfiguration(providerType common.PaymentProviderType, config common.JSONB) error {
+func (s *PaymentProviderServiceImpl) UpdateProviderConfiguration(providerType common.PaymentProviderType, config map[string]interface{}) error {
 	if config == nil {
 		return fmt.Errorf("configuration cannot be nil")
 	}
@@ -266,14 +267,14 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 				"PLN", "CZK", "HUF", "BGN", "RON", "HRK", "ISK", "MXN", "BRL", "SGD",
 				"HKD", "INR", "MYR", "PHP", "THB", "TWD", "KRW", "NZD", "ILS", "ZAR",
 			},
-			Configuration: common.JSONB{
+			Configuration: datatypes.JSONMap(map[string]interface{}{
 				"SecretKey":          s.config.Stripe.SecretKey,
 				"PublicKey":          s.config.Stripe.PublicKey,
 				"WebhookSecret":      s.config.Stripe.WebhookSecret,
 				"PaymentDescription": s.config.Stripe.PaymentDescription,
 				"ReturnURL":          s.config.Stripe.ReturnURL,
 				"Enabled":            s.config.Stripe.Enabled,
-			},
+			}),
 			Priority:   100,
 			IsTestMode: false,
 		},
@@ -284,7 +285,7 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			Methods:             []common.PaymentMethod{common.PaymentMethodWallet},
 			Enabled:             s.config.MobilePay.Enabled,
 			SupportedCurrencies: []string{"NOK", "DKK", "EUR"},
-			Configuration: common.JSONB{
+			Configuration: datatypes.JSONMap(map[string]interface{}{
 				"MerchantSerialNumber": s.config.MobilePay.MerchantSerialNumber,
 				"SubscriptionKey":      s.config.MobilePay.SubscriptionKey,
 				"ClientID":             s.config.MobilePay.ClientID,
@@ -295,7 +296,7 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 				"Market":               s.config.MobilePay.Market,
 				"Enabled":              s.config.MobilePay.Enabled,
 				"IsTestMode":           s.config.MobilePay.IsTestMode,
-			},
+			}),
 			Priority:   90,
 			IsTestMode: s.config.MobilePay.IsTestMode,
 		},
@@ -306,12 +307,12 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			Methods:             []common.PaymentMethod{common.PaymentMethodCreditCard},
 			Enabled:             true, // Always enabled for testing
 			SupportedCurrencies: []string{"USD", "EUR", "GBP", "NOK", "DKK"},
-			Configuration: common.JSONB{
+			Configuration: datatypes.JSONMap(map[string]interface{}{
 				"Enabled":            true,
 				"IsTestMode":         true,
 				"PaymentDescription": "Test payment for development",
 				"AutoConfirm":        true,
-			},
+			}),
 			Priority:   10,
 			IsTestMode: true,
 		},
@@ -334,8 +335,10 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 
 			// Register webhook for MobilePay if enabled
 			if provider.Type == common.PaymentProviderMobilePay && provider.Enabled && s.mobilePayService != nil {
-				webhookURL, _ := provider.Configuration["WebhookURL"].(string)
-				if err := s.mobilePayService.RegisterWebhook(provider, webhookURL); err != nil {
+				webhookURL, err := provider.GetConfigurationField("WebhookURL")
+				if err != nil {
+					s.logger.Error("Failed to get WebhookURL from configuration: %v", err)
+				} else if err := s.mobilePayService.RegisterWebhook(provider, webhookURL.(string)); err != nil {
 					s.logger.Error("Failed to register MobilePay webhook during initialization: %v", err)
 					// Don't fail the entire initialization if webhook registration fails
 				} else {
@@ -353,8 +356,10 @@ func (s *PaymentProviderServiceImpl) InitializeDefaultProviders() error {
 			if existingProvider.Type == common.PaymentProviderMobilePay && existingProvider.Enabled &&
 				(existingProvider.WebhookSecret == "" || existingProvider.ExternalWebhookID == "") && s.mobilePayService != nil {
 				s.logger.Info("Registering webhook for existing MobilePay provider (missing webhook data)")
-				webhookURL, _ := existingProvider.Configuration["WebhookURL"].(string)
-				if err := s.mobilePayService.RegisterWebhook(existingProvider, webhookURL); err != nil {
+				webhookURL, err := provider.GetConfigurationField("WebhookURL")
+				if err != nil {
+					s.logger.Error("Failed to get WebhookURL from configuration: %v", err)
+				} else if err := s.mobilePayService.RegisterWebhook(existingProvider, webhookURL.(string)); err != nil {
 					s.logger.Error("Failed to register MobilePay webhook for existing provider: %v", err)
 					// Don't fail the entire initialization if webhook registration fails
 				} else {

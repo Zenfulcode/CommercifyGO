@@ -3,6 +3,7 @@ package gorm
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
@@ -13,6 +14,22 @@ import (
 // PaymentProviderRepository implements repository.PaymentProviderRepository using GORM
 type PaymentProviderRepository struct {
 	db *gorm.DB
+}
+
+// isPostgreSQL detects if the database is PostgreSQL
+func (r *PaymentProviderRepository) isPostgreSQL() bool {
+	return strings.Contains(strings.ToLower(r.db.Dialector.Name()), "postgres")
+}
+
+// buildJSONContainsQuery builds a database-agnostic query to check if JSON array contains a value
+func (r *PaymentProviderRepository) buildJSONContainsQuery(column, value string) (string, interface{}) {
+	if r.isPostgreSQL() {
+		// PostgreSQL uses ? operator for JSON contains - need to use ?? to escape in GORM
+		return fmt.Sprintf("%s ?? ?", column), value
+	} else {
+		// SQLite uses json_extract with LIKE
+		return fmt.Sprintf("json_extract(%s, '$') LIKE ?", column), "%\"" + value + "\"%"
+	}
 }
 
 // Create implements repository.PaymentProviderRepository.
@@ -90,8 +107,11 @@ func (r *PaymentProviderRepository) GetEnabled() ([]*entity.PaymentProvider, err
 // GetEnabledByMethod implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByMethod(method common.PaymentMethod) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Use SQLite-compatible JSON query to check if the method exists in the methods array
-	if err := r.db.Where("enabled = ? AND json_extract(methods, '$') LIKE ?", true, "%\""+string(method)+"\"%").
+
+	// Build database-agnostic JSON query
+	query, param := r.buildJSONContainsQuery("methods", string(method))
+
+	if err := r.db.Where("enabled = ? AND "+query, true, param).
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by method: %w", err)
 	}
@@ -101,10 +121,13 @@ func (r *PaymentProviderRepository) GetEnabledByMethod(method common.PaymentMeth
 // GetEnabledByCurrency implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByCurrency(currency string) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Use SQLite-compatible JSON query to check if the currency exists in the supported_currencies array
+
+	// Build database-agnostic JSON query for currency check
+	query, param := r.buildJSONContainsQuery("supported_currencies", currency)
+
 	// If supported_currencies is empty/null, include the provider (supports all currencies)
-	if err := r.db.Where("enabled = ? AND (supported_currencies IS NULL OR supported_currencies = '[]' OR json_extract(supported_currencies, '$') LIKE ?)",
-		true, "%\""+currency+"\"%").
+	if err := r.db.Where("enabled = ? AND (supported_currencies IS NULL OR supported_currencies = '[]' OR "+query+")",
+		true, param).
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by currency: %w", err)
 	}
@@ -114,9 +137,14 @@ func (r *PaymentProviderRepository) GetEnabledByCurrency(currency string) ([]*en
 // GetEnabledByMethodAndCurrency implements repository.PaymentProviderRepository.
 func (r *PaymentProviderRepository) GetEnabledByMethodAndCurrency(method common.PaymentMethod, currency string) ([]*entity.PaymentProvider, error) {
 	var providers []*entity.PaymentProvider
-	// Combine both method and currency filters using SQLite-compatible JSON queries
-	if err := r.db.Where("enabled = ? AND json_extract(methods, '$') LIKE ? AND (supported_currencies IS NULL OR supported_currencies = '[]' OR json_extract(supported_currencies, '$') LIKE ?)",
-		true, "%\""+string(method)+"\"%", "%\""+currency+"\"%").
+
+	// Build database-agnostic JSON queries for both method and currency
+	methodQuery, methodParam := r.buildJSONContainsQuery("methods", string(method))
+	currencyQuery, currencyParam := r.buildJSONContainsQuery("supported_currencies", currency)
+
+	// Combine both method and currency filters
+	if err := r.db.Where("enabled = ? AND "+methodQuery+" AND (supported_currencies IS NULL OR supported_currencies = '[]' OR "+currencyQuery+")",
+		true, methodParam, currencyParam).
 		Order("priority DESC, created_at ASC").Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch payment providers by method and currency: %w", err)
 	}

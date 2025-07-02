@@ -29,6 +29,23 @@ func (t *TransactionRepository) CountSuccessfulByOrderIDAndType(orderID uint, tr
 
 // Create implements repository.PaymentTransactionRepository.
 func (t *TransactionRepository) Create(transaction *entity.PaymentTransaction) error {
+	// Always create a new transaction record (no upsert behavior)
+	// This allows multiple transactions of the same type for the same order
+	// which is useful for scenarios like partial captures, webhook retries, etc.
+	if transaction.TransactionID == "" {
+		sequence, err := t.getNextSequenceNumber(transaction.Type)
+		if err != nil {
+			return fmt.Errorf("failed to generate sequence number: %w", err)
+		}
+		transaction.SetTransactionID(sequence)
+	}
+	return t.db.Create(transaction).Error
+}
+
+// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
+// of the same type already exists for the order. This method implements upsert behavior
+// for cases where you want to ensure only one transaction per type per order.
+func (t *TransactionRepository) CreateOrUpdate(transaction *entity.PaymentTransaction) error {
 	// Check if a transaction of this type already exists for this order
 	var existingTransaction entity.PaymentTransaction
 	err := t.db.Where("order_id = ? AND type = ?", transaction.OrderID, transaction.Type).
@@ -40,14 +57,7 @@ func (t *TransactionRepository) Create(transaction *entity.PaymentTransaction) e
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// No existing transaction, create a new one
-		if transaction.TransactionID == "" {
-			sequence, err := t.getNextSequenceNumber(transaction.Type)
-			if err != nil {
-				return fmt.Errorf("failed to generate sequence number: %w", err)
-			}
-			transaction.SetTransactionID(sequence)
-		}
-		return t.db.Create(transaction).Error
+		return t.Create(transaction)
 	} else {
 		// Transaction exists, update it with new information
 		existingTransaction.Status = transaction.Status
@@ -66,13 +76,6 @@ func (t *TransactionRepository) Create(transaction *entity.PaymentTransaction) e
 		*transaction = existingTransaction
 		return nil
 	}
-}
-
-// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
-// of the same type already exists for the order. This ensures only one transaction
-// per type per order, with status updates reflecting the transaction lifecycle.
-func (t *TransactionRepository) CreateOrUpdate(transaction *entity.PaymentTransaction) error {
-	return t.Create(transaction) // Delegate to Create which now handles upsert logic
 }
 
 // Delete implements repository.PaymentTransactionRepository.

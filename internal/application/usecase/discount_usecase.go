@@ -287,77 +287,8 @@ func (uc *DiscountUseCase) ApplyDiscountToOrder(input ApplyDiscountToOrderInput,
 		return nil, errors.New("invalid discount code")
 	}
 
-	// For category-based discounts, we need to modify the ProductIDs to include products from those categories
-	if discount.Type == entity.DiscountTypeProduct && len(discount.CategoryIDs) > 0 {
-		// Create a map to track which items in the order need discounts
-		eligibleProducts := make(map[uint]bool)
-
-		// First add directly specified products
-		for _, productID := range discount.ProductIDs {
-			eligibleProducts[productID] = true
-		}
-
-		// Then find products that belong to the specified categories
-		for _, categoryID := range discount.CategoryIDs {
-			// Get all products in this category
-			products, err := uc.productRepo.List("", "", categoryID, 0, 1000, 0, 0, true)
-			if err == nil && len(products) > 0 {
-				// Add these products to our eligibility map
-				for _, product := range products {
-					eligibleProducts[product.ID] = true
-				}
-			}
-		}
-
-		// Now calculate the discount based on eligible products
-		var discountAmount int64
-
-		for _, item := range order.Items {
-			if eligibleProducts[item.ProductID] {
-				itemTotal := int64(item.Quantity) * item.Price
-
-				switch discount.Method {
-				case entity.DiscountMethodFixed:
-					// Apply fixed discount per item
-					itemDiscount := min(money.ToCents(discount.Value), itemTotal)
-					discountAmount += itemDiscount
-				case entity.DiscountMethodPercentage:
-					// Apply percentage discount to the item
-					// itemTotal * (discount.Value / 100)
-					itemDiscount := money.ApplyPercentage(itemTotal, discount.Value)
-					discountAmount += itemDiscount
-				}
-			}
-		}
-
-		// Apply maximum discount cap if specified
-		if discount.MaxDiscountValue > 0 && discountAmount > discount.MaxDiscountValue {
-			discountAmount = discount.MaxDiscountValue
-		}
-
-		// Ensure discount doesn't exceed order total
-		if discountAmount > order.TotalAmount {
-			discountAmount = order.TotalAmount
-		}
-
-		// Apply calculated discount amount
-		order.DiscountAmount = discountAmount
-		order.FinalAmount = order.TotalAmount - discountAmount
-
-		// Record the applied discount using JSON helper method
-		appliedDiscount := &entity.AppliedDiscount{
-			DiscountID:     discount.ID,
-			DiscountCode:   discount.Code,
-			DiscountAmount: discountAmount,
-		}
-		order.SetAppliedDiscountJSON(appliedDiscount)
-
-		order.UpdatedAt = time.Now()
-	} else {
-		// For non-category specific discounts, use the standard entity method
-		if err := order.ApplyDiscount(discount); err != nil {
-			return nil, err
-		}
+	if err := order.ApplyDiscount(discount); err != nil {
+		return nil, err
 	}
 
 	uc.orderRepo.Update(order)
@@ -372,6 +303,10 @@ func (uc *DiscountUseCase) ApplyDiscountToOrder(input ApplyDiscountToOrderInput,
 
 // RemoveDiscountFromOrder removes a discount from an order
 func (uc *DiscountUseCase) RemoveDiscountFromOrder(order *entity.Order) {
+	if order.GetAppliedDiscount() == nil {
+		return
+	}
+
 	order.RemoveDiscount()
 	uc.orderRepo.Update(order)
 }

@@ -6,8 +6,12 @@ import (
 
 // PaymentTransactionRepository defines the interface for payment transaction persistence
 type PaymentTransactionRepository interface {
-	// Create creates a new payment transaction
+	// Create creates a new payment transaction (always creates a new record)
 	Create(transaction *entity.PaymentTransaction) error
+
+	// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
+	// of the same type already exists for the order (upsert behavior)
+	CreateOrUpdate(transaction *entity.PaymentTransaction) error
 
 	// GetByID retrieves a payment transaction by ID
 	GetByID(id uint) (*entity.PaymentTransaction, error)

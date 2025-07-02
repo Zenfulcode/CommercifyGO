@@ -405,7 +405,7 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	calculateOptionsInput := CalculateShippingOptionsInput{
-		Address:     shippingAddr,
+		Address:     *shippingAddr,
 		OrderValue:  checkout.TotalAmount,
 		OrderWeight: checkout.TotalWeight,
 	}
@@ -602,7 +602,10 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 	}
 
 	// Convert checkout to order
-	order := checkout.ToOrder()
+	order, erro := entity.NewOrderFromCheckout(checkout)
+	if erro != nil {
+		return nil, fmt.Errorf("failed to create order from checkout: %w", erro)
+	}
 
 	// Create order in repository
 	err = uc.orderRepo.Create(order)
@@ -611,7 +614,7 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 	}
 
 	// Update order number to final format now that we have an ID
-	order.SetOrderNumber(order.ID)
+	order.SetOrderNumber(&order.ID)
 	err = uc.orderRepo.Update(order)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order number: %w", err)

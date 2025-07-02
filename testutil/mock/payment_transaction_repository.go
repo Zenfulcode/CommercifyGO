@@ -46,6 +46,12 @@ func (m *PaymentTransactionRepository) Create(transaction *entity.PaymentTransac
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Generate TransactionID if not set (like the real implementation)
+	if transaction.TransactionID == "" {
+		sequence := m.getNextSequenceNumber(transaction.Type)
+		transaction.SetTransactionID(sequence)
+	}
+
 	// Check if transaction ID already exists
 	if _, exists := m.transactionIDMap[transaction.TransactionID]; exists {
 		return errors.New("transaction with this ID already exists")
@@ -63,6 +69,42 @@ func (m *PaymentTransactionRepository) Create(transaction *entity.PaymentTransac
 	m.transactionIDMap[txnCopy.TransactionID] = &txnCopy
 
 	return nil
+}
+
+// CreateOrUpdate creates a new transaction or updates an existing one if a transaction
+// of the same type already exists for the order (upsert behavior)
+func (m *PaymentTransactionRepository) CreateOrUpdate(transaction *entity.PaymentTransaction) error {
+	if m.CreateError != nil {
+		return m.CreateError
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Look for existing transaction with same order ID and type
+	var existingTxn *entity.PaymentTransaction
+	for _, txn := range m.transactions {
+		if txn.OrderID == transaction.OrderID && txn.Type == transaction.Type {
+			existingTxn = txn
+			break
+		}
+	}
+
+	if existingTxn != nil {
+		// Update existing transaction
+		existingTxn.Status = transaction.Status
+		existingTxn.Amount = transaction.Amount
+		existingTxn.ExternalID = transaction.ExternalID
+		existingTxn.RawResponse = transaction.RawResponse
+		existingTxn.Metadata = transaction.Metadata
+		
+		// Copy updated values back to input transaction
+		*transaction = *existingTxn
+		return nil
+	} else {
+		// Create new transaction
+		return m.Create(transaction)
+	}
 }
 
 // GetByID retrieves a payment transaction by ID
@@ -296,4 +338,16 @@ func (m *PaymentTransactionRepository) GetAllTransactions() []*entity.PaymentTra
 	}
 
 	return results
+}
+
+// getNextSequenceNumber generates the next sequence number for a given transaction type
+// This is a simplified version of the real implementation for mock purposes
+func (m *PaymentTransactionRepository) getNextSequenceNumber(transactionType entity.TransactionType) int {
+	count := 0
+	for _, txn := range m.transactions {
+		if txn.Type == transactionType {
+			count++
+		}
+	}
+	return count + 1
 }

@@ -1,10 +1,10 @@
 package entity
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/zenfulcode/commercify/internal/domain/common"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -15,13 +15,13 @@ type PaymentProvider struct {
 	Name                string                     `gorm:"not null;size:100" json:"name"`
 	Description         string                     `gorm:"size:500" json:"description"`
 	IconURL             string                     `gorm:"size:500" json:"icon_url,omitempty"`
-	Methods             []common.PaymentMethod     `gorm:"type:json;serializer:json" json:"methods"`
+	Methods             []common.PaymentMethod     `json:"methods"`
 	Enabled             bool                       `gorm:"default:true" json:"enabled"`
-	SupportedCurrencies []string                   `gorm:"type:json;serializer:json" json:"supported_currencies,omitempty"`
-	Configuration       common.JSONB               `gorm:"type:json;serializer:json" json:"configuration,omitempty"`
+	SupportedCurrencies []string                   `json:"supported_currencies,omitempty"`
+	Configuration       datatypes.JSONMap          `json:"configuration,omitempty"`
 	WebhookURL          string                     `gorm:"size:500" json:"webhook_url,omitempty"`
 	WebhookSecret       string                     `gorm:"size:255" json:"webhook_secret,omitempty"`
-	WebhookEvents       []string                   `gorm:"type:json;serializer:json" json:"webhook_events,omitempty"`
+	WebhookEvents       []string                   `json:"webhook_events,omitempty"`
 	ExternalWebhookID   string                     `gorm:"size:255" json:"external_webhook_id,omitempty"`
 	IsTestMode          bool                       `gorm:"default:false" json:"is_test_mode"`
 	Priority            int                        `gorm:"default:0" json:"priority"` // Higher priority means higher preference
@@ -57,37 +57,9 @@ func (p *PaymentProvider) SetMethods(methods []common.PaymentMethod) {
 	p.Methods = methods
 }
 
-// GetMethodsJSON returns the payment methods as a JSON string
-func (p *PaymentProvider) GetMethodsJSON() (string, error) {
-	methodsJSON, err := json.Marshal(p.Methods)
-	if err != nil {
-		return "", err
-	}
-	return string(methodsJSON), nil
-}
-
-// SetMethodsFromJSON sets the payment methods from a JSON string
-func (p *PaymentProvider) SetMethodsFromJSON(methodsJSON []byte) error {
-	return json.Unmarshal(methodsJSON, &p.Methods)
-}
-
 // SetSupportedCurrencies sets the supported currencies for this provider
 func (p *PaymentProvider) SetSupportedCurrencies(currencies []string) {
 	p.SupportedCurrencies = currencies
-}
-
-// GetSupportedCurrenciesJSON returns the supported currencies as a JSON string
-func (p *PaymentProvider) GetSupportedCurrenciesJSON() (string, error) {
-	currenciesJSON, err := json.Marshal(p.SupportedCurrencies)
-	if err != nil {
-		return "", err
-	}
-	return string(currenciesJSON), nil
-}
-
-// SetSupportedCurrenciesFromJSON sets the supported currencies from a JSON string
-func (p *PaymentProvider) SetSupportedCurrenciesFromJSON(currenciesJSON []byte) error {
-	return json.Unmarshal(currenciesJSON, &p.SupportedCurrencies)
 }
 
 // SetWebhookEvents sets the webhook events for this provider
@@ -95,41 +67,40 @@ func (p *PaymentProvider) SetWebhookEvents(events []string) {
 	p.WebhookEvents = events
 }
 
-// GetWebhookEventsJSON returns the webhook events as a JSON string
-func (p *PaymentProvider) GetWebhookEventsJSON() (string, error) {
-	eventsJSON, err := json.Marshal(p.WebhookEvents)
-	if err != nil {
-		return "", err
-	}
-	return string(eventsJSON), nil
-}
-
-// SetWebhookEventsFromJSON sets the webhook events from a JSON string
-func (p *PaymentProvider) SetWebhookEventsFromJSON(eventsJSON []byte) error {
-	return json.Unmarshal(eventsJSON, &p.WebhookEvents)
-}
-
 // SetConfiguration sets the configuration for this provider
-func (p *PaymentProvider) SetConfiguration(config common.JSONB) {
+func (p *PaymentProvider) SetConfiguration(config map[string]interface{}) {
 	if config == nil {
-		p.Configuration = common.JSONB{}
-	} else {
-		p.Configuration = config
+		p.Configuration = nil
+		return
 	}
+
+	p.Configuration = datatypes.JSONMap(config)
 }
 
 // GetConfigurationJSON returns the configuration as a JSON string
-func (p *PaymentProvider) GetConfigurationJSON() (string, error) {
-	configJSON, err := json.Marshal(p.Configuration)
+func (p *PaymentProvider) GetConfiguration() (string, error) {
+	if p.Configuration == nil {
+		return "{}", nil // Return empty JSON if no configuration
+	}
+
+	jsonData, err := p.Configuration.MarshalJSON()
 	if err != nil {
 		return "", err
 	}
-	return string(configJSON), nil
+
+	return string(jsonData), nil
 }
 
-// SetConfigurationFromJSON sets the configuration from a JSON string
-func (p *PaymentProvider) SetConfigurationFromJSON(configJSON []byte) error {
-	return json.Unmarshal(configJSON, &p.Configuration)
+func (p *PaymentProvider) GetConfigurationField(fieldName string) (interface{}, error) {
+	if p.Configuration == nil {
+		return nil, errors.New("configuration is nil")
+	}
+
+	if p.Configuration[fieldName] == nil {
+		return nil, errors.New("field not found")
+	}
+
+	return p.Configuration[fieldName], nil
 }
 
 // SupportsCurrency checks if the provider supports a specific currency

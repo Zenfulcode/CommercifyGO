@@ -7,6 +7,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/testutil/mock"
+	"gorm.io/datatypes"
 )
 
 func TestPaymentTransactionRepository(t *testing.T) {
@@ -15,7 +16,7 @@ func TestPaymentTransactionRepository(t *testing.T) {
 	// Test Create
 	txn, err := entity.NewPaymentTransaction(
 		1,                                  // orderID
-		"test-123",                         // transactionID
+		"test-123",                         // externalID
 		entity.TransactionTypeAuthorize,    // type
 		entity.TransactionStatusSuccessful, // status
 		10000,                              // amount (100.00)
@@ -37,12 +38,18 @@ func TestPaymentTransactionRepository(t *testing.T) {
 		t.Fatalf("Failed to get payment transaction by ID: %v", err)
 	}
 
-	if retrieved.TransactionID != "test-123" {
-		t.Errorf("Expected transaction ID 'test-123', got '%s'", retrieved.TransactionID)
+	// The TransactionID should be auto-generated (e.g., "TXN-AUTH-2025-001")
+	if retrieved.TransactionID == "" {
+		t.Errorf("Expected generated transaction ID, got empty string")
 	}
 
-	// Test GetByTransactionID
-	retrieved2, err := repo.GetByTransactionID("test-123")
+	// The ExternalID should be what we passed in
+	if retrieved.ExternalID != "test-123" {
+		t.Errorf("Expected external ID 'test-123', got '%s'", retrieved.ExternalID)
+	}
+
+	// Test GetByTransactionID using the generated transaction ID
+	retrieved2, err := repo.GetByTransactionID(retrieved.TransactionID)
 	if err != nil {
 		t.Fatalf("Failed to get payment transaction by transaction ID: %v", err)
 	}
@@ -278,8 +285,8 @@ func TestProductRepository(t *testing.T) {
 		Price:      9999, // $99.99
 		IsDefault:  true,
 		Weight:     1.5,
-		Attributes: entity.VariantAttributes{"color": "red", "size": "large"},
-		Images:     common.StringSlice{"variant1.jpg"},
+		Attributes: datatypes.JSONType[entity.VariantAttributes]{},
+		Images:     datatypes.JSONSlice[string]{"variant1.jpg"},
 	}
 
 	// Create a test product
@@ -288,7 +295,7 @@ func TestProductRepository(t *testing.T) {
 		Description: "A test product description",
 		Currency:    "USD",
 		CategoryID:  1,
-		Images:      common.StringSlice{"product1.jpg", "product2.jpg"},
+		Images:      datatypes.JSONSlice[string]{"product1.jpg", "product2.jpg"},
 		Active:      true,
 		Variants:    []*entity.ProductVariant{variant},
 	}

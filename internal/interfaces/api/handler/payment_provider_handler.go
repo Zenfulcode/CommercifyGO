@@ -8,6 +8,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"gorm.io/datatypes"
 )
 
 // PaymentProviderHandler handles payment provider management requests
@@ -89,7 +90,7 @@ func (h *PaymentProviderHandler) EnablePaymentProvider(w http.ResponseWriter, r 
 
 // UpdateConfigurationRequest represents a request to update provider configuration
 type UpdateConfigurationRequest struct {
-	Configuration common.JSONB `json:"configuration"`
+	Configuration datatypes.JSONMap `json:"configuration"`
 }
 
 // UpdateProviderConfiguration handles updating a payment provider's configuration

@@ -202,7 +202,7 @@ func (m *PaymentProviderService) GetWebhookInfo(providerType common.PaymentProvi
 }
 
 // UpdateProviderConfiguration updates the configuration for a payment provider
-func (m *PaymentProviderService) UpdateProviderConfiguration(providerType common.PaymentProviderType, config common.JSONB) error {
+func (m *PaymentProviderService) UpdateProviderConfiguration(providerType common.PaymentProviderType, config map[string]interface{}) error {
 	if m.UpdateProviderConfigurationError != nil {
 		return m.UpdateProviderConfigurationError
 	}
