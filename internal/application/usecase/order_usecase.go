@@ -201,6 +201,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 		txn, txErr := entity.NewPaymentTransaction(
 			order.ID,
 			transactionID,
+			"", // Idempotency key
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusFailed,
 			amount,
@@ -237,6 +238,7 @@ func (uc *OrderUseCase) CapturePayment(transactionID string, amount int64) error
 	txn, err := entity.NewPaymentTransaction(
 		order.ID,
 		transactionID,
+		"", // Idempotency key
 		entity.TransactionTypeCapture,
 		entity.TransactionStatusSuccessful,
 		amount,
@@ -293,6 +295,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 		txn, txErr := entity.NewPaymentTransaction(
 			order.ID,
 			transactionID,
+			"", // Idempotency key
 			entity.TransactionTypeCancel,
 			entity.TransactionStatusFailed,
 			0, // No amount for cancellation
@@ -323,6 +326,7 @@ func (uc *OrderUseCase) CancelPayment(transactionID string) error {
 	txn, err := entity.NewPaymentTransaction(
 		order.ID,
 		transactionID,
+		"", // Idempotency key
 		entity.TransactionTypeCancel,
 		entity.TransactionStatusSuccessful,
 		0, // No amount for cancellation
@@ -349,14 +353,11 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return errors.New("order not found for payment ID")
 	}
 
-	// Check if the payment is already refunded
-	if order.PaymentStatus == entity.PaymentStatusRefunded {
-		return errors.New("payment already refunded")
-	}
-
-	// Check if the payment is in a state that allows refund (authorized or captured)
-	if order.PaymentStatus != entity.PaymentStatusAuthorized && order.PaymentStatus != entity.PaymentStatusCaptured {
-		return errors.New("payment refund only allowed for authorized or captured payments")
+	// Check if the payment is in a state that allows refund (authorized, captured, or partially refunded)
+	if order.PaymentStatus != entity.PaymentStatusAuthorized &&
+		order.PaymentStatus != entity.PaymentStatusCaptured &&
+		order.PaymentStatus != entity.PaymentStatusRefunded {
+		return errors.New("payment refund only allowed for authorized, captured, or partially refunded payments")
 	}
 
 	// Check if the amount is valid
@@ -371,13 +372,32 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 
 	providerType := common.PaymentProviderType(order.PaymentProvider)
 
-	// Get total refunded amount so far (if any)
-	var totalRefundedSoFar int64 = 0
-	totalRefundedSoFar, _ = uc.paymentTxnRepo.SumAmountByOrderIDAndType(order.ID, entity.TransactionTypeRefund)
+	// Get the total captured amount (what's available to refund)
+	totalCapturedAmount, err := uc.paymentTxnRepo.SumCapturedAmountByOrderID(order.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get captured amount: %w", err)
+	}
 
-	// Check if we're trying to refund more than the original amount when combining with previous refunds
-	if totalRefundedSoFar+amount > order.FinalAmount {
-		return errors.New("total refund amount would exceed the original payment amount")
+	// If no amount has been captured, we can't refund
+	if totalCapturedAmount == 0 {
+		return errors.New("no captured amount available for refund")
+	}
+
+	// Get total refunded amount so far (if any)
+	totalRefundedSoFar, err := uc.paymentTxnRepo.SumRefundedAmountByOrderID(order.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get refunded amount: %w", err)
+	}
+
+	// Check if the payment has already been fully refunded
+	if totalRefundedSoFar >= totalCapturedAmount {
+		return errors.New("payment has already been fully refunded")
+	}
+
+	// Check if we're trying to refund more than the remaining amount
+	remainingAmount := totalCapturedAmount - totalRefundedSoFar
+	if amount > remainingAmount {
+		return fmt.Errorf("refund amount (%d) would exceed remaining refundable amount (%d)", amount, remainingAmount)
 	}
 
 	_, err = uc.paymentSvc.RefundPayment(transactionID, order.Currency, amount, providerType)
@@ -386,6 +406,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		txn, txErr := entity.NewPaymentTransaction(
 			order.ID,
 			transactionID,
+			"", // Idempotency key
 			entity.TransactionTypeRefund,
 			entity.TransactionStatusFailed,
 			amount,
@@ -402,11 +423,8 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 		return fmt.Errorf("failed to refund payment: %v", err)
 	}
 
-	// Calculate if this is a full refund
-	isFullRefund := false
-	if amount >= order.FinalAmount || (totalRefundedSoFar+amount) >= order.FinalAmount {
-		isFullRefund = true
-	}
+	// Calculate if this is a full refund (refunding all captured amount)
+	isFullRefund := (totalRefundedSoFar + amount) >= totalCapturedAmount
 
 	// Only update the payment status to refunded if it's a full refund
 	if isFullRefund {
@@ -424,6 +442,7 @@ func (uc *OrderUseCase) RefundPayment(transactionID string, amount int64) error 
 	txn, err := entity.NewPaymentTransaction(
 		order.ID,
 		transactionID,
+		"", // Idempotency key
 		entity.TransactionTypeRefund,
 		entity.TransactionStatusSuccessful,
 		amount,
@@ -501,6 +520,59 @@ func (uc *OrderUseCase) RecordPaymentTransaction(transaction *entity.PaymentTran
 
 	// Create transaction record
 	return uc.paymentTxnRepo.Create(transaction)
+}
+
+// GetTransactionByTransactionID retrieves a payment transaction by its transaction ID
+func (uc *OrderUseCase) GetTransactionByTransactionID(transactionID string) (*entity.PaymentTransaction, error) {
+	return uc.paymentTxnRepo.GetByTransactionID(transactionID)
+}
+
+// GetTransactionByIdempotencyKey retrieves a payment transaction by its idempotency key
+func (uc *OrderUseCase) GetTransactionByIdempotencyKey(idempotencyKey string) (*entity.PaymentTransaction, error) {
+	return uc.paymentTxnRepo.GetByIdempotencyKey(idempotencyKey)
+}
+
+// GetLatestPendingTransactionByType retrieves the latest pending transaction of a specific type for an order
+func (uc *OrderUseCase) GetLatestPendingTransactionByType(orderID uint, txnType entity.TransactionType) (*entity.PaymentTransaction, error) {
+	// Get all transactions for the order
+	transactions, err := uc.paymentTxnRepo.GetByOrderID(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transactions for order %d: %w", orderID, err)
+	}
+
+	// Find the latest pending transaction of the specified type
+	var latestPending *entity.PaymentTransaction
+	for _, txn := range transactions {
+		if txn.Type == txnType && txn.Status == entity.TransactionStatusPending {
+			if latestPending == nil || txn.CreatedAt.After(latestPending.CreatedAt) {
+				latestPending = txn
+			}
+		}
+	}
+
+	if latestPending == nil {
+		return nil, fmt.Errorf("no pending transaction of type %s found for order %d", txnType, orderID)
+	}
+
+	return latestPending, nil
+}
+
+// UpdatePaymentTransactionStatus updates an existing transaction's status and metadata
+func (uc *OrderUseCase) UpdatePaymentTransactionStatus(transaction *entity.PaymentTransaction, status entity.TransactionStatus, rawResponse string, metadata map[string]string) error {
+	// Update status using the proper method that handles amount field updates
+	transaction.UpdateStatus(status)
+	
+	if rawResponse != "" {
+		transaction.SetRawResponse(rawResponse)
+	}
+
+	// Add any new metadata
+	for key, value := range metadata {
+		transaction.AddMetadata(key, value)
+	}
+
+	// Save the updated transaction
+	return uc.paymentTxnRepo.Update(transaction)
 }
 
 // UpdatePaymentStatusInput contains the data needed to update payment status
@@ -629,7 +701,8 @@ func (uc *OrderUseCase) increaseStock(order *entity.Order) error {
 		}
 
 		// Update stock
-		if err := variant.UpdateStock(item.Quantity); err != nil { // Positive quantity to increase stock
+		changeAmount := item.Quantity // Positive because we're increasing
+		if err := variant.UpdateStock(changeAmount); err != nil {
 			return fmt.Errorf("failed to update stock for variant %d: %w", item.ProductVariantID, err)
 		}
 

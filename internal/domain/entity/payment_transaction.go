@@ -34,23 +34,30 @@ const (
 // Each transaction represents a specific event in the payment lifecycle
 type PaymentTransaction struct {
 	gorm.Model
-	OrderID       uint              `gorm:"index;not null"` // Foreign key to order (indexed for performance)
-	Order         Order             `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
-	TransactionID string            `gorm:"uniqueIndex;not null;size:100"`         // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
-	ExternalID    string            `gorm:"index;size:255"`                        // External transaction ID from payment provider (can be empty for some providers)
-	Type          TransactionType   `gorm:"not null;size:50;index:idx_order_type"` // Type of transaction (authorize, capture, refund, cancel)
-	Status        TransactionStatus `gorm:"not null;size:50"`                      // Status of the transaction (pending -> successful/failed)
-	Amount        int64             `gorm:"not null"`                              // Amount of the transaction
-	Currency      string            `gorm:"not null;size:3"`                       // Currency of the transaction
-	Provider      string            `gorm:"not null;size:100"`                     // Payment provider (stripe, paypal, etc.)
-	RawResponse   string            `gorm:"type:text"`                             // Raw response from payment provider (JSON)
-	Metadata      datatypes.JSONMap `gorm:"type:text"`                             // Additional metadata stored as JSON
+	OrderID        uint              `gorm:"index;not null"` // Foreign key to order (indexed for performance)
+	Order          Order             `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	TransactionID  string            `gorm:"uniqueIndex;not null;size:100"`         // Human-readable transaction number (e.g., "TXN-AUTH-2025-001")
+	ExternalID     string            `gorm:"index;size:255"`                        // External transaction ID from payment provider (can be empty for some providers)
+	IdempotencyKey string            `gorm:"index;size:255"`                        // Idempotency key from payment provider webhooks (prevents duplicate processing)
+	Type           TransactionType   `gorm:"not null;size:50;index:idx_order_type"` // Type of transaction (authorize, capture, refund, cancel)
+	Status         TransactionStatus `gorm:"not null;size:50"`                      // Status of the transaction (pending -> successful/failed)
+	Amount         int64             `gorm:"not null"`                              // Amount of the transaction
+	Currency       string            `gorm:"not null;size:3"`                       // Currency of the transaction
+	Provider       string            `gorm:"not null;size:100"`                     // Payment provider (stripe, paypal, etc.)
+	RawResponse    string            `gorm:"type:text"`                             // Raw response from payment provider (JSON)
+	Metadata       datatypes.JSONMap `gorm:"type:text"`                             // Additional metadata stored as JSON
+
+	// Amount tracking fields for better payment state management
+	AuthorizedAmount int64 `gorm:"default:0"` // Amount that was authorized (for authorize transactions)
+	CapturedAmount   int64 `gorm:"default:0"` // Amount that was captured (for capture transactions)
+	RefundedAmount   int64 `gorm:"default:0"` // Amount that was refunded (for refund transactions)
 }
 
 // NewPaymentTransaction creates a new payment transaction
 func NewPaymentTransaction(
 	orderID uint,
 	externalID string,
+	idempotencyKey string,
 	transactionType TransactionType,
 	status TransactionStatus,
 	amount int64,
@@ -73,17 +80,37 @@ func NewPaymentTransaction(
 		return nil, errors.New("currency cannot be empty")
 	}
 
-	return &PaymentTransaction{
-		OrderID:    orderID,
-		ExternalID: externalID, // Can be empty for some providers
-		Type:       transactionType,
-		Status:     status,
-		Amount:     amount,
-		Currency:   currency,
-		Provider:   provider,
-		Metadata:   make(datatypes.JSONMap),
+	txn := &PaymentTransaction{
+		OrderID:        orderID,
+		ExternalID:     externalID,     // Can be empty for some providers
+		IdempotencyKey: idempotencyKey, // Can be empty for some providers
+		Type:           transactionType,
+		Status:         status,
+		Amount:         amount,
+		Currency:       currency,
+		Provider:       provider,
+		Metadata:       make(datatypes.JSONMap),
 		// TransactionID will be set when the transaction is saved to get the sequence number
-	}, nil
+	}
+
+	// Set the appropriate amount field based on transaction type and status
+	// Only set amount fields when the transaction is successful
+	if status == TransactionStatusSuccessful {
+		switch transactionType {
+		case TransactionTypeAuthorize:
+			txn.AuthorizedAmount = amount
+		case TransactionTypeCapture:
+			txn.CapturedAmount = amount
+		case TransactionTypeRefund:
+			txn.RefundedAmount = amount
+		case TransactionTypeCancel:
+			// For cancellations, we don't set any specific amount field
+			// as it's typically a state change rather than a money movement
+		}
+	}
+	// For pending, failed, or other statuses, amount fields remain 0
+
+	return txn, nil
 }
 
 // AddMetadata adds metadata to the transaction
@@ -102,8 +129,34 @@ func (pt *PaymentTransaction) SetRawResponse(response string) {
 
 // UpdateStatus updates the status of the transaction
 func (pt *PaymentTransaction) UpdateStatus(status TransactionStatus) {
+	previousStatus := pt.Status
 	pt.Status = status
 
+	// When transitioning from pending/failed to successful, set the appropriate amount field
+	if previousStatus != TransactionStatusSuccessful && status == TransactionStatusSuccessful {
+		switch pt.Type {
+		case TransactionTypeAuthorize:
+			pt.AuthorizedAmount = pt.Amount
+		case TransactionTypeCapture:
+			pt.CapturedAmount = pt.Amount
+		case TransactionTypeRefund:
+			pt.RefundedAmount = pt.Amount
+		case TransactionTypeCancel:
+			// For cancellations, we don't set any specific amount field
+		}
+	}
+
+	// When transitioning from successful to failed, clear the appropriate amount field
+	if previousStatus == TransactionStatusSuccessful && status == TransactionStatusFailed {
+		switch pt.Type {
+		case TransactionTypeAuthorize:
+			pt.AuthorizedAmount = 0
+		case TransactionTypeCapture:
+			pt.CapturedAmount = 0
+		case TransactionTypeRefund:
+			pt.RefundedAmount = 0
+		}
+	}
 }
 
 // SetTransactionID sets the friendly number for the transaction

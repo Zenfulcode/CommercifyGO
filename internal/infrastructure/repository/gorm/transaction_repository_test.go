@@ -21,6 +21,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -39,6 +40,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn1, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_duplicate",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			5000,
@@ -56,7 +58,8 @@ func TestTransactionRepository_Create(t *testing.T) {
 		// Create "identical" transaction (same order + type) with different status and external ID
 		txn2, err := entity.NewPaymentTransaction(
 			1,
-			"external_id_updated",              // Different external ID
+			"external_id_updated", // Different external ID
+			"test-idempotency-key-2",
 			entity.TransactionTypeAuthorize,    // Same type (this will trigger update)
 			entity.TransactionStatusSuccessful, // Different status
 			5000,                               // Same amount
@@ -88,6 +91,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn1, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_amount_test",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusSuccessful,
 			5000,
@@ -105,6 +109,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn2, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_amount_updated",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture, // Same type, so will update
 			entity.TransactionStatusSuccessful,
 			3000, // Different amount
@@ -136,6 +141,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn1, err := entity.NewPaymentTransaction(
 			99, // Use order 99 to avoid conflicts
 			"external_id_auth",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -151,6 +157,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 		txn2, err := entity.NewPaymentTransaction(
 			99, // Use order 99 to avoid conflicts
 			"external_id_capture",
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture, // Different type
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -190,6 +197,7 @@ func TestTransactionRepository_GetByID(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_get_by_id",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,
@@ -229,6 +237,7 @@ func TestTransactionRepository_GetByTransactionID(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"external_id_123", // This is the external ID
+			"test-idempotency-key-1",
 			entity.TransactionTypeCapture,
 			entity.TransactionStatusSuccessful,
 			5000,
@@ -267,18 +276,18 @@ func TestTransactionRepository_GetByOrderID(t *testing.T) {
 
 	t.Run("Get transactions for order with multiple transactions", func(t *testing.T) {
 		// Create multiple transactions for order 1
-		txn1, err := entity.NewPaymentTransaction(1, "txn_order_1_auth", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "txn_order_1_auth", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		txn2, err := entity.NewPaymentTransaction(1, "txn_order_1_capture", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(1, "txn_order_1_capture", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
 
 		// Create transaction for order 2
-		txn3, err := entity.NewPaymentTransaction(2, "txn_order_2_auth", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn3, err := entity.NewPaymentTransaction(2, "txn_order_2_auth", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn3)
 		require.NoError(t, err)
@@ -309,13 +318,13 @@ func TestTransactionRepository_GetLatestByOrderIDAndType(t *testing.T) {
 
 	t.Run("Get latest transaction of specific type", func(t *testing.T) {
 		// Create authorization transaction
-		txn1, err := entity.NewPaymentTransaction(1, "external_auth_1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "external_auth_1", "test-idempotency-key-1", entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, 10000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
 		// Create a capture transaction (different type)
-		txn2, err := entity.NewPaymentTransaction(1, "external_capture_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(1, "external_capture_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
@@ -348,18 +357,18 @@ func TestTransactionRepository_CountSuccessfulByOrderIDAndType(t *testing.T) {
 		testutil.CreateTestOrder(t, db, 11)
 
 		// Create successful capture transactions for different orders
-		txn1, err := entity.NewPaymentTransaction(10, "external_success_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(10, "external_success_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
 
-		txn2, err := entity.NewPaymentTransaction(11, "external_success_2", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 3000, "USD", "stripe")
+		txn2, err := entity.NewPaymentTransaction(11, "external_success_2", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 3000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn2)
 		require.NoError(t, err)
 
 		// Create failed capture transaction for order 1
-		txn3, err := entity.NewPaymentTransaction(1, "external_failed_1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 2000, "USD", "stripe")
+		txn3, err := entity.NewPaymentTransaction(1, "external_failed_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 2000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn3)
 		require.NoError(t, err)
@@ -391,7 +400,7 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 
 	t.Run("Sum amounts for successful transactions", func(t *testing.T) {
 		// Create a successful capture transaction for order 1
-		txn1, err := entity.NewPaymentTransaction(1, "external_sum_1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
+		txn1, err := entity.NewPaymentTransaction(1, "external_sum_1", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusSuccessful, 5000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.Create(txn1)
 		require.NoError(t, err)
@@ -402,7 +411,7 @@ func TestTransactionRepository_SumAmountByOrderIDAndType(t *testing.T) {
 		assert.Equal(t, int64(5000), total)
 
 		// Now update the transaction with a failed status using CreateOrUpdate - should not be included in sum
-		txn_update, err := entity.NewPaymentTransaction(1, "external_sum_updated", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 3000, "USD", "stripe")
+		txn_update, err := entity.NewPaymentTransaction(1, "external_sum_updated", "test-idempotency-key-1", entity.TransactionTypeCapture, entity.TransactionStatusFailed, 3000, "USD", "stripe")
 		require.NoError(t, err)
 		err = repo.CreateOrUpdate(txn_update) // Use CreateOrUpdate to update the existing capture transaction
 		require.NoError(t, err)
@@ -432,6 +441,7 @@ func TestTransactionRepository_Update(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_update",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			10000,
@@ -469,6 +479,7 @@ func TestTransactionRepository_Delete(t *testing.T) {
 		txn, err := entity.NewPaymentTransaction(
 			1,
 			"txn_delete",
+			"test-idempotency-key-1",
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusSuccessful,
 			10000,

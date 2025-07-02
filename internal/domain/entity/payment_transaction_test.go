@@ -13,6 +13,7 @@ func TestPaymentTransaction(t *testing.T) {
 		txn, err := NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-1",
 			TransactionTypeAuthorize,
 			TransactionStatusSuccessful,
 			10000,
@@ -110,6 +111,7 @@ func TestPaymentTransaction(t *testing.T) {
 				txn, err := NewPaymentTransaction(
 					tt.orderID,
 					tt.externalID,
+					"test-idempotency-key",
 					tt.txnType,
 					tt.status,
 					tt.amount,
@@ -128,6 +130,7 @@ func TestPaymentTransaction(t *testing.T) {
 		txn, err := NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-2",
 			TransactionTypeAuthorize,
 			TransactionStatusSuccessful,
 			10000,
@@ -157,6 +160,7 @@ func TestPaymentTransaction(t *testing.T) {
 		txn, err := NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-3",
 			TransactionTypeAuthorize,
 			TransactionStatusSuccessful,
 			10000,
@@ -175,6 +179,7 @@ func TestPaymentTransaction(t *testing.T) {
 		txn, err := NewPaymentTransaction(
 			1,
 			"txn_123",
+			"test-idempotency-key-4",
 			TransactionTypeAuthorize,
 			TransactionStatusPending,
 			10000,
@@ -183,8 +188,107 @@ func TestPaymentTransaction(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		// Initially pending transaction should have no authorized amount
+		assert.Equal(t, int64(0), txn.AuthorizedAmount)
+		assert.Equal(t, int64(10000), txn.Amount) // Original amount is preserved
+
+		// Update to successful should set authorized amount
 		txn.UpdateStatus(TransactionStatusSuccessful)
 		assert.Equal(t, TransactionStatusSuccessful, txn.Status)
+		assert.Equal(t, int64(10000), txn.AuthorizedAmount)
+
+		// Update back to failed should clear authorized amount
+		txn.UpdateStatus(TransactionStatusFailed)
+		assert.Equal(t, TransactionStatusFailed, txn.Status)
+		assert.Equal(t, int64(0), txn.AuthorizedAmount)
+		assert.Equal(t, int64(10000), txn.Amount) // Original amount still preserved
+	})
+
+	t.Run("Amount field behavior by transaction type", func(t *testing.T) {
+		testCases := []struct {
+			name                 string
+			txnType              TransactionType
+			expectedAuthField    int64
+			expectedCaptureField int64
+			expectedRefundField  int64
+		}{
+			{
+				name:                 "Authorize transaction",
+				txnType:              TransactionTypeAuthorize,
+				expectedAuthField:    10000,
+				expectedCaptureField: 0,
+				expectedRefundField:  0,
+			},
+			{
+				name:                 "Capture transaction",
+				txnType:              TransactionTypeCapture,
+				expectedAuthField:    0,
+				expectedCaptureField: 10000,
+				expectedRefundField:  0,
+			},
+			{
+				name:                 "Refund transaction",
+				txnType:              TransactionTypeRefund,
+				expectedAuthField:    0,
+				expectedCaptureField: 0,
+				expectedRefundField:  10000,
+			},
+			{
+				name:                 "Cancel transaction",
+				txnType:              TransactionTypeCancel,
+				expectedAuthField:    0,
+				expectedCaptureField: 0,
+				expectedRefundField:  0,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				// Test pending transaction - should have no amount fields set
+				pendingTxn, err := NewPaymentTransaction(
+					1,
+					"txn_pending",
+					"test-idempotency-pending",
+					tc.txnType,
+					TransactionStatusPending,
+					10000,
+					"USD",
+					"stripe",
+				)
+				require.NoError(t, err)
+
+				// Pending transaction should have no amount fields set
+				assert.Equal(t, int64(0), pendingTxn.AuthorizedAmount)
+				assert.Equal(t, int64(0), pendingTxn.CapturedAmount)
+				assert.Equal(t, int64(0), pendingTxn.RefundedAmount)
+				assert.Equal(t, int64(10000), pendingTxn.Amount) // Original amount preserved
+
+				// Test successful transaction - should have appropriate amount field set
+				successfulTxn, err := NewPaymentTransaction(
+					1,
+					"txn_successful",
+					"test-idempotency-successful",
+					tc.txnType,
+					TransactionStatusSuccessful,
+					10000,
+					"USD",
+					"stripe",
+				)
+				require.NoError(t, err)
+
+				// Successful transaction should have appropriate amount field set
+				assert.Equal(t, tc.expectedAuthField, successfulTxn.AuthorizedAmount)
+				assert.Equal(t, tc.expectedCaptureField, successfulTxn.CapturedAmount)
+				assert.Equal(t, tc.expectedRefundField, successfulTxn.RefundedAmount)
+				assert.Equal(t, int64(10000), successfulTxn.Amount) // Original amount preserved
+
+				// Test updating pending to successful
+				pendingTxn.UpdateStatus(TransactionStatusSuccessful)
+				assert.Equal(t, tc.expectedAuthField, pendingTxn.AuthorizedAmount)
+				assert.Equal(t, tc.expectedCaptureField, pendingTxn.CapturedAmount)
+				assert.Equal(t, tc.expectedRefundField, pendingTxn.RefundedAmount)
+			})
+		}
 	})
 }
 

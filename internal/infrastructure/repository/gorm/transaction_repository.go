@@ -146,6 +146,48 @@ func (t *TransactionRepository) SumAmountByOrderIDAndType(orderID uint, transact
 	return result.TotalAmount, nil
 }
 
+// SumAuthorizedAmountByOrderID implements repository.PaymentTransactionRepository.
+func (t *TransactionRepository) SumAuthorizedAmountByOrderID(orderID uint) (int64, error) {
+	var result struct {
+		TotalAmount int64
+	}
+	if err := t.db.Model(&entity.PaymentTransaction{}).
+		Select("COALESCE(SUM(authorized_amount), 0) as total_amount").
+		Where("order_id = ? AND status = ?", orderID, entity.TransactionStatusSuccessful).
+		Scan(&result).Error; err != nil {
+		return 0, fmt.Errorf("failed to sum authorized amounts: %w", err)
+	}
+	return result.TotalAmount, nil
+}
+
+// SumCapturedAmountByOrderID implements repository.PaymentTransactionRepository.
+func (t *TransactionRepository) SumCapturedAmountByOrderID(orderID uint) (int64, error) {
+	var result struct {
+		TotalAmount int64
+	}
+	if err := t.db.Model(&entity.PaymentTransaction{}).
+		Select("COALESCE(SUM(captured_amount), 0) as total_amount").
+		Where("order_id = ? AND status = ?", orderID, entity.TransactionStatusSuccessful).
+		Scan(&result).Error; err != nil {
+		return 0, fmt.Errorf("failed to sum captured amounts: %w", err)
+	}
+	return result.TotalAmount, nil
+}
+
+// SumRefundedAmountByOrderID implements repository.PaymentTransactionRepository.
+func (t *TransactionRepository) SumRefundedAmountByOrderID(orderID uint) (int64, error) {
+	var result struct {
+		TotalAmount int64
+	}
+	if err := t.db.Model(&entity.PaymentTransaction{}).
+		Select("COALESCE(SUM(refunded_amount), 0) as total_amount").
+		Where("order_id = ? AND status = ?", orderID, entity.TransactionStatusSuccessful).
+		Scan(&result).Error; err != nil {
+		return 0, fmt.Errorf("failed to sum refunded amounts: %w", err)
+	}
+	return result.TotalAmount, nil
+}
+
 // Update implements repository.PaymentTransactionRepository.
 func (t *TransactionRepository) Update(transaction *entity.PaymentTransaction) error {
 	return t.db.Save(transaction).Error
@@ -188,4 +230,20 @@ func getTypeCode(transactionType entity.TransactionType) string {
 	default:
 		return strings.ToUpper(string(transactionType))
 	}
+}
+
+// GetByIdempotencyKey implements repository.PaymentTransactionRepository.
+func (t *TransactionRepository) GetByIdempotencyKey(idempotencyKey string) (*entity.PaymentTransaction, error) {
+	var transaction entity.PaymentTransaction
+
+	// Search for transactions by the dedicated idempotency_key field
+	if err := t.db.Preload("Order").
+		Where("idempotency_key = ?", idempotencyKey).
+		First(&transaction).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("payment transaction with idempotency key %s not found", idempotencyKey)
+		}
+		return nil, fmt.Errorf("failed to fetch payment transaction by idempotency key: %w", err)
+	}
+	return &transaction, nil
 }

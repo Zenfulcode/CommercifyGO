@@ -86,7 +86,24 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentAuthorized(event *models.Webho
 		return err
 	}
 
-	// Record the authorization transaction
+	// Check if payment is already authorized or in a later stage (idempotency check)
+	if order.PaymentStatus == entity.PaymentStatusAuthorized ||
+		order.PaymentStatus == entity.PaymentStatusCaptured ||
+		order.PaymentStatus == entity.PaymentStatusRefunded {
+		h.logger.Info("Payment for order %d is already authorized or beyond, skipping duplicate authorization webhook", orderID)
+		return nil
+	}
+
+	// Check if we already processed this exact webhook event using idempotency key (prevents duplicate webhook processing)
+	if event.IdempotencyKey != "" {
+		existingTxn, err := h.orderUseCase.GetTransactionByIdempotencyKey(event.IdempotencyKey)
+		if err == nil && existingTxn != nil {
+			h.logger.Info("Transaction with idempotency key %s already exists for order %d, skipping duplicate authorization webhook", event.IdempotencyKey, orderID)
+			return nil
+		}
+	}
+
+	// Record/update the authorization transaction
 	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeAuthorize, entity.TransactionStatusSuccessful, order.FinalAmount, order.Currency, "mobilepay", event); err != nil {
 		h.logger.Error("Failed to record authorization transaction for order %d: %v", orderID, err)
 		// Don't fail the webhook processing if transaction recording fails
@@ -117,7 +134,23 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCaptured(event *models.Webhook
 		return err
 	}
 
-	// Record the capture transaction
+	// Check if payment is already captured or refunded (idempotency check)
+	if order.PaymentStatus == entity.PaymentStatusCaptured ||
+		order.PaymentStatus == entity.PaymentStatusRefunded {
+		h.logger.Info("Payment for order %d is already captured or refunded, skipping duplicate capture webhook", orderID)
+		return nil
+	}
+
+	// Check if we already processed this exact webhook event using idempotency key (prevents duplicate webhook processing)
+	if event.IdempotencyKey != "" {
+		existingTxn, err := h.orderUseCase.GetTransactionByIdempotencyKey(event.IdempotencyKey)
+		if err == nil && existingTxn != nil {
+			h.logger.Info("Transaction with idempotency key %s already exists for order %d, skipping duplicate capture webhook", event.IdempotencyKey, orderID)
+			return nil
+		}
+	}
+
+	// Record/update the capture transaction
 	// Use the amount from the webhook event if available, otherwise use order amount
 	captureAmount := order.FinalAmount
 	if event.Amount.Value > 0 {
@@ -155,7 +188,22 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentCancelled(event *models.Webhoo
 		return err
 	}
 
-	// Record the cancellation transaction
+	// Check if payment is already cancelled (idempotency check)
+	if order.PaymentStatus == entity.PaymentStatusCancelled {
+		h.logger.Info("Payment for order %d is already cancelled, skipping duplicate cancellation webhook", orderID)
+		return nil
+	}
+
+	// Check if we already processed this exact webhook event using idempotency key (prevents duplicate webhook processing)
+	if event.IdempotencyKey != "" {
+		existingTxn, err := h.orderUseCase.GetTransactionByIdempotencyKey(event.IdempotencyKey)
+		if err == nil && existingTxn != nil {
+			h.logger.Info("Transaction with idempotency key %s already exists for order %d, skipping duplicate cancellation webhook", event.IdempotencyKey, orderID)
+			return nil
+		}
+	}
+
+	// Record/update the cancellation transaction
 	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeCancel, entity.TransactionStatusSuccessful, 0, order.Currency, "mobilepay", event); err != nil {
 		h.logger.Error("Failed to record cancellation transaction for order %d: %v", orderID, err)
 		// Don't fail the webhook processing if transaction recording fails
@@ -187,7 +235,26 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentExpired(event *models.WebhookE
 		return err
 	}
 
-	// Record the expiration as a failed transaction
+	// Check if payment is already failed, cancelled, or in a successful state (idempotency check)
+	if order.PaymentStatus == entity.PaymentStatusFailed ||
+		order.PaymentStatus == entity.PaymentStatusCancelled ||
+		order.PaymentStatus == entity.PaymentStatusAuthorized ||
+		order.PaymentStatus == entity.PaymentStatusCaptured ||
+		order.PaymentStatus == entity.PaymentStatusRefunded {
+		h.logger.Info("Payment for order %d is already in a final state (%s), skipping duplicate expiration webhook", orderID, order.PaymentStatus)
+		return nil
+	}
+
+	// Check if we already processed this exact webhook event using idempotency key (prevents duplicate webhook processing)
+	if event.IdempotencyKey != "" {
+		existingTxn, err := h.orderUseCase.GetTransactionByIdempotencyKey(event.IdempotencyKey)
+		if err == nil && existingTxn != nil {
+			h.logger.Info("Transaction with idempotency key %s already exists for order %d, skipping duplicate expiration webhook", event.IdempotencyKey, orderID)
+			return nil
+		}
+	}
+
+	// Record/update the expiration as a failed transaction
 	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeAuthorize, entity.TransactionStatusFailed, 0, order.Currency, "mobilepay", event); err != nil {
 		h.logger.Error("Failed to record expiration transaction for order %d: %v", orderID, err)
 		// Don't fail the webhook processing if transaction recording fails
@@ -219,19 +286,39 @@ func (h *MobilePayWebhookHandler) handleSDKPaymentRefunded(event *models.Webhook
 		return err
 	}
 
-	// Record the refund transaction
-	// Use the amount from the webhook event if available, otherwise use order amount
+	// Check if payment is in a refundable state (idempotency check)
+	// Allow refunds for both captured and already partially refunded payments
+	if order.PaymentStatus != entity.PaymentStatusCaptured && order.PaymentStatus != entity.PaymentStatusRefunded {
+		h.logger.Info("Payment for order %d is not in a refundable state (%s), skipping refund webhook", orderID, order.PaymentStatus)
+		return nil
+	}
+
+	// Check if we already processed this exact webhook event using idempotency key (prevents duplicate webhook processing)
+	// For refunds, we check to prevent the exact same webhook event from being processed multiple times
+	if event.IdempotencyKey != "" {
+		existingTxn, err := h.orderUseCase.GetTransactionByIdempotencyKey(event.IdempotencyKey)
+		if err == nil && existingTxn != nil {
+			h.logger.Info("Transaction with idempotency key %s already exists for order %d, skipping duplicate refund webhook", event.IdempotencyKey, orderID)
+			return nil
+		}
+	}
+
+	// For refunds, always create a new transaction (don't update pending ones)
+	// This allows multiple partial refunds to be tracked separately
 	refundAmount := order.FinalAmount
 	if event.Amount.Value > 0 {
 		refundAmount = int64(event.Amount.Value)
 	}
 
-	if err := h.recordPaymentTransaction(orderID, event.Reference, entity.TransactionTypeRefund, entity.TransactionStatusSuccessful, refundAmount, order.Currency, "mobilepay", event); err != nil {
+	h.logger.Info("Creating new refund transaction for order %d with amount %d", orderID, refundAmount)
+	if err := h.createNewTransaction(orderID, event.Reference, entity.TransactionTypeRefund, entity.TransactionStatusSuccessful, refundAmount, order.Currency, "mobilepay", event); err != nil {
 		h.logger.Error("Failed to record refund transaction for order %d: %v", orderID, err)
 		// Don't fail the webhook processing if transaction recording fails
 	}
 
-	// Update order payment status to refunded
+	// Always mark order as refunded when any refund occurs
+	// The system can track partial vs full refunds through transaction records
+	// Business logic elsewhere can determine if it's a full or partial refund by comparing totals
 	_, err = h.orderUseCase.UpdatePaymentStatus(usecase.UpdatePaymentStatusInput{
 		OrderID:       orderID,
 		PaymentStatus: entity.PaymentStatusRefunded,
@@ -279,10 +366,57 @@ func getWebhookSecretFromDatabase(paymentProviderService service.PaymentProvider
 
 // recordPaymentTransaction creates and saves a payment transaction record
 func (h *MobilePayWebhookHandler) recordPaymentTransaction(orderID uint, transactionID string, txnType entity.TransactionType, status entity.TransactionStatus, amount int64, currency, provider string, event *models.WebhookEvent) error {
+	// Try to update existing pending transaction first
+	if err := h.updateOrCreateTransaction(orderID, transactionID, txnType, status, amount, currency, provider, event); err != nil {
+		return fmt.Errorf("failed to update or create payment transaction: %w", err)
+	}
+	return nil
+}
+
+// updateOrCreateTransaction attempts to update an existing pending transaction or creates a new one
+func (h *MobilePayWebhookHandler) updateOrCreateTransaction(orderID uint, transactionID string, txnType entity.TransactionType, status entity.TransactionStatus, amount int64, currency, provider string, event *models.WebhookEvent) error {
+	// First, try to find an existing pending transaction of the same type
+	existingTxn, err := h.orderUseCase.GetLatestPendingTransactionByType(orderID, txnType)
+	if err == nil && existingTxn != nil {
+		// Update the existing pending transaction
+		h.logger.Info("Updating existing pending %s transaction for order %d from pending to %s", txnType, orderID, status)
+
+		// Prepare metadata and raw response from webhook event
+		metadata := make(map[string]string)
+		var rawResponse string
+
+		if event != nil {
+			rawResponse = h.buildEventRawResponse(event)
+			metadata = h.buildEventMetadata(event)
+		}
+
+		// Update the external ID to the webhook reference
+		existingTxn.ExternalID = transactionID
+		if err := h.orderUseCase.UpdatePaymentTransactionStatus(existingTxn, status, rawResponse, metadata); err != nil {
+			return fmt.Errorf("failed to update existing transaction: %w", err)
+		}
+
+		return nil
+	}
+
+	// No pending transaction found, create a new one (fallback for edge cases)
+	h.logger.Info("No pending %s transaction found for order %d, creating new transaction with status %s", txnType, orderID, status)
+	return h.createNewTransaction(orderID, transactionID, txnType, status, amount, currency, provider, event)
+}
+
+// createNewTransaction creates a completely new transaction record
+func (h *MobilePayWebhookHandler) createNewTransaction(orderID uint, transactionID string, txnType entity.TransactionType, status entity.TransactionStatus, amount int64, currency, provider string, event *models.WebhookEvent) error {
+	// Get idempotency key from event if available
+	idempotencyKey := ""
+	if event != nil {
+		idempotencyKey = event.IdempotencyKey
+	}
+
 	// Create payment transaction
 	txn, err := entity.NewPaymentTransaction(
 		orderID,
 		transactionID,
+		idempotencyKey,
 		txnType,
 		status,
 		amount,
@@ -293,31 +427,42 @@ func (h *MobilePayWebhookHandler) recordPaymentTransaction(orderID uint, transac
 		return fmt.Errorf("failed to create payment transaction: %w", err)
 	}
 
-	// Add webhook event data as raw response
+	// Add webhook event data
 	if event != nil {
-		eventData := map[string]interface{}{
-			"event_name":    string(event.Name),
-			"reference":     event.Reference,
-			"psp_reference": event.PSPReference,
-			"timestamp":     event.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
-			"success":       event.Success,
-			"msn":           event.MSN,
-		}
-
-		// Convert to JSON string for storage
-		eventJSON := fmt.Sprintf("%+v", eventData)
-		txn.SetRawResponse(eventJSON)
+		txn.SetRawResponse(h.buildEventRawResponse(event))
 
 		// Add metadata
-		txn.AddMetadata("webhook_event_name", string(event.Name))
-		txn.AddMetadata("webhook_psp_reference", event.PSPReference)
-		txn.AddMetadata("webhook_timestamp", event.Timestamp.Format("2006-01-02T15:04:05Z07:00"))
-		txn.AddMetadata("webhook_success", fmt.Sprintf("%t", event.Success))
-		if event.IdempotencyKey != "" {
-			txn.AddMetadata("idempotency_key", event.IdempotencyKey)
+		for key, value := range h.buildEventMetadata(event) {
+			txn.AddMetadata(key, value)
 		}
 	}
 
 	// Save the transaction using the usecase
 	return h.orderUseCase.RecordPaymentTransaction(txn)
+}
+
+// buildEventRawResponse builds the raw response string from webhook event
+func (h *MobilePayWebhookHandler) buildEventRawResponse(event *models.WebhookEvent) string {
+	eventData := map[string]interface{}{
+		"event_name":    string(event.Name),
+		"reference":     event.Reference,
+		"psp_reference": event.PSPReference,
+		"timestamp":     event.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"success":       event.Success,
+		"msn":           event.MSN,
+	}
+	return fmt.Sprintf("%+v", eventData)
+}
+
+// buildEventMetadata builds metadata map from webhook event
+func (h *MobilePayWebhookHandler) buildEventMetadata(event *models.WebhookEvent) map[string]string {
+	metadata := make(map[string]string)
+	metadata["webhook_event_name"] = string(event.Name)
+	metadata["webhook_psp_reference"] = event.PSPReference
+	metadata["webhook_timestamp"] = event.Timestamp.Format("2006-01-02T15:04:05Z07:00")
+	metadata["webhook_success"] = fmt.Sprintf("%t", event.Success)
+	if event.IdempotencyKey != "" {
+		metadata["idempotency_key"] = event.IdempotencyKey
+	}
+	return metadata
 }
