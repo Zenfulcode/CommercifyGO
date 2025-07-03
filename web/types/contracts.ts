@@ -6,6 +6,7 @@ AddressDTO,
 CardDetailsDTO,
 CheckoutDTO,
 OrderDTO,
+OrderSummaryDTO,
 OrderStatus,
 ShippingOptionDTO,
 UserDTO,
@@ -111,7 +112,7 @@ export interface CheckoutSearchRequest {
   PaginationDTO: PaginationDTO;
 }
 export interface CheckoutCompleteResponse {
-  order: any /* dto.OrderSummaryDTO */;
+  order: OrderSummaryDTO;
   action_required?: boolean;
   redirect_url?: string;
 }
@@ -364,6 +365,7 @@ export interface UpdateProductRequest {
   category_id?: number /* uint */;
   images?: string[];
   active?: boolean;
+  variants?: UpdateVariantRequest[]; // Optional, can be nil if no variants are updated
 }
 /**
  * UpdateVariantRequest represents the data needed to update an existing product variant
