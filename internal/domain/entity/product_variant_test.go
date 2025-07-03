@@ -126,6 +126,7 @@ func TestProductVariant(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test successful update
+		isDefaultPtr := true
 		updated, err := variant.Update(
 			"NEW-SKU",
 			20,
@@ -133,6 +134,7 @@ func TestProductVariant(t *testing.T) {
 			2.5,
 			[]string{"new-image.jpg"},
 			VariantAttributes{"color": "blue"},
+			&isDefaultPtr,
 		)
 
 		require.NoError(t, err)
@@ -158,6 +160,7 @@ func TestProductVariant(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test no update
+		isDefaultPtr := false
 		updated, err := variant.Update(
 			"TEST-SKU-001", // same SKU
 			10,             // same stock
@@ -165,10 +168,57 @@ func TestProductVariant(t *testing.T) {
 			1.5,            // same weight
 			nil,            // same images
 			nil,            // same attributes
+			&isDefaultPtr,  // same isDefault
 		)
 
 		require.NoError(t, err)
 		assert.False(t, updated)
+	})
+
+	t.Run("Update method with isDefault change", func(t *testing.T) {
+		variant, err := NewProductVariant(
+			"TEST-SKU-001",
+			10,
+			9999,
+			1.5,
+			nil,
+			nil,
+			false, // initially not default
+		)
+		require.NoError(t, err)
+		assert.False(t, variant.IsDefault)
+
+		// Test updating isDefault to true
+		isDefaultPtr := true
+		updated, err := variant.Update(
+			"TEST-SKU-001", // same SKU
+			10,             // same stock
+			9999,           // same price
+			1.5,            // same weight
+			nil,            // same images
+			nil,            // same attributes
+			&isDefaultPtr,  // change isDefault to true
+		)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.True(t, variant.IsDefault)
+
+		// Test updating isDefault back to false
+		isDefaultPtr = false
+		updated, err = variant.Update(
+			"TEST-SKU-001", // same SKU
+			10,             // same stock
+			9999,           // same price
+			1.5,            // same weight
+			nil,            // same images
+			nil,            // same attributes
+			&isDefaultPtr,  // change isDefault to false
+		)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.False(t, variant.IsDefault)
 	})
 
 	t.Run("ToVariantDTO", func(t *testing.T) {
