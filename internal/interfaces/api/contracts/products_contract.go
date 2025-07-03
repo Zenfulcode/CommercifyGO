@@ -37,12 +37,13 @@ type CreateVariantRequest struct {
 
 // UpdateProductRequest represents the data needed to update an existing product
 type UpdateProductRequest struct {
-	Name        *string   `json:"name,omitempty"`
-	Description *string   `json:"description,omitempty"`
-	Currency    *string   `json:"currency,omitempty"`
-	CategoryID  *uint     `json:"category_id,omitempty"`
-	Images      *[]string `json:"images,omitempty"`
-	Active      *bool     `json:"active,omitempty"`
+	Name        *string                 `json:"name,omitempty"`
+	Description *string                 `json:"description,omitempty"`
+	Currency    *string                 `json:"currency,omitempty"`
+	CategoryID  *uint                   `json:"category_id,omitempty"`
+	Images      *[]string               `json:"images,omitempty"`
+	Active      *bool                   `json:"active,omitempty"`
+	Variants    *[]UpdateVariantRequest `json:"variants,omitempty"` // Optional, can be nil if no variants are updated
 }
 
 // UpdateVariantRequest represents the data needed to update an existing product variant
@@ -120,18 +121,39 @@ func (cv *CreateVariantRequest) ToUseCaseInput() usecase.CreateVariantInput {
 }
 
 func (up *UpdateProductRequest) ToUseCaseInput() usecase.UpdateProductInput {
-	return usecase.UpdateProductInput{
+	input := usecase.UpdateProductInput{
 		Name:        up.Name,
 		Description: up.Description,
 		CategoryID:  up.CategoryID,
 		Images:      up.Images,
 		Active:      up.Active,
 	}
+
+	// Convert variants if provided
+	if up.Variants != nil {
+		variants := make([]usecase.UpdateVariantInput, len(*up.Variants))
+		for i, v := range *up.Variants {
+			variants[i] = v.ToUseCaseInput()
+		}
+		input.Variants = &variants
+	}
+
+	return input
 }
 
 func (u UpdateVariantRequest) ToUseCaseInput() usecase.UpdateVariantInput {
-
 	var variantInput usecase.VariantInput
+
+	// Set defaults for required fields
+	variantInput.SKU = ""
+	variantInput.Stock = 0
+	variantInput.Price = 0
+	variantInput.Weight = 0
+	variantInput.IsDefault = false
+	variantInput.Images = []string{}
+	variantInput.Attributes = make(map[string]string)
+
+	// Update with provided values
 	if u.SKU != nil {
 		variantInput.SKU = *u.SKU
 	}

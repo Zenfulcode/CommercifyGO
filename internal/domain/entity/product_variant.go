@@ -56,7 +56,7 @@ func NewProductVariant(sku string, stock int, price int64, weight float64, attri
 	}, nil
 }
 
-func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float64, images []string, attributes VariantAttributes) (bool, error) {
+func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float64, images []string, attributes VariantAttributes, isDefault *bool) (bool, error) {
 	updated := false
 	if SKU != "" && v.SKU != SKU {
 		v.SKU = SKU
@@ -81,6 +81,10 @@ func (v *ProductVariant) Update(SKU string, stock int, price int64, weight float
 	}
 	if len(attributes) > 0 {
 		v.Attributes = datatypes.NewJSONType(attributes)
+		updated = true
+	}
+	if isDefault != nil && v.IsDefault != *isDefault {
+		v.IsDefault = *isDefault
 		updated = true
 	}
 

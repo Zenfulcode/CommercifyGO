@@ -107,7 +107,7 @@ func TestProduct(t *testing.T) {
 			"Description",
 			"USD",
 			1,
-			nil,
+			[]string{},
 			[]*ProductVariant{variant1},
 			true,
 		)

@@ -176,9 +176,10 @@ type UpdateProductInput struct {
 	CategoryID  *uint
 	Images      *[]string
 	Active      *bool
+	Variants    *[]UpdateVariantInput
 }
 
-// UpdateProduct updates a product
+// UpdateProduct updates a product (admin only)
 func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*entity.Product, error) {
 	// Get product
 	product, err := uc.productRepo.GetByID(id)
@@ -195,7 +196,88 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 		product.CategoryID = *input.CategoryID
 	}
 
+	// Update basic product fields
 	updated := product.Update(input.Name, input.Description, input.Images, input.Active)
+
+	// Handle variant updates if provided
+	if input.Variants != nil {
+		for _, variantUpdate := range *input.Variants {
+			// Find the variant to update by SKU or ID
+			var targetVariant *entity.ProductVariant
+			for _, variant := range product.Variants {
+				// If SKU is provided, match by SKU; otherwise this is a new variant
+				if variantUpdate.SKU != "" && variant.SKU == variantUpdate.SKU {
+					targetVariant = variant
+					break
+				}
+			}
+
+			if targetVariant != nil {
+				// Handle IsDefault logic before updating
+				var isDefaultPtr *bool
+				if variantUpdate.IsDefault {
+					// If setting this variant as default, unset any other default variants
+					for _, v := range product.Variants {
+						if v.ID != targetVariant.ID && v.IsDefault {
+							v.IsDefault = false
+						}
+					}
+					isDefaultPtr = &variantUpdate.IsDefault
+				} else {
+					isDefaultPtr = &variantUpdate.IsDefault
+				}
+
+				// Update existing variant
+				variantUpdated, err := targetVariant.Update(
+					variantUpdate.SKU,
+					variantUpdate.Stock,
+					variantUpdate.Price,
+					variantUpdate.Weight,
+					variantUpdate.Images,
+					variantUpdate.Attributes,
+					isDefaultPtr,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to update variant: %w", err)
+				}
+				if variantUpdated {
+					updated = true
+				}
+			} else {
+				// Add new variant if SKU is provided and not found
+				if variantUpdate.SKU != "" {
+					// If this new variant is set as default, unset any existing default variants
+					if variantUpdate.IsDefault {
+						for _, v := range product.Variants {
+							if v.IsDefault {
+								v.IsDefault = false
+							}
+						}
+					}
+
+					newVariant, err := entity.NewProductVariant(
+						variantUpdate.SKU,
+						variantUpdate.Stock,
+						variantUpdate.Price,
+						variantUpdate.Weight,
+						variantUpdate.Attributes,
+						variantUpdate.Images,
+						variantUpdate.IsDefault,
+					)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create variant: %w", err)
+					}
+
+					err = product.AddVariant(newVariant)
+					if err != nil {
+						return nil, fmt.Errorf("failed to add variant to product: %w", err)
+					}
+					updated = true
+				}
+			}
+		}
+	}
+
 	if !updated {
 		return product, nil // No changes to update
 	}
@@ -213,7 +295,7 @@ type UpdateVariantInput struct {
 	VariantInput
 }
 
-// UpdateVariant updates a product variant
+// UpdateVariant updates a product variant (admin only)
 func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateVariantInput) (*entity.ProductVariant, error) {
 	product, err := uc.productRepo.GetByID(productId)
 	if err != nil {
@@ -227,17 +309,22 @@ func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateV
 	}
 
 	// Update variant fields
-	variant.Update(
+	isDefaultPtr := &input.IsDefault
+	updated, err := variant.Update(
 		input.SKU,
 		input.Stock,
 		input.Price,
 		input.Weight,
 		input.Images,
 		input.Attributes,
+		isDefaultPtr,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update variant: %w", err)
+	}
 
-	// Handle default status
-	if input.IsDefault != variant.IsDefault {
+	// Handle default status if changed
+	if updated && input.IsDefault != variant.IsDefault {
 		// If setting this variant as default, unset any other default variants
 		if input.IsDefault {
 			for _, v := range product.Variants {
@@ -246,8 +333,6 @@ func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateV
 				}
 			}
 		}
-
-		variant.IsDefault = input.IsDefault
 	}
 
 	// Update variant in repository
@@ -258,7 +343,7 @@ func (uc *ProductUseCase) UpdateVariant(productId, variantId uint, input UpdateV
 	return variant, nil
 }
 
-// AddVariant adds a new variant to a product
+// AddVariant adds a new variant to a product (admin only)
 func (uc *ProductUseCase) AddVariant(productID uint, input CreateVariantInput) (*entity.ProductVariant, error) {
 	product, err := uc.productRepo.GetByID(productID)
 	if err != nil {
@@ -302,18 +387,55 @@ func (uc *ProductUseCase) AddVariant(productID uint, input CreateVariantInput) (
 	return variant, nil
 }
 
-// DeleteVariant deletes a product variant
+// DeleteVariant deletes a product variant (admin only)
 func (uc *ProductUseCase) DeleteVariant(productID, variantID uint) error {
 	product, err := uc.productRepo.GetByID(productID)
 	if err != nil {
 		return err
 	}
 
-	err = product.RemoveVariant(variantID)
-	if err != nil {
-		return fmt.Errorf("failed to remove variant: %w", err)
+	// Check if the variant exists in the product
+	variant := product.GetVariantByID(variantID)
+	if variant == nil {
+		return errors.New("variant not found")
 	}
 
+	// Check if this is the last variant (products must have at least one variant)
+	if len(product.Variants) <= 1 {
+		return errors.New("cannot delete the last variant of a product")
+	}
+
+	// TODO: Add checks for orders and checkouts with this specific variant
+	// For now, we'll check at the product level which is safer
+	hasOrders, err := uc.orderRepo.HasOrdersWithProduct(productID)
+	if err != nil {
+		return fmt.Errorf("failed to check for product orders: %w", err)
+	}
+	if hasOrders {
+		return errors.New("cannot delete variant from product with existing orders")
+	}
+
+	hasActiveCheckouts, err := uc.checkoutRepo.HasActiveCheckoutsWithProduct(productID)
+	if err != nil {
+		return fmt.Errorf("failed to check for active checkouts: %w", err)
+	}
+	if hasActiveCheckouts {
+		return errors.New("cannot delete variant from product with active checkouts")
+	}
+
+	// Remove the variant from the product's variants slice first
+	err = product.RemoveVariant(variantID)
+	if err != nil {
+		return fmt.Errorf("failed to remove variant from product: %w", err)
+	}
+
+	// Actually delete the variant from the database
+	err = uc.productVariantRepo.Delete(variantID)
+	if err != nil {
+		return fmt.Errorf("failed to delete variant from database: %w", err)
+	}
+
+	// Update the product to reflect the change (this will sync the variants relationship)
 	if err := uc.productRepo.Update(product); err != nil {
 		return fmt.Errorf("failed to update product after removing variant: %w", err)
 	}
@@ -321,7 +443,7 @@ func (uc *ProductUseCase) DeleteVariant(productID, variantID uint) error {
 	return nil
 }
 
-// DeleteProduct deletes a product after checking it has no associated orders or active checkouts
+// DeleteProduct deletes a product after checking it has no associated orders or active checkouts (admin only)
 func (uc *ProductUseCase) DeleteProduct(id uint) error {
 	if id == 0 {
 		return errors.New("product ID is required")

@@ -43,12 +43,8 @@ export interface CheckoutDTO {
   discount_amount: number /* float64 */;
   final_amount: number /* float64 */;
   applied_discount?: AppliedDiscountDTO;
-  created_at: string;
-  updated_at: string;
   last_activity_at: string;
   expires_at: string;
-  completed_at?: string;
-  converted_order_id?: number /* uint */;
 }
 /**
  * CheckoutItemDTO represents an item in a checkout
@@ -202,6 +198,7 @@ export interface OrderSummaryDTO {
   payment_status: PaymentStatus;
   total_amount: number /* float64 */; // Subtotal (items only)
   shipping_cost: number /* float64 */; // Shipping cost
+  discount_amount: number /* float64 */; // Discount applied amount
   final_amount: number /* float64 */; // Total including shipping and discounts
   order_lines_amount: number /* int */;
   currency: string;
@@ -281,7 +278,7 @@ export interface ProductDTO {
   sku: string; // Default variant SKU
   total_stock: number /* int */; // Total stock across all variants
   category: string;
-  category_id: number /* uint */;
+  category_id?: number /* uint */;
   images: string[];
   has_variants: boolean;
   active: boolean;
@@ -298,7 +295,7 @@ export interface VariantDTO {
   variant_name: string;
   sku: string;
   stock: number /* int */;
-  attributes: any /* common.StringMap */;
+  attributes: { [key: string]: string};
   images: string[];
   is_default: boolean;
   weight: number /* float64 */;
