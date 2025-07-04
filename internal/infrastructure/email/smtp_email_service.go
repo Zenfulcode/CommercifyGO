@@ -69,13 +69,13 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 	}
 
 	// Format email message
-	msg := []byte(fmt.Sprintf("From: %s <%s>\r\n"+
+	msg := fmt.Appendf(nil, "From: %s <%s>\r\n"+
 		"To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: %s; charset=UTF-8\r\n"+
 		"\r\n"+
-		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body))
+		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body)
 
 	// Send email
 	s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
@@ -142,9 +142,6 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 
 	// Debug logging
 	s.logger.Info("Email template data - Order ID: %d", order.ID)
-	s.logger.Info("Shipping Address: %+v", shippingAddr)
-	s.logger.Info("Billing Address: %+v", billingAddr)
-	s.logger.Info("Applied Discount: %+v", appliedDiscount)
 
 	data := map[string]any{
 		"Order":           order,

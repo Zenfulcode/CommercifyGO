@@ -115,11 +115,14 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pageSize <= 0 {
-		page = 10 // Default limit
+		pageSize = 10 // Default limit
 	}
 
+	// Calculate offset for pagination
+	offset := (page - 1) * pageSize
+
 	// Get orders
-	orders, err := h.orderUseCase.GetUserOrders(userID, page, pageSize)
+	orders, err := h.orderUseCase.GetUserOrders(userID, offset, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
 		// TODO: Add proper error handling
@@ -163,14 +166,17 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 		pageSize = 10 // Default page size
 	}
 
+	// Calculate offset for pagination
+	offset := (page - 1) * pageSize
+
 	// Get orders by status if provided
 	var orders []*entity.Order
 	var err error
 
 	if status != "" {
-		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), page, pageSize)
+		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), offset, pageSize)
 	} else {
-		orders, err = h.orderUseCase.ListAllOrders(page, pageSize)
+		orders, err = h.orderUseCase.ListAllOrders(offset, pageSize)
 	}
 
 	if err != nil {

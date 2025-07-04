@@ -561,7 +561,7 @@ func (uc *OrderUseCase) GetLatestPendingTransactionByType(orderID uint, txnType 
 func (uc *OrderUseCase) UpdatePaymentTransactionStatus(transaction *entity.PaymentTransaction, status entity.TransactionStatus, rawResponse string, metadata map[string]string) error {
 	// Update status using the proper method that handles amount field updates
 	transaction.UpdateStatus(status)
-	
+
 	if rawResponse != "" {
 		transaction.SetRawResponse(rawResponse)
 	}
