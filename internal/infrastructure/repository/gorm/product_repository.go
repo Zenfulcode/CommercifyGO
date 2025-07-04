@@ -129,7 +129,11 @@ func (r *ProductRepository) List(query, currency string, categoryID, offset, lim
 		tx = tx.Where("currency = ?", currency)
 	}
 
-	tx = tx.Where("active = ?", active)
+	// Active filter: if active=true, only show active products; if active=false, show all products
+	if active {
+		tx = tx.Where("active = ?", true)
+	}
+	// If active is false, don't add any filter to show all products (active and inactive)
 
 	// Price filtering requires joining with variants
 	if minPriceCents > 0 || maxPriceCents > 0 {
@@ -175,7 +179,11 @@ func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint,
 		tx = tx.Where("currency = ?", currency)
 	}
 
-	tx = tx.Where("active = ?", active)
+	// Only filter by active status if active=true
+	// If active=false, return all products (active and inactive)
+	if active {
+		tx = tx.Where("active = ?", true)
+	}
 
 	// Price filtering requires joining with variants
 	if minPriceCents > 0 || maxPriceCents > 0 {

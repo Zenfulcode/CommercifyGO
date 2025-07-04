@@ -87,7 +87,7 @@ docker-build-push: docker-build-tag docker-push ## Build and push Docker image (
 
 docker-dev-push: ## Build Docker image for development
 	docker build -t ghcr.io/zenfulcode/commercifygo:v2-dev .
-	docker push ghcr.io/zenfulcode/commercifygo:dev
+	docker push ghcr.io/zenfulcode/commercifygo:v2-dev
 
 # Development commands
 test: ## Run tests
