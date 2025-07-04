@@ -32,7 +32,15 @@ func NewEmailTestHandler(emailSvc service.EmailService, logger logger.Logger, em
 func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("Test email endpoint called")
 
-	// Create a mock user (but we'll send emails to admin address)
+	// Get target email from query parameter or request body
+	targetEmail := h.getTargetEmail(r)
+	if targetEmail == "" {
+		targetEmail = h.config.AdminEmail // Fallback to admin email
+	}
+
+	h.logger.Info("Sending test emails to: %s", targetEmail)
+
+	// Create a mock user (but we'll send emails to specified address)
 	mockUser := &entity.User{
 		Email:     "customer@example.com", // This is just for the mock data
 		FirstName: "John",
@@ -117,33 +125,33 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 
 	var errors []string
 
-	// Override email addresses to send both emails to admin for testing
-	adminUser := &entity.User{
-		Email:     h.config.AdminEmail, // Send to admin email
+	// Override email addresses to send both emails to specified target email
+	targetUser := &entity.User{
+		Email:     targetEmail, // Send to specified email
 		FirstName: mockUser.FirstName,
 		LastName:  mockUser.LastName,
 	}
 
-	// Also update the order's customer details to use admin email for testing
+	// Also update the order's customer details to use target email for testing
 	testOrder := *mockOrder
 	testOrder.CustomerDetails = &entity.CustomerDetails{
-		Email:    h.config.AdminEmail, // Send to admin email
+		Email:    targetEmail, // Send to specified email
 		Phone:    mockOrder.CustomerDetails.Phone,
 		FullName: mockOrder.CustomerDetails.FullName,
 	}
 
-	// Send order confirmation email to admin (instead of customer)
-	h.logger.Info("Sending test order confirmation email to admin: %s", h.config.AdminEmail)
-	if err := h.emailSvc.SendOrderConfirmation(&testOrder, adminUser); err != nil {
+	// Send order confirmation email to target email
+	h.logger.Info("Sending test order confirmation email to: %s", targetEmail)
+	if err := h.emailSvc.SendOrderConfirmation(&testOrder, targetUser); err != nil {
 		h.logger.Error("Failed to send order confirmation email: %v", err)
 		errors = append(errors, "Order confirmation: "+err.Error())
 	} else {
 		h.logger.Info("Order confirmation email sent successfully")
 	}
 
-	// Send order notification email to admin
-	h.logger.Info("Sending test order notification email to admin: %s", h.config.AdminEmail)
-	if err := h.emailSvc.SendOrderNotification(&testOrder, adminUser); err != nil {
+	// Send order notification email to target email
+	h.logger.Info("Sending test order notification email to: %s", targetEmail)
+	if err := h.emailSvc.SendOrderNotification(&testOrder, targetUser); err != nil {
 		h.logger.Error("Failed to send order notification email: %v", err)
 		errors = append(errors, "Order notification: "+err.Error())
 	} else {
@@ -166,8 +174,30 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Both order confirmation and notification emails sent successfully",
 		"details": map[string]string{
-			"customer_email": mockUser.Email,
-			"order_id":       "12345",
+			"target_email": targetEmail,
+			"order_id":     "12345",
 		},
 	})
+}
+
+// getTargetEmail extracts the target email from query parameter or request body
+func (h *EmailTestHandler) getTargetEmail(r *http.Request) string {
+	// First try query parameter
+	if email := r.URL.Query().Get("email"); email != "" {
+		return email
+	}
+
+	// Then try request body for POST requests
+	if r.Method == http.MethodPost {
+		var requestBody struct {
+			Email string `json:"email"`
+		}
+
+		// Try to decode JSON body
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err == nil {
+			return requestBody.Email
+		}
+	}
+
+	return ""
 }
