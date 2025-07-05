@@ -9,6 +9,7 @@ import (
 
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -119,6 +120,7 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
 	}
 
 	// Send email
@@ -150,6 +152,7 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
 	}
 
 	// Send email
@@ -170,10 +173,13 @@ func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]a
 	// Create template with helper functions
 	tmpl := template.New(templateName).Funcs(template.FuncMap{
 		"centsToDollars": func(cents int64) float64 {
-			return float64(cents) / 100.0
+			return money.FromCents(cents)
 		},
 		"formatPrice": func(cents int64) string {
-			return fmt.Sprintf("%.2f", float64(cents)/100.0)
+			return fmt.Sprintf("%.2f", money.FromCents(cents))
+		},
+		"formatPriceWithCurrency": func(cents int64, currency string) string {
+			return s.formatCurrency(cents, currency)
 		},
 	})
 
@@ -190,4 +196,17 @@ func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]a
 	}
 
 	return buf.String(), nil
+}
+
+// formatCurrency formats a cents amount with the currency code at the end
+func (s *SMTPEmailService) formatCurrency(amount int64, currency string) string {
+	// Format amount as decimal
+	decimal := money.FromCents(amount)
+
+	// Format with currency code at the end for all currencies
+	if currency == "JPY" {
+		// JPY typically doesn't use decimals
+		return fmt.Sprintf("%.0f %s", decimal*100, currency) // Convert back to whole yen
+	}
+	return fmt.Sprintf("%.2f %s", decimal, currency)
 }

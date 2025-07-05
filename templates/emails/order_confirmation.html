@@ -90,30 +90,30 @@
         <tr>
           <td>Product #{{.ProductID}}</td>
           <td>{{.Quantity}}</td>
-          <td>${{formatPrice .Price}}</td>
-          <td>${{formatPrice .Subtotal}}</td>
+          <td>{{formatPriceWithCurrency .Price $.Currency}}</td>
+          <td>{{formatPriceWithCurrency .Subtotal $.Currency}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
 
     <div class="order-summary">
-      <p><strong>Subtotal:</strong> ${{formatPrice .Order.TotalAmount}}</p>
+      <p><strong>Subtotal:</strong> {{formatPriceWithCurrency .Order.TotalAmount .Currency}}</p>
 
       {{if gt .Order.ShippingCost 0}}
-      <p><strong>Shipping:</strong> ${{formatPrice .Order.ShippingCost}}</p>
+      <p><strong>Shipping:</strong> {{formatPriceWithCurrency .Order.ShippingCost .Currency}}</p>
       {{else}}
       <p><strong>Shipping:</strong> Free</p>
       {{end}}      {{if gt .Order.DiscountAmount 0}}
       <p>
-        <strong>Discount:</strong> -${{formatPrice .Order.DiscountAmount}} {{if
+        <strong>Discount:</strong> -{{formatPriceWithCurrency .Order.DiscountAmount .Currency}} {{if
         .AppliedDiscount}} {{if .AppliedDiscount.DiscountCode}}
         (Code: {{.AppliedDiscount.DiscountCode}}) {{end}} {{end}}
       </p>
       {{end}}
 
       <div class="total">
-        <p><strong>Total:</strong> ${{formatPrice .Order.FinalAmount}}</p>
+        <p><strong>Total:</strong> {{formatPriceWithCurrency .Order.FinalAmount .Currency}}</p>
       </div>
     </div>
 
