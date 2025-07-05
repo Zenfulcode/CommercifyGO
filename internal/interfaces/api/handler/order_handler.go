@@ -41,6 +41,10 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse query parameters for includes
+	includePaymentTransactions := r.URL.Query().Get("include_payment_transactions") == "true"
+	includeItems := r.URL.Query().Get("include_items") != "false" // Default to true for backward compatibility
+
 	// Get order
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
 	if err != nil {
@@ -86,7 +90,12 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderDTO := contracts.OrderDetailResponse(order.ToOrderDetailsDTO())
+	// Create order DTO with conditional includes
+	options := entity.OrderDetailOptions{
+		IncludePaymentTransactions: includePaymentTransactions,
+		IncludeItems:               includeItems,
+	}
+	orderDTO := contracts.OrderDetailResponse(order.ToOrderDetailsDTOWithOptions(options))
 
 	// Return order
 	w.Header().Set("Content-Type", "application/json")

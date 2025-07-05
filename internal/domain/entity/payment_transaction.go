@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -215,4 +217,20 @@ func generateTransactionID(transactionType TransactionType, sequence int) string
 // SetExternalID sets the external payment provider ID
 func (pt *PaymentTransaction) SetExternalID(externalID string) {
 	pt.ExternalID = externalID
+}
+
+// ToPaymentTransactionDTO converts a PaymentTransaction entity to DTO
+func (pt *PaymentTransaction) ToPaymentTransactionDTO() dto.PaymentTransactionDTO {
+	return dto.PaymentTransactionDTO{
+		ID:            pt.ID,
+		TransactionID: pt.TransactionID,
+		ExternalID:    pt.ExternalID,
+		Type:          dto.TransactionType(pt.Type),
+		Status:        dto.TransactionStatus(pt.Status),
+		Amount:        money.FromCents(pt.Amount),
+		Currency:      pt.Currency,
+		Provider:      pt.Provider,
+		CreatedAt:     pt.CreatedAt,
+		UpdatedAt:     pt.UpdatedAt,
+	}
 }

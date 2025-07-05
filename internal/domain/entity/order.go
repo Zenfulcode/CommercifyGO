@@ -534,7 +534,14 @@ func (o *Order) ToOrderSummaryDTO() *dto.OrderSummaryDTO {
 	}
 }
 
-func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
+// OrderDetailOptions defines what to include in the order details
+type OrderDetailOptions struct {
+	IncludePaymentTransactions bool
+	IncludeItems               bool
+}
+
+// ToOrderDetailsDTOWithOptions converts an Order entity to DTO with configurable includes
+func (o *Order) ToOrderDetailsDTOWithOptions(options OrderDetailOptions) *dto.OrderDTO {
 	var discountDetails *dto.AppliedDiscountDTO
 	if appliedDiscount := o.GetAppliedDiscount(); appliedDiscount != nil {
 		discountDetails = appliedDiscount.ToAppliedDiscountDTO()
@@ -558,13 +565,35 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		userID = *o.UserID
 	}
 
-	return &dto.OrderDTO{
+	// Create default values for required fields if they're nil
+	var customerDetailsValue dto.CustomerDetailsDTO
+	if customerDetails != nil {
+		customerDetailsValue = *customerDetails
+	}
+
+	var shippingDetailsValue dto.ShippingOptionDTO
+	if shippingDetails != nil {
+		shippingDetailsValue = *shippingDetails
+	}
+
+	// Create default values for addresses if they're nil
+	var shippingAddressValue dto.AddressDTO
+	if shippingAddr != nil {
+		shippingAddressValue = *shippingAddr.ToAddressDTO()
+	}
+
+	var billingAddressValue dto.AddressDTO
+	if billingAddr != nil {
+		billingAddressValue = *billingAddr.ToAddressDTO()
+	}
+
+	orderDTO := &dto.OrderDTO{
 		ID:              o.ID,
 		OrderNumber:     o.OrderNumber,
 		UserID:          userID,
 		CheckoutID:      o.CheckoutSessionID,
-		CustomerDetails: *customerDetails,
-		ShippingDetails: *shippingDetails,
+		CustomerDetails: customerDetailsValue,
+		ShippingDetails: shippingDetailsValue,
 		DiscountDetails: discountDetails,
 		Status:          dto.OrderStatus(o.Status),
 		PaymentStatus:   dto.PaymentStatus(o.PaymentStatus),
@@ -573,14 +602,29 @@ func (o *Order) ToOrderDetailsDTO() *dto.OrderDTO {
 		ShippingCost:    money.FromCents(o.ShippingCost),
 		DiscountAmount:  money.FromCents(o.DiscountAmount),
 		FinalAmount:     money.FromCents(o.FinalAmount),
-		Items:           o.ToOrderItemsDTO(),
-		ShippingAddress: *shippingAddr.ToAddressDTO(),
-		BillingAddress:  *billingAddr.ToAddressDTO(),
+		ShippingAddress: shippingAddressValue,
+		BillingAddress:  billingAddressValue,
 		ActionRequired:  o.ActionRequired(),
 		ActionURL:       o.ActionURL.String,
 		CreatedAt:       o.CreatedAt,
 		UpdatedAt:       o.UpdatedAt,
 	}
+
+	// Conditionally include items
+	if options.IncludeItems {
+		orderDTO.Items = o.ToOrderItemsDTO()
+	}
+
+	// Conditionally include payment transactions
+	if options.IncludePaymentTransactions {
+		paymentTransactions := make([]dto.PaymentTransactionDTO, len(o.PaymentTransactions))
+		for i, pt := range o.PaymentTransactions {
+			paymentTransactions[i] = pt.ToPaymentTransactionDTO()
+		}
+		orderDTO.PaymentTransactions = paymentTransactions
+	}
+
+	return orderDTO
 }
 
 func (o *Order) ToOrderItemsDTO() []dto.OrderItemDTO {
@@ -624,24 +668,68 @@ func (c *CustomerDetails) ToCustomerDetailsDTO() *dto.CustomerDetailsDTO {
 
 // GetShippingAddress returns the shipping address from JSON
 func (o *Order) GetShippingAddress() *Address {
+	// Handle cases where the JSON data might be empty/null
+	defer func() {
+		if r := recover(); r != nil {
+			// Gracefully handle any panics from Data() method
+		}
+	}()
+
 	data := o.ShippingAddress.Data()
+	// Check if we got a valid address (not completely empty)
+	if data.Street1 == "" && data.City == "" && data.Country == "" {
+		return nil
+	}
 	return &data
 }
 
 // GetBillingAddress returns the billing address from JSON
 func (o *Order) GetBillingAddress() *Address {
+	// Handle cases where the JSON data might be empty/null
+	defer func() {
+		if r := recover(); r != nil {
+			// Gracefully handle any panics from Data() method
+		}
+	}()
+
 	data := o.BillingAddress.Data()
+	// Check if we got a valid address (not completely empty)
+	if data.Street1 == "" && data.City == "" && data.Country == "" {
+		return nil
+	}
 	return &data
 }
 
 // GetAppliedDiscount returns the applied discount from JSON
 func (o *Order) GetAppliedDiscount() *AppliedDiscount {
+	// Handle cases where the JSON data might be empty/null
+	defer func() {
+		if r := recover(); r != nil {
+			// Gracefully handle any panics from Data() method
+		}
+	}()
+
 	data := o.AppliedDiscount.Data()
+	// Check if we got a valid discount (has an ID)
+	if data.DiscountID == 0 {
+		return nil
+	}
 	return &data
 }
 
 // GetShippingOption returns the shipping option from JSON
 func (o *Order) GetShippingOption() *ShippingOption {
+	// Handle cases where the JSON data might be empty/null
+	defer func() {
+		if r := recover(); r != nil {
+			// Gracefully handle any panics from Data() method
+		}
+	}()
+
 	data := o.ShippingOption.Data()
+	// Check if we got a valid shipping option (has a name or method ID)
+	if data.Name == "" && data.ShippingMethodID == 0 {
+		return nil
+	}
 	return &data
 }

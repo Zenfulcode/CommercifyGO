@@ -10,6 +10,19 @@ GET /api/orders/{id}
 
 Retrieve a specific order for the authenticated user.
 
+**Query Parameters:**
+
+- `include_payment_transactions` (optional): Include payment transaction details in the response (default: false)
+  - Values: `true` or `false`
+- `include_items` (optional): Include order items in the response (default: true)
+  - Values: `true` or `false`
+
+**Examples:**
+
+- Get order with payment transactions: `GET /api/orders/123?include_payment_transactions=true`
+- Get order without items: `GET /api/orders/123?include_items=false`
+- Get order with both: `GET /api/orders/123?include_payment_transactions=true&include_items=true`
+
 Example response:
 
 ```json
@@ -58,6 +71,59 @@ Example response:
     },
     "payment_method": "wallet",
     "payment_status": "captured",
+    "shipping_method": "express",
+    "shipping_cost": 14.99,
+    "tax_amount": 0,
+    "discount_amount": 0,
+    "created_at": "2024-03-20T11:00:00Z",
+    "updated_at": "2024-03-20T11:05:00Z"
+  }
+}
+```
+
+**Example response with payment transactions (`include_payment_transactions=true`):**
+
+```json
+{
+  "success": true,
+  "message": "Order retrieved successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "user_id": "550e8400-e29b-41d4-a716-446655440004",
+    "status": "paid",
+    "payment_status": "captured",
+    "total_amount": 2514.97,
+    "currency": "USD",
+    "items": [...],
+    "payment_transactions": [
+      {
+        "id": 1,
+        "transaction_id": "TXN-AUTH-2025-001",
+        "external_id": "pi_1234567890",
+        "type": "authorize",
+        "status": "successful",
+        "amount": 2514.97,
+        "currency": "USD",
+        "provider": "stripe",
+        "created_at": "2024-03-20T11:00:00Z",
+        "updated_at": "2024-03-20T11:00:00Z"
+      },
+      {
+        "id": 2,
+        "transaction_id": "TXN-CAPTURE-2025-001",
+        "external_id": "ch_1234567890",
+        "type": "capture",
+        "status": "successful",
+        "amount": 2514.97,
+        "currency": "USD",
+        "provider": "stripe",
+        "created_at": "2024-03-20T11:05:00Z",
+        "updated_at": "2024-03-20T11:05:00Z"
+      }
+    ],
+    "shipping_address": {...},
+    "billing_address": {...},
+    "payment_method": "credit_card",
     "shipping_method": "express",
     "shipping_cost": 14.99,
     "tax_amount": 0,

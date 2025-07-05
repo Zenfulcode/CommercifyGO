@@ -10,6 +10,7 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 )
 
 // PaymentHandler handles payment-related HTTP requests
@@ -57,21 +58,39 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 
 	// Parse request body
 	var input struct {
-		Amount float64 `json:"amount"`
+		Amount float64 `json:"amount,omitempty"` // Optional when is_full is true
+		IsFull bool    `json:"is_full"`          // Whether to capture the full authorized amount
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate amount
-	if input.Amount <= 0 {
-		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
+	// Validate input - either amount or is_full must be specified
+	if !input.IsFull && input.Amount <= 0 {
+		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
 		return
 	}
 
+	// If both amount and is_full are specified, prioritize is_full
+	if input.IsFull && input.Amount > 0 {
+		h.logger.Info("Both amount and is_full specified for payment %s, using is_full=true", paymentID)
+	}
+
 	// Capture payment
-	err := h.orderUseCase.CapturePayment(paymentID, money.ToCents(input.Amount))
+	var err error
+	if input.IsFull {
+		// For full capture, we need to get the order first to determine the full amount
+		order, orderErr := h.orderUseCase.GetOrderByPaymentID(paymentID)
+		if orderErr != nil {
+			h.logger.Error("Failed to get order for payment %s: %v", paymentID, orderErr)
+			http.Error(w, "Order not found for payment ID", http.StatusNotFound)
+			return
+		}
+		err = h.orderUseCase.CapturePayment(paymentID, order.FinalAmount)
+	} else {
+		err = h.orderUseCase.CapturePayment(paymentID, money.ToCents(input.Amount))
+	}
 	if err != nil {
 		h.logger.Error("Failed to capture payment: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -80,10 +99,7 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 
 	// Return success
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Payment captured successfully",
-	})
+	json.NewEncoder(w).Encode(contracts.SuccessResponseMessage("Payment captured successfully"))
 }
 
 // CancelPayment handles cancelling a payment
@@ -106,10 +122,7 @@ func (h *PaymentHandler) CancelPayment(w http.ResponseWriter, r *http.Request) {
 
 	// Return success
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Payment cancelled successfully",
-	})
+	json.NewEncoder(w).Encode(contracts.SuccessResponseMessage("Payment cancelled successfully"))
 }
 
 // RefundPayment handles refunding a payment
@@ -124,21 +137,39 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var input struct {
-		Amount float64 `json:"amount"`
+		Amount float64 `json:"amount,omitempty"` // Optional when is_full is true
+		IsFull bool    `json:"is_full"`          // Whether to refund the full captured amount
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate amount
-	if input.Amount <= 0 {
-		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
+	// Validate input - either amount or is_full must be specified
+	if !input.IsFull && input.Amount <= 0 {
+		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
 		return
 	}
 
+	// If both amount and is_full are specified, prioritize is_full
+	if input.IsFull && input.Amount > 0 {
+		h.logger.Info("Both amount and is_full specified for payment %s, using is_full=true", paymentID)
+	}
+
 	// Refund payment
-	err := h.orderUseCase.RefundPayment(paymentID, money.ToCents(input.Amount))
+	var err error
+	if input.IsFull {
+		// For full refund, we need to get the order first to determine the full amount
+		order, orderErr := h.orderUseCase.GetOrderByPaymentID(paymentID)
+		if orderErr != nil {
+			h.logger.Error("Failed to get order for payment %s: %v", paymentID, orderErr)
+			http.Error(w, "Order not found for payment ID", http.StatusNotFound)
+			return
+		}
+		err = h.orderUseCase.RefundPayment(paymentID, order.FinalAmount)
+	} else {
+		err = h.orderUseCase.RefundPayment(paymentID, money.ToCents(input.Amount))
+	}
 	if err != nil {
 		h.logger.Error("Failed to refund payment: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -147,10 +178,7 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 
 	// Return success
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Payment refunded successfully",
-	})
+	json.NewEncoder(w).Encode(contracts.SuccessResponseMessage("Payment refunded successfully"))
 }
 
 // ForceApproveMobilePayPayment handles force approving a MobilePay payment (admin only)
@@ -188,8 +216,5 @@ func (h *PaymentHandler) ForceApproveMobilePayPayment(w http.ResponseWriter, r *
 
 	// Return success
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Payment force approved successfully",
-	})
+	json.NewEncoder(w).Encode(contracts.SuccessResponseMessage("Payment force approved successfully"))
 }

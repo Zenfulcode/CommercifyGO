@@ -179,9 +179,9 @@ export interface OrderDTO {
   currency: string;
   shipping_address: AddressDTO;
   billing_address: AddressDTO;
-  payment_details?: PaymentDetails;
   shipping_details: ShippingOptionDTO;
   discount_details?: AppliedDiscountDTO;
+  payment_transactions?: PaymentTransactionDTO[];
   customer: CustomerDetailsDTO;
   action_required: boolean; // Indicates if action is needed (e.g., payment)
   action_url?: string; // URL for payment or order actions
@@ -262,6 +262,36 @@ export const PaymentStatusCaptured: PaymentStatus = "captured";
 export const PaymentStatusRefunded: PaymentStatus = "refunded";
 export const PaymentStatusCancelled: PaymentStatus = "cancelled";
 export const PaymentStatusFailed: PaymentStatus = "failed";
+/**
+ * PaymentTransactionDTO represents a payment transaction
+ */
+export interface PaymentTransactionDTO {
+  id: number /* uint */;
+  transaction_id: string;
+  external_id?: string;
+  type: TransactionType;
+  status: TransactionStatus;
+  amount: number /* float64 */;
+  currency: string;
+  provider: string;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * TransactionType represents the type of payment transaction
+ */
+export type TransactionType = string;
+export const TransactionTypeAuthorize: TransactionType = "authorize";
+export const TransactionTypeCapture: TransactionType = "capture";
+export const TransactionTypeRefund: TransactionType = "refund";
+export const TransactionTypeCancel: TransactionType = "cancel";
+/**
+ * TransactionStatus represents the status of a payment transaction
+ */
+export type TransactionStatus = string;
+export const TransactionStatusSuccessful: TransactionStatus = "successful";
+export const TransactionStatusFailed: TransactionStatus = "failed";
+export const TransactionStatusPending: TransactionStatus = "pending";
 
 //////////
 // source: product.go
