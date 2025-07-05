@@ -14,7 +14,8 @@ type HandlerProvider interface {
 	CheckoutHandler() *handler.CheckoutHandler
 	OrderHandler() *handler.OrderHandler
 	PaymentHandler() *handler.PaymentHandler
-	WebhookHandler() *handler.WebhookHandler
+	PaymentProviderHandler() *handler.PaymentProviderHandler
+	WebhookHandlerProvider() *handler.WebhookHandlerProvider
 	DiscountHandler() *handler.DiscountHandler
 	ShippingHandler() *handler.ShippingHandler
 	CurrencyHandler() *handler.CurrencyHandler
@@ -27,18 +28,19 @@ type handlerProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	userHandler      *handler.UserHandler
-	productHandler   *handler.ProductHandler
-	categoryHandler  *handler.CategoryHandler
-	checkoutHandler  *handler.CheckoutHandler
-	orderHandler     *handler.OrderHandler
-	paymentHandler   *handler.PaymentHandler
-	webhookHandler   *handler.WebhookHandler
-	discountHandler  *handler.DiscountHandler
-	shippingHandler  *handler.ShippingHandler
-	currencyHandler  *handler.CurrencyHandler
-	healthHandler    *handler.HealthHandler
-	emailTestHandler *handler.EmailTestHandler
+	userHandler            *handler.UserHandler
+	productHandler         *handler.ProductHandler
+	categoryHandler        *handler.CategoryHandler
+	checkoutHandler        *handler.CheckoutHandler
+	orderHandler           *handler.OrderHandler
+	paymentHandler         *handler.PaymentHandler
+	paymentProviderHandler *handler.PaymentProviderHandler
+	webhookHandlerProvider *handler.WebhookHandlerProvider
+	discountHandler        *handler.DiscountHandler
+	shippingHandler        *handler.ShippingHandler
+	currencyHandler        *handler.CurrencyHandler
+	healthHandler          *handler.HealthHandler
+	emailTestHandler       *handler.EmailTestHandler
 }
 
 // NewHandlerProvider creates a new handler provider
@@ -120,20 +122,18 @@ func (p *handlerProvider) PaymentHandler() *handler.PaymentHandler {
 	return p.paymentHandler
 }
 
-// WebhookHandler returns the webhook handler
-func (p *handlerProvider) WebhookHandler() *handler.WebhookHandler {
+// PaymentProviderHandler returns the payment provider handler
+func (p *handlerProvider) PaymentProviderHandler() *handler.PaymentProviderHandler {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.webhookHandler == nil {
-		p.webhookHandler = handler.NewWebhookHandler(
-			p.container.Config(),
-			p.container.UseCases().OrderUseCase(),
-			p.container.UseCases().WebhookUseCase(),
+	if p.paymentProviderHandler == nil {
+		p.paymentProviderHandler = handler.NewPaymentProviderHandler(
+			p.container.Services().PaymentProviderService(),
 			p.container.Logger(),
 		)
 	}
-	return p.webhookHandler
+	return p.paymentProviderHandler
 }
 
 // CheckoutHandler returns the checkout handler
@@ -201,8 +201,14 @@ func (p *handlerProvider) HealthHandler() *handler.HealthHandler {
 	defer p.mu.Unlock()
 
 	if p.healthHandler == nil {
+		db, err := p.container.DB().DB()
+		if err != nil {
+			p.container.Logger().Error("Failed to get database connection for health check", "error", err)
+			return nil
+		}
+
 		p.healthHandler = handler.NewHealthHandler(
-			p.container.DB(),
+			db,
 			p.container.Logger(),
 		)
 	}
@@ -222,4 +228,20 @@ func (p *handlerProvider) EmailTestHandler() *handler.EmailTestHandler {
 		)
 	}
 	return p.emailTestHandler
+}
+
+// WebhookHandlerProvider returns the webhook handler provider
+func (p *handlerProvider) WebhookHandlerProvider() *handler.WebhookHandlerProvider {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.webhookHandlerProvider == nil {
+		p.webhookHandlerProvider = handler.NewWebhookHandlerProvider(
+			p.container.UseCases().OrderUseCase(),
+			p.container.Services().PaymentProviderService(),
+			p.container.Config(),
+			p.container.Logger(),
+		)
+	}
+	return p.webhookHandlerProvider
 }

@@ -26,6 +26,7 @@ services:
     env_file:
       - .env
     environment:
+      DB_DRIVER: postgres
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
@@ -49,11 +50,6 @@ services:
       # STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       # STRIPE_PAYMENT_DESCRIPTION: ${STRIPE_PAYMENT_DESCRIPTION}
 
-      # PAYPAL_ENABLED: ${PAYPAL_ENABLED:-false}
-      # PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID}
-      # PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET}
-      # PAYPAL_SANDBOX: ${PAYPAL_SANDBOX:-true}
-
       # MOBILEPAY_ENABLED: ${MOBILEPAY_ENABLED:-false}
       # MOBILEPAY_TEST_MODE: ${MOBILEPAY_TEST_MODE:-true}
       # MOBILEPAY_MERCHANT_SERIAL_NUMBER: ${MOBILEPAY_MERCHANT_SERIAL_NUMBER}
@@ -72,24 +68,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # Convenience services for database operations
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    profiles: ["tools"]
-    entrypoint: ["/app/commercify-migrate"]
-    command: ["-up"]
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: commercify
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   seed:
     build:
       context: .
@@ -98,6 +76,7 @@ services:
     entrypoint: ["/app/commercify-seed"]
     command: ["-all"]
     environment:
+      DB_DRIVER: postgres
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres

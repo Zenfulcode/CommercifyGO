@@ -2,10 +2,9 @@
 package container
 
 import (
-	"database/sql"
-
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"gorm.io/gorm"
 )
 
 // Container defines the interface for dependency injection container
@@ -14,7 +13,7 @@ type Container interface {
 	Config() *config.Config
 
 	// DB returns the database connection
-	DB() *sql.DB
+	DB() *gorm.DB
 
 	// Logger returns the application logger
 	Logger() logger.Logger
@@ -38,7 +37,7 @@ type Container interface {
 // DIContainer is the concrete implementation of the Container interface
 type DIContainer struct {
 	config *config.Config
-	db     *sql.DB
+	db     *gorm.DB
 	logger logger.Logger
 
 	// Providers
@@ -50,7 +49,7 @@ type DIContainer struct {
 }
 
 // NewContainer creates a new dependency injection container
-func NewContainer(config *config.Config, db *sql.DB, logger logger.Logger) Container {
+func NewContainer(config *config.Config, db *gorm.DB, logger logger.Logger) Container {
 	container := &DIContainer{
 		config: config,
 		db:     db,
@@ -73,7 +72,7 @@ func (c *DIContainer) Config() *config.Config {
 }
 
 // DB returns the database connection
-func (c *DIContainer) DB() *sql.DB {
+func (c *DIContainer) DB() *gorm.DB {
 	return c.db
 }
 

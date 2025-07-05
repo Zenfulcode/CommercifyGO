@@ -9,6 +9,7 @@ import (
 
 	"github.com/zenfulcode/commercify/config"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
+	"github.com/zenfulcode/commercify/internal/domain/money"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
 )
@@ -69,17 +70,13 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 	}
 
 	// Format email message
-	// Sanitize email subject and body
-	sanitizedSubject := template.HTMLEscapeString(data.Subject)
-	sanitizedBody := template.HTMLEscapeString(body)
-
-	msg := []byte(fmt.Sprintf("From: %s <%s>\r\n"+
+	msg := fmt.Appendf(nil, "From: %s <%s>\r\n"+
 		"To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: %s; charset=UTF-8\r\n"+
 		"\r\n"+
-		"%s", s.config.FromName, s.config.FromEmail, data.To, sanitizedSubject, contentType, sanitizedBody))
+		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body)
 
 	// Send email
 	s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
@@ -105,11 +102,25 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 	s.logger.Info("Sending order confirmation email for Order ID: %d to User: %s", order.ID, user.Email)
 
 	// Prepare data for the template
-	data := map[string]interface{}{
-		"Order":        order,
-		"User":         user,
-		"StoreName":    s.config.FromName,
-		"ContactEmail": s.config.FromEmail,
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Email template data - Order ID: %d", order.ID)
+	s.logger.Info("Shipping Address: %+v", shippingAddr)
+	s.logger.Info("Billing Address: %+v", billingAddr)
+	s.logger.Info("Applied Discount: %+v", appliedDiscount)
+
+	data := map[string]any{
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.FromName,
+		"ContactEmail":    s.config.FromEmail,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
 	}
 
 	// Send email
@@ -127,10 +138,21 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	s.logger.Info("Sending order notification email for Order ID: %d to Admin: %s", order.ID, s.config.AdminEmail)
 
 	// Prepare data for the template
-	data := map[string]interface{}{
-		"Order":     order,
-		"User":      user,
-		"StoreName": s.config.FromName,
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Email template data - Order ID: %d", order.ID)
+
+	data := map[string]any{
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.FromName,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
 	}
 
 	// Send email
@@ -144,17 +166,20 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 }
 
 // renderTemplate renders an HTML template with the given data
-func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]interface{}) (string, error) {
+func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]any) (string, error) {
 	// Get template path
 	templatePath := filepath.Join("templates", "emails", templateName)
 
 	// Create template with helper functions
 	tmpl := template.New(templateName).Funcs(template.FuncMap{
 		"centsToDollars": func(cents int64) float64 {
-			return float64(cents) / 100.0
+			return money.FromCents(cents)
 		},
 		"formatPrice": func(cents int64) string {
-			return fmt.Sprintf("%.2f", float64(cents)/100.0)
+			return fmt.Sprintf("%.2f", money.FromCents(cents))
+		},
+		"formatPriceWithCurrency": func(cents int64, currency string) string {
+			return s.formatCurrency(cents, currency)
 		},
 	})
 
@@ -171,4 +196,17 @@ func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]i
 	}
 
 	return buf.String(), nil
+}
+
+// formatCurrency formats a cents amount with the currency code at the end
+func (s *SMTPEmailService) formatCurrency(amount int64, currency string) string {
+	// Format amount as decimal
+	decimal := money.FromCents(amount)
+
+	// Format with currency code at the end for all currencies
+	if currency == "JPY" {
+		// JPY typically doesn't use decimals
+		return fmt.Sprintf("%.0f %s", decimal*100, currency) // Convert back to whole yen
+	}
+	return fmt.Sprintf("%.2f %s", decimal, currency)
 }

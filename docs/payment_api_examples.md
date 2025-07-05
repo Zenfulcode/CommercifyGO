@@ -93,13 +93,27 @@ POST /api/admin/payments/{paymentId}/capture
 
 Capture a previously authorized payment (admin only).
 
-**Request Body:**
+**Request Body (Partial Capture):**
 
 ```json
 {
-  "amount": 2514.97
+  "amount": 1500.00,
+  "is_full": false
 }
 ```
+
+**Request Body (Full Capture):**
+
+```json
+{
+  "is_full": true
+}
+```
+
+**Note:** 
+- When `is_full` is `true`, the `amount` field is ignored and the full authorized amount is captured
+- When `is_full` is `false` (or omitted), the `amount` field is required
+- If both `amount` and `is_full: true` are provided, `is_full` takes precedence
 
 Example response:
 
@@ -153,13 +167,27 @@ POST /api/admin/payments/{paymentId}/refund
 
 Refund a captured payment (admin only).
 
-**Request Body:**
+**Request Body (Partial Refund):**
 
 ```json
 {
-  "amount": 2514.97
+  "amount": 1500.00,
+  "is_full": false
 }
 ```
+
+**Request Body (Full Refund):**
+
+```json
+{
+  "is_full": true
+}
+```
+
+**Note:** 
+- When `is_full` is `true`, the `amount` field is ignored and the full captured amount is refunded
+- When `is_full` is `false` (or omitted), the `amount` field is required
+- If both `amount` and `is_full: true` are provided, `is_full` takes precedence
 
 Example response:
 

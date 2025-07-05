@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
 	"slices"
@@ -32,12 +31,8 @@ func (m *CorsMiddleware) ApplyCors(next http.Handler) http.Handler {
 			allowedOrigins = []string{"*"}
 		}
 
-		fmt.Println("Allowed Origins:", allowedOrigins)
-
 		// Get origin from request
 		origin := r.Header.Get("Origin")
-
-		fmt.Println("Request Origin:", origin)
 
 		// Check if the origin is allowed
 		if m.isAllowedOrigin(origin, allowedOrigins) {
@@ -67,8 +62,10 @@ func (m *CorsMiddleware) getAllowedOrigins() []string {
 
 // isAllowedOrigin checks if the origin is in the allowed list or if all origins are allowed
 func (m *CorsMiddleware) isAllowedOrigin(origin string, allowedOrigins []string) bool {
+	// For webhook requests that don't send Origin header, allow them through
+	// This is common for server-to-server communications like webhooks
 	if origin == "" {
-		return false
+		return true
 	}
 
 	// Check if "*" is in the allowed origins list

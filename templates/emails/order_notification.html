@@ -92,51 +92,61 @@
         <tr>
           <td>{{.ProductID}}</td>
           <td>{{.Quantity}}</td>
-          <td>${{formatPrice .Price}}</td>
-          <td>${{formatPrice .Subtotal}}</td>
+          <td>{{formatPriceWithCurrency .Price $.Currency}}</td>
+          <td>{{formatPriceWithCurrency .Subtotal $.Currency}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
 
     <div class="order-summary">
-      <p><strong>Subtotal:</strong> ${{formatPrice .Order.TotalAmount}}</p>
+      <p><strong>Subtotal:</strong> {{formatPriceWithCurrency .Order.TotalAmount .Currency}}</p>
       
       {{if gt .Order.ShippingCost 0}}
-      <p><strong>Shipping:</strong> ${{formatPrice .Order.ShippingCost}}</p>
+      <p><strong>Shipping:</strong> {{formatPriceWithCurrency .Order.ShippingCost .Currency}}</p>
       {{else}}
       <p><strong>Shipping:</strong> Free</p>
       {{end}}
       
       {{if gt .Order.DiscountAmount 0}}
-      <p><strong>Discount Applied:</strong> -${{formatPrice .Order.DiscountAmount}}
-      {{if .Order.AppliedDiscount}}
-        {{if .Order.AppliedDiscount.DiscountCode}}
-          (Code: {{.Order.AppliedDiscount.DiscountCode}})
+      <p><strong>Discount Applied:</strong> -{{formatPriceWithCurrency .Order.DiscountAmount .Currency}}
+      {{if .AppliedDiscount}}
+        {{if .AppliedDiscount.DiscountCode}}
+          (Code: {{.AppliedDiscount.DiscountCode}})
         {{end}}
       {{end}}
       </p>
       {{end}}
       
       <div class="total">
-        <p><strong>Final Total:</strong> ${{formatPrice .Order.FinalAmount}}</p>
+        <p><strong>Final Total:</strong> {{formatPriceWithCurrency .Order.FinalAmount .Currency}}</p>
       </div>
     </div>
 
     <h2>Shipping Address</h2>
     <div class="address">
-      {{.Order.ShippingAddr.Street}}<br />
-      {{.Order.ShippingAddr.City}}, {{.Order.ShippingAddr.State}}
-      {{.Order.ShippingAddr.PostalCode}}<br />
-      {{.Order.ShippingAddr.Country}}
+      {{if .ShippingAddr.Street1}}
+        {{.ShippingAddr.Street1}}<br />
+        {{if .ShippingAddr.Street2}}{{.ShippingAddr.Street2}}<br />{{end}}
+        {{.ShippingAddr.City}}{{if .ShippingAddr.State}}, {{.ShippingAddr.State}}{{end}}
+        {{if .ShippingAddr.PostalCode}} {{.ShippingAddr.PostalCode}}{{end}}<br />
+        {{.ShippingAddr.Country}}
+      {{else}}
+        <p>No shipping address provided</p>
+      {{end}}
     </div>
 
     <h2>Billing Address</h2>
     <div class="address">
-      {{.Order.BillingAddr.Street}}<br />
-      {{.Order.BillingAddr.City}}, {{.Order.BillingAddr.State}}
-      {{.Order.BillingAddr.PostalCode}}<br />
-      {{.Order.BillingAddr.Country}}
+      {{if .BillingAddr.Street1}}
+        {{.BillingAddr.Street1}}<br />
+        {{if .BillingAddr.Street2}}{{.BillingAddr.Street2}}<br />{{end}}
+        {{.BillingAddr.City}}{{if .BillingAddr.State}}, {{.BillingAddr.State}}{{end}}
+        {{if .BillingAddr.PostalCode}} {{.BillingAddr.PostalCode}}{{end}}<br />
+        {{.BillingAddr.Country}}
+      {{else}}
+        <p>No billing address provided</p>
+      {{end}}
     </div>
 
     <p>Please log in to the admin dashboard to process this order.</p>

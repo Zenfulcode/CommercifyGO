@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 )
 
 // HealthHandler handles health check requests
@@ -38,8 +38,6 @@ var startTime = time.Now()
 
 // Health performs a health check and returns the service status
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("Health check requested")
-
 	status := "healthy"
 	httpStatus := http.StatusOK
 	services := make(map[string]string)
@@ -60,12 +58,12 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	healthStatus := HealthStatus{
 		Status:    status,
 		Timestamp: time.Now(),
-		Version:   "1.0.6", // TODO: Make this configurable
+		Version:   "1.2.1", // TODO: Make this configurable
 		Services:  services,
 		Uptime:    uptime,
 	}
 
-	response := dto.ResponseDTO[HealthStatus]{
+	response := contracts.ResponseDTO[HealthStatus]{
 		Success: status == "healthy",
 		Data:    healthStatus,
 	}
@@ -73,6 +71,8 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	if status != "healthy" {
 		response.Error = "One or more services are unhealthy"
 	}
+
+	h.logger.Info("Health check performed: %s", status)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)

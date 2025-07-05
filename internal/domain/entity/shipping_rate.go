@@ -2,57 +2,56 @@ package entity
 
 import (
 	"errors"
-	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/gorm"
 )
 
 // ShippingRate connects shipping methods to zones with pricing
 type ShippingRate struct {
-	ID                    uint              `json:"id"`
-	ShippingMethodID      uint              `json:"shipping_method_id"`
-	ShippingMethod        *ShippingMethod   `json:"shipping_method,omitempty"`
-	ShippingZoneID        uint              `json:"shipping_zone_id"`
-	ShippingZone          *ShippingZone     `json:"shipping_zone,omitempty"`
-	BaseRate              int64             `json:"base_rate"`
-	MinOrderValue         int64             `json:"min_order_value"`
-	FreeShippingThreshold *int64            `json:"free_shipping_threshold"`
-	WeightBasedRates      []WeightBasedRate `json:"weight_based_rates,omitempty"`
-	ValueBasedRates       []ValueBasedRate  `json:"value_based_rates,omitempty"`
-	Active                bool              `json:"active"`
-	CreatedAt             time.Time         `json:"created_at"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	gorm.Model
+	ShippingMethodID      uint              `gorm:"index;not null"`
+	ShippingMethod        *ShippingMethod   `gorm:"foreignKey:ShippingMethodID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ShippingZoneID        uint              `gorm:"index;not null"`
+	ShippingZone          *ShippingZone     `gorm:"foreignKey:ShippingZoneID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	BaseRate              int64             `gorm:"not null;default:0"`
+	MinOrderValue         int64             `gorm:"default:0"`
+	FreeShippingThreshold *int64            `gorm:"default:null"`
+	WeightBasedRates      []WeightBasedRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	ValueBasedRates       []ValueBasedRate  `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	Active                bool              `gorm:"default:true"`
 }
 
 // WeightBasedRate represents additional costs based on order weight
 type WeightBasedRate struct {
-	ID             uint      `json:"id"`
-	ShippingRateID uint      `json:"shipping_rate_id"`
-	MinWeight      float64   `json:"min_weight"`
-	MaxWeight      float64   `json:"max_weight"`
-	Rate           int64     `json:"rate"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	gorm.Model
+	ShippingRateID uint         `gorm:"index;not null"`
+	ShippingRate   ShippingRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	MinWeight      float64      `gorm:"not null"`
+	MaxWeight      float64      `gorm:"not null"`
+	Rate           int64        `gorm:"not null"`
 }
 
 // ValueBasedRate represents additional costs/discounts based on order value
 type ValueBasedRate struct {
-	ID             uint      `json:"id"`
-	ShippingRateID uint      `json:"shipping_rate_id"`
-	MinOrderValue  int64     `json:"min_order_value"`
-	MaxOrderValue  int64     `json:"max_order_value"`
-	Rate           int64     `json:"rate"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	gorm.Model
+	ShippingRateID uint         `gorm:"index;not null"`
+	ShippingRate   ShippingRate `gorm:"foreignKey:ShippingRateID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
+	MinOrderValue  int64        `gorm:"not null"`
+	MaxOrderValue  int64        `gorm:"not null"`
+	Rate           int64        `gorm:"not null"`
 }
 
 // ShippingOption represents a single shipping option with its cost
 type ShippingOption struct {
-	ShippingRateID        uint   `json:"shipping_rate_id"`
-	ShippingMethodID      uint   `json:"shipping_method_id"`
-	Name                  string `json:"name"`
-	Description           string `json:"description"`
-	EstimatedDeliveryDays int    `json:"estimated_delivery_days"`
-	Cost                  int64  `json:"cost"`
-	FreeShipping          bool   `json:"free_shipping"`
+	ShippingRateID        uint
+	ShippingMethodID      uint
+	Name                  string
+	Description           string
+	EstimatedDeliveryDays int
+	Cost                  int64
+	FreeShipping          bool
 }
 
 // NewShippingRate creates a new shipping rate
@@ -78,15 +77,12 @@ func NewShippingRate(
 		return nil, errors.New("minimum order value cannot be negative")
 	}
 
-	now := time.Now()
 	return &ShippingRate{
 		ShippingMethodID: shippingMethodID,
 		ShippingZoneID:   shippingZoneID,
 		BaseRate:         baseRate,
 		MinOrderValue:    minOrderValue,
 		Active:           true,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}, nil
 }
 
@@ -102,7 +98,7 @@ func (r *ShippingRate) Update(baseRate, minOrderValue int64) error {
 
 	r.BaseRate = baseRate
 	r.MinOrderValue = minOrderValue
-	r.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -114,7 +110,7 @@ func (r *ShippingRate) SetFreeShippingThreshold(threshold *int64) {
 	}
 
 	r.FreeShippingThreshold = threshold
-	r.UpdatedAt = time.Now()
+
 }
 
 // CalculateShippingCost calculates the shipping cost for an order
@@ -155,7 +151,7 @@ func (r *ShippingRate) CalculateShippingCost(orderValue int64, weight float64) (
 func (r *ShippingRate) Activate() {
 	if !r.Active {
 		r.Active = true
-		r.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -163,6 +159,69 @@ func (r *ShippingRate) Activate() {
 func (r *ShippingRate) Deactivate() {
 	if r.Active {
 		r.Active = false
-		r.UpdatedAt = time.Now()
+
+	}
+}
+
+func (s *ShippingOption) ToShippingOptionDTO() *dto.ShippingOptionDTO {
+	return &dto.ShippingOptionDTO{
+		ShippingRateID:        s.ShippingRateID,
+		ShippingMethodID:      s.ShippingMethodID,
+		Name:                  s.Name,
+		Description:           s.Description,
+		EstimatedDeliveryDays: s.EstimatedDeliveryDays,
+		Cost:                  money.FromCents(s.Cost),
+		FreeShipping:          s.FreeShipping,
+	}
+}
+
+func (r *ShippingRate) ToShippingRateDTO() *dto.ShippingRateDTO {
+	var shippingRateDto = dto.ShippingRateDTO{
+		ID:               r.ID,
+		ShippingMethodID: r.ShippingMethodID,
+		ShippingZoneID:   r.ShippingZoneID,
+		BaseRate:         money.FromCents(r.BaseRate),
+		MinOrderValue:    money.FromCents(r.MinOrderValue),
+		Active:           r.Active,
+	}
+
+	if r.FreeShippingThreshold != nil {
+		shippingRateDto.FreeShippingThreshold = money.FromCents(*r.FreeShippingThreshold)
+	}
+	if r.ShippingMethod != nil {
+		shippingRateDto.ShippingMethod = r.ShippingMethod.ToShippingMethodDTO()
+	}
+	if r.ShippingZone != nil {
+		shippingRateDto.ShippingZone = r.ShippingZone.ToShippingZoneDTO()
+	}
+	if len(r.WeightBasedRates) > 0 {
+		shippingRateDto.WeightBasedRates = make([]dto.WeightBasedRateDTO, len(r.WeightBasedRates))
+		for i, wbr := range r.WeightBasedRates {
+			shippingRateDto.WeightBasedRates[i] = dto.WeightBasedRateDTO{
+				ID:        wbr.ID,
+				MinWeight: wbr.MinWeight,
+				MaxWeight: wbr.MaxWeight,
+				Rate:      money.FromCents(wbr.Rate),
+			}
+		}
+	}
+	return &shippingRateDto
+}
+
+func (w *WeightBasedRate) ToWeightBasedRateDTO() *dto.WeightBasedRateDTO {
+	return &dto.WeightBasedRateDTO{
+		ID:        w.ID,
+		MinWeight: w.MinWeight,
+		MaxWeight: w.MaxWeight,
+		Rate:      money.FromCents(w.Rate),
+	}
+}
+
+func (v *ValueBasedRate) ToValueBasedRateDTO() *dto.ValueBasedRateDTO {
+	return &dto.ValueBasedRateDTO{
+		ID:            v.ID,
+		MinOrderValue: money.FromCents(v.MinOrderValue),
+		MaxOrderValue: money.FromCents(v.MaxOrderValue),
+		Rate:          money.FromCents(v.Rate),
 	}
 }

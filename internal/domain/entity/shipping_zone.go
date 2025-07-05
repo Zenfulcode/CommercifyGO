@@ -2,38 +2,32 @@ package entity
 
 import (
 	"errors"
-	"time"
+	"slices"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"gorm.io/gorm"
 )
 
 // ShippingZone represents a geographical shipping zone
 type ShippingZone struct {
-	ID          uint      `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Countries   []string  `json:"countries"` // Country codes like "US", "CA"
-	States      []string  `json:"states"`    // State/province codes like "CA", "NY"
-	ZipCodes    []string  `json:"zip_codes"` // Zip/postal codes or patterns
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	gorm.Model
+	Name        string   `gorm:"not null;size:255"`
+	Description string   `gorm:"type:text"`
+	Countries   []string `gorm:"type:jsonb;default:'[]'"`
+	Active      bool     `gorm:"default:true"`
 }
 
 // NewShippingZone creates a new shipping zone
-func NewShippingZone(name string, description string) (*ShippingZone, error) {
+func NewShippingZone(name, description string, countries []string) (*ShippingZone, error) {
 	if name == "" {
 		return nil, errors.New("shipping zone name cannot be empty")
 	}
 
-	now := time.Now()
 	return &ShippingZone{
 		Name:        name,
 		Description: description,
-		Countries:   []string{},
-		States:      []string{},
-		ZipCodes:    []string{},
+		Countries:   countries,
 		Active:      true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
 	}, nil
 }
 
@@ -45,33 +39,21 @@ func (z *ShippingZone) Update(name string, description string) error {
 
 	z.Name = name
 	z.Description = description
-	z.UpdatedAt = time.Now()
+
 	return nil
 }
 
 // SetCountries sets the countries for this shipping zone
 func (z *ShippingZone) SetCountries(countries []string) {
 	z.Countries = countries
-	z.UpdatedAt = time.Now()
-}
 
-// SetStates sets the states/provinces for this shipping zone
-func (z *ShippingZone) SetStates(states []string) {
-	z.States = states
-	z.UpdatedAt = time.Now()
-}
-
-// SetZipCodes sets the zip/postal codes for this shipping zone
-func (z *ShippingZone) SetZipCodes(zipCodes []string) {
-	z.ZipCodes = zipCodes
-	z.UpdatedAt = time.Now()
 }
 
 // Activate activates a shipping zone
 func (z *ShippingZone) Activate() {
 	if !z.Active {
 		z.Active = true
-		z.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -79,7 +61,7 @@ func (z *ShippingZone) Activate() {
 func (z *ShippingZone) Deactivate() {
 	if z.Active {
 		z.Active = false
-		z.UpdatedAt = time.Now()
+
 	}
 }
 
@@ -90,48 +72,17 @@ func (z *ShippingZone) IsAddressInZone(address Address) bool {
 		return true
 	}
 
-	// Check country match
-	countryMatch := false
-	for _, country := range z.Countries {
-		if country == address.Country {
-			countryMatch = true
-			break
-		}
-	}
+	return slices.Contains(z.Countries, address.Country)
+}
 
-	if !countryMatch {
-		return false
+func (z *ShippingZone) ToShippingZoneDTO() *dto.ShippingZoneDTO {
+	return &dto.ShippingZoneDTO{
+		ID:          z.ID,
+		Name:        z.Name,
+		Description: z.Description,
+		Countries:   z.Countries,
+		Active:      z.Active,
+		CreatedAt:   z.CreatedAt,
+		UpdatedAt:   z.UpdatedAt,
 	}
-
-	// If we matched country and no states are specified, it's a match
-	if len(z.States) == 0 {
-		return true
-	}
-
-	// Check state match
-	stateMatch := false
-	for _, state := range z.States {
-		if state == address.State {
-			stateMatch = true
-			break
-		}
-	}
-
-	if !stateMatch {
-		return false
-	}
-
-	// If we matched country and state, and no zip codes are specified, it's a match
-	if len(z.ZipCodes) == 0 {
-		return true
-	}
-
-	// Check zip code match (exact match only - could be extended for patterns/ranges)
-	for _, zipCode := range z.ZipCodes {
-		if zipCode == address.PostalCode {
-			return true
-		}
-	}
-
-	return false
 }

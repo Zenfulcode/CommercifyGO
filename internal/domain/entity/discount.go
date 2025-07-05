@@ -5,7 +5,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/money"
+	"gorm.io/gorm"
 )
 
 // DiscountType represents the type of discount
@@ -30,22 +32,20 @@ const (
 
 // Discount represents a discount in the system
 type Discount struct {
-	ID               uint           `json:"id"`
-	Code             string         `json:"code"`
-	Type             DiscountType   `json:"type"`
-	Method           DiscountMethod `json:"method"`
-	Value            float64        `json:"value"`              // Still using float64 for percentage value
-	MinOrderValue    int64          `json:"min_order_value"`    // stored in cents
-	MaxDiscountValue int64          `json:"max_discount_value"` // stored in cents
-	ProductIDs       []uint         `json:"product_ids,omitempty"`
-	CategoryIDs      []uint         `json:"category_ids,omitempty"`
-	StartDate        time.Time      `json:"start_date"`
-	EndDate          time.Time      `json:"end_date"`
-	UsageLimit       int            `json:"usage_limit"`
-	CurrentUsage     int            `json:"current_usage"`
-	Active           bool           `json:"active"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	gorm.Model
+	Code             string         `gorm:"uniqueIndex;not null;size:100"`
+	Type             DiscountType   `gorm:"not null;size:50"`
+	Method           DiscountMethod `gorm:"not null;size:50"`
+	Value            float64        `gorm:"not null"`
+	MinOrderValue    int64          `gorm:"default:0"`
+	MaxDiscountValue int64          `gorm:"default:0"`
+	ProductIDs       []uint         `gorm:"type:jsonb"`
+	CategoryIDs      []uint         `gorm:"type:jsonb"`
+	StartDate        time.Time      `gorm:"index"`
+	EndDate          time.Time      `gorm:"index"`
+	UsageLimit       int            `gorm:"default:0"`
+	CurrentUsage     int            `gorm:"default:0"`
+	Active           bool           `gorm:"default:true"`
 }
 
 // NewDiscount creates a new discount
@@ -82,7 +82,6 @@ func NewDiscount(
 		return nil, errors.New("end date cannot be before start date")
 	}
 
-	now := time.Now()
 	return &Discount{
 		Code:             code,
 		Type:             discountType,
@@ -97,8 +96,6 @@ func NewDiscount(
 		UsageLimit:       usageLimit,
 		CurrentUsage:     0,
 		Active:           true,
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}, nil
 }
 
@@ -204,5 +201,25 @@ func (d *Discount) CalculateDiscount(order *Order) int64 {
 // IncrementUsage increments the usage count of the discount
 func (d *Discount) IncrementUsage() {
 	d.CurrentUsage++
-	d.UpdatedAt = time.Now()
+}
+
+func (d *Discount) ToDiscountDTO() *dto.DiscountDTO {
+	return &dto.DiscountDTO{
+		ID:               d.ID,
+		Code:             d.Code,
+		Type:             string(d.Type),
+		Method:           string(d.Method),
+		Value:            d.Value,
+		MinOrderValue:    money.FromCents(d.MinOrderValue),
+		MaxDiscountValue: money.FromCents(d.MaxDiscountValue),
+		ProductIDs:       d.ProductIDs,
+		CategoryIDs:      d.CategoryIDs,
+		StartDate:        d.StartDate,
+		EndDate:          d.EndDate,
+		UsageLimit:       d.UsageLimit,
+		CurrentUsage:     d.CurrentUsage,
+		Active:           d.Active,
+		CreatedAt:        d.CreatedAt,
+		UpdatedAt:        d.UpdatedAt,
+	}
 }

@@ -30,7 +30,7 @@ type Claims struct {
 }
 
 // GenerateToken generates a JWT token for a user
-func (s *JWTService) GenerateToken(user *entity.User) (string, error) {
+func (s *JWTService) GenerateToken(user *entity.User) (string, int, error) {
 	// Set expiration time
 	expirationTime := time.Now().Add(time.Duration(s.config.TokenDuration) * time.Hour)
 
@@ -54,10 +54,10 @@ func (s *JWTService) GenerateToken(user *entity.User) (string, error) {
 	// Sign token with secret key
 	tokenString, err := token.SignedString([]byte(s.config.JWTSecret))
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
-	return tokenString, nil
+	return tokenString, expirationTime.Second(), nil
 }
 
 // ValidateToken validates a JWT token

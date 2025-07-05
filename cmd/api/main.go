@@ -34,16 +34,11 @@ func main() {
 	}
 
 	// Connect to database
-	db, err := database.NewPostgresConnection(cfg.Database)
+	db, err := database.InitDB(cfg.Database)
 	if err != nil {
 		logger.Fatal("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
-
-	// Run database migrations
-	if err := database.RunMigrations(db, cfg.Database); err != nil {
-		logger.Fatal("Failed to run database migrations: %v", err)
-	}
+	defer database.Close(db)
 
 	// Initialize API server
 	server := api.NewServer(cfg, db, logger)

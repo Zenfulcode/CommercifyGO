@@ -27,11 +27,11 @@ func main() {
 	}
 
 	// Connect to database
-	db, err := database.NewPostgresConnection(cfg.Database)
+	db, err := database.InitDB(cfg.Database)
 	if err != nil {
 		logger.Fatal("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer database.Close(db)
 
 	// Initialize dependency container
 	diContainer := container.NewContainer(cfg, db, logger)

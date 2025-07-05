@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"github.com/zenfulcode/commercify/internal/domain/service"
@@ -50,8 +51,8 @@ type CheckoutUseCase struct {
 }
 
 type ProcessPaymentInput struct {
-	PaymentProvider service.PaymentProviderType
-	PaymentMethod   service.PaymentMethod
+	PaymentProvider common.PaymentProviderType
+	PaymentMethod   common.PaymentMethod
 	CardDetails     *service.CardDetails `json:"card_details,omitempty"`
 	PhoneNumber     string               `json:"phone_number,omitempty"`
 }
@@ -74,7 +75,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		return nil, errors.New("customer details are required for payment processing")
 	}
 
-	if order.ShippingMethodID == 0 {
+	if order.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required for payment processing")
 	}
 
@@ -137,6 +138,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		txn, err := entity.NewPaymentTransaction(
 			order.ID,
 			paymentResult.TransactionID,
+			"", // Idempotency key
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusPending,
 			order.FinalAmount,
@@ -166,6 +168,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 		txn, err := entity.NewPaymentTransaction(
 			order.ID,
 			paymentResult.TransactionID,
+			"", // Idempotency key
 			entity.TransactionTypeAuthorize,
 			entity.TransactionStatusFailed,
 			order.FinalAmount,
@@ -228,6 +231,7 @@ func (uc *CheckoutUseCase) ProcessPayment(order *entity.Order, input ProcessPaym
 	txn, err := entity.NewPaymentTransaction(
 		order.ID,
 		paymentResult.TransactionID,
+		"", // Idempotency key
 		entity.TransactionTypeAuthorize,
 		entity.TransactionStatusSuccessful,
 		order.FinalAmount,
@@ -387,7 +391,8 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 	}
 
 	// Validate shipping address is set
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	shippingAddr := checkout.GetShippingAddress()
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required to calculate shipping options")
 	}
 
@@ -402,8 +407,14 @@ func (uc *CheckoutUseCase) SetShippingMethod(checkout *entity.Checkout, methodID
 		return nil, errors.New("shipping method is not available")
 	}
 
+	calculateOptionsInput := CalculateShippingOptionsInput{
+		Address:     *shippingAddr,
+		OrderValue:  checkout.TotalAmount,
+		OrderWeight: checkout.TotalWeight,
+	}
+
 	// Calculate shipping options
-	options, err := uc.shippingUsecase.CalculateShippingOptions(checkout.ShippingAddr, checkout.TotalAmount, checkout.TotalWeight)
+	options, err := uc.shippingUsecase.CalculateShippingOptions(calculateOptionsInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate shipping options: %w", err)
 	}
@@ -574,11 +585,26 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("checkout has no items")
 	}
 
-	if checkout.ShippingAddr.Street == "" || checkout.ShippingAddr.Country == "" {
+	// Validate stock availability for all items before creating order
+	for _, item := range checkout.Items {
+		variant, err := uc.productVariantRepo.GetByID(item.ProductVariantID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get variant for stock validation: %w", err)
+		}
+
+		if !variant.IsAvailable(item.Quantity) {
+			return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Required: %d", variant.SKU, variant.Stock, item.Quantity)
+		}
+	}
+
+	shippingAddr := checkout.GetShippingAddress()
+	billingAddr := checkout.GetBillingAddress()
+
+	if shippingAddr.Street1 == "" || shippingAddr.Country == "" {
 		return nil, errors.New("shipping address is required")
 	}
 
-	if checkout.BillingAddr.Street == "" || checkout.BillingAddr.Country == "" {
+	if billingAddr.Street1 == "" || billingAddr.Country == "" {
 		return nil, errors.New("billing address is required")
 	}
 
@@ -586,17 +612,27 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 		return nil, errors.New("customer details are required")
 	}
 
-	if checkout.ShippingMethodID == 0 {
+	if checkout.GetShippingOption() == nil {
 		return nil, errors.New("shipping method is required")
 	}
 
 	// Convert checkout to order
-	order := checkout.ToOrder()
+	order, erro := entity.NewOrderFromCheckout(checkout)
+	if erro != nil {
+		return nil, fmt.Errorf("failed to create order from checkout: %w", erro)
+	}
 
 	// Create order in repository
 	err = uc.orderRepo.Create(order)
 	if err != nil {
 		return nil, err
+	}
+
+	// Update order number to final format now that we have an ID
+	order.SetOrderNumber(&order.ID)
+	err = uc.orderRepo.Update(order)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order number: %w", err)
 	}
 
 	// Mark checkout as completed
@@ -608,8 +644,8 @@ func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Ord
 	}
 
 	// Increment discount usage if a discount was applied
-	if checkout.AppliedDiscount != nil {
-		discount, err := uc.discountRepo.GetByID(checkout.AppliedDiscount.DiscountID)
+	if appliedDiscount := checkout.GetAppliedDiscount(); appliedDiscount != nil {
+		discount, err := uc.discountRepo.GetByID(appliedDiscount.DiscountID)
 		if err == nil {
 			discount.IncrementUsage()
 			uc.discountRepo.Update(discount)
@@ -806,13 +842,19 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("SKU is required")
 	}
 
+	// TODO: Remove this comment when we fully switch to variants
+	// product, err := uc.productRepo.GetBySKU(input.SKU)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get product for variant: %w", err)
+	// }
+
 	// Find the product variant by SKU (all products now have variants)
 	variant, err := uc.productVariantRepo.GetBySKU(input.SKU)
 	if err != nil {
 		return nil, fmt.Errorf("product variant not found with SKU '%s'", input.SKU)
 	}
 
-	// Get the parent product
+	// Get the parent product (without currency constraint first)
 	product, err := uc.productRepo.GetByID(variant.ProductID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product for variant: %w", err)
@@ -823,29 +865,43 @@ func (uc *CheckoutUseCase) AddItemToCheckout(checkoutID uint, input CheckoutInpu
 		return nil, errors.New("product is not available")
 	}
 
-	// Extract variant name from attributes
-	variantName := ""
-	for _, attr := range variant.Attributes {
-		if variantName == "" {
-			variantName = attr.Value
+	// Check stock availability
+	// If the item is already in the checkout, we need to check the total quantity (existing + new)
+	existingQuantity := 0
+	for _, item := range checkout.Items {
+		if item.ProductID == variant.ProductID && item.ProductVariantID == variant.ID {
+			existingQuantity = item.Quantity
+			break
+		}
+	}
+	totalQuantity := existingQuantity + input.Quantity
+
+	if !variant.IsAvailable(totalQuantity) {
+		return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Total requested: %d (existing: %d + new: %d)", variant.SKU, variant.Stock, totalQuantity, existingQuantity, input.Quantity)
+	}
+
+	// Handle currency mismatch
+	if product.Currency != checkout.Currency {
+		// If the checkout is empty, change the checkout currency to match the product
+		if len(checkout.Items) == 0 {
+			checkout, err = uc.ChangeCurrency(checkout, product.Currency)
+			if err != nil {
+				return nil, fmt.Errorf("failed to change checkout currency to %s: %w", product.Currency, err)
+			}
 		} else {
-			variantName += " / " + attr.Value
+			// If checkout has items, don't allow mixing currencies
+			return nil, fmt.Errorf("cannot add %s product to %s checkout. Please complete your current checkout or start a new one", product.Currency, checkout.Currency)
 		}
 	}
 
-	// Get the price in the checkout's currency
-	priceInCheckoutCurrency, err := uc.getPriceInCurrency(variant, checkout.Currency)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get price in checkout currency: %w", err)
-	}
-
+	// TODO: This might be redundant if we always use variants
 	// Populate input with variant details
 	input.ProductID = variant.ProductID
 	input.VariantID = variant.ID
 	input.ProductName = product.Name
-	input.VariantName = variantName
-	input.Price = priceInCheckoutCurrency
-	input.Weight = product.Weight
+	input.VariantName = variant.Name()
+	input.Price = variant.Price
+	input.Weight = variant.Weight
 
 	// Add the item to the checkout
 	err = checkout.AddItem(input.ProductID, input.VariantID, input.Quantity, input.Price, input.Weight, input.ProductName, input.VariantName, input.SKU)
@@ -900,6 +956,11 @@ func (uc *CheckoutUseCase) UpdateCheckoutItemBySKU(checkoutID uint, input Update
 	// Check if product is active
 	if !product.Active {
 		return nil, errors.New("product is not available")
+	}
+
+	// Check stock availability for the new quantity
+	if !variant.IsAvailable(input.Quantity) {
+		return nil, fmt.Errorf("insufficient stock for product variant '%s'. Available: %d, Requested: %d", variant.SKU, variant.Stock, input.Quantity)
 	}
 
 	productID := variant.ProductID
@@ -1023,34 +1084,6 @@ func (uc *CheckoutUseCase) ChangeCurrencyByUserID(userID uint, newCurrencyCode s
 	}
 
 	return uc.ChangeCurrency(checkout, newCurrencyCode)
-}
-
-// getPriceInCurrency gets the price of a variant in the specified currency
-func (uc *CheckoutUseCase) getPriceInCurrency(variant *entity.ProductVariant, targetCurrency string) (int64, error) {
-	// If the variant already has a price in the target currency, use it
-	if price, found := variant.GetPriceInCurrency(targetCurrency); found {
-		return price, nil
-	}
-
-	// If the variant's default currency matches the target, return the default price
-	if variant.CurrencyCode == targetCurrency {
-		return variant.Price, nil
-	}
-
-	// Convert from variant's currency to target currency
-	fromCurrency, err := uc.currencyRepo.GetByCode(variant.CurrencyCode)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get variant currency %s: %w", variant.CurrencyCode, err)
-	}
-
-	toCurrency, err := uc.currencyRepo.GetByCode(targetCurrency)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get target currency %s: %w", targetCurrency, err)
-	}
-
-	// Convert the price
-	convertedPrice := fromCurrency.ConvertAmount(variant.Price, toCurrency)
-	return convertedPrice, nil
 }
 
 // decreaseStockForOrder decreases stock for all items in an order when payment is authorized

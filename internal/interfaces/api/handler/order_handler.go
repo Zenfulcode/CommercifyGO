@@ -9,8 +9,8 @@ import (
 	"github.com/zenfulcode/commercify/internal/application/usecase"
 	"github.com/zenfulcode/commercify/internal/domain/common"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
-	"github.com/zenfulcode/commercify/internal/dto"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 	"github.com/zenfulcode/commercify/internal/interfaces/api/middleware"
 )
 
@@ -41,11 +41,15 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse query parameters for includes
+	includePaymentTransactions := r.URL.Query().Get("include_payment_transactions") == "true"
+	includeItems := r.URL.Query().Get("include_items") != "false" // Default to true for backward compatibility
+
 	// Get order
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
 	if err != nil {
 		h.logger.Error("Failed to get order: %v", err)
-		response := dto.ErrorResponse(err.Error())
+		response := contracts.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(response)
@@ -57,7 +61,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Check if authenticated user owns the order or is admin
 	if isAuthenticated {
-		if order.UserID == userID {
+		if order.UserID != nil && *order.UserID == userID {
 			authorized = true
 		} else {
 			// Check if user is admin
@@ -79,14 +83,19 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	if !authorized {
 		h.logger.Error("Unauthorized access to order %d", order.ID)
-		response := dto.ErrorResponse("You are not authorized to view this order")
+		response := contracts.ErrorResponse("You are not authorized to view this order")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	orderDTO := dto.OrderDetailResponse(order)
+	// Create order DTO with conditional includes
+	options := entity.OrderDetailOptions{
+		IncludePaymentTransactions: includePaymentTransactions,
+		IncludeItems:               includeItems,
+	}
+	orderDTO := contracts.OrderDetailResponse(order.ToOrderDetailsDTOWithOptions(options))
 
 	// Return order
 	w.Header().Set("Content-Type", "application/json")
@@ -99,7 +108,7 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		response := dto.ErrorResponse("Unauthorized")
+		response := contracts.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -115,15 +124,18 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pageSize <= 0 {
-		page = 10 // Default limit
+		pageSize = 10 // Default limit
 	}
 
+	// Calculate offset for pagination
+	offset := (page - 1) * pageSize
+
 	// Get orders
-	orders, err := h.orderUseCase.GetUserOrders(userID, page, pageSize)
+	orders, err := h.orderUseCase.GetUserOrders(userID, offset, pageSize)
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
 		// TODO: Add proper error handling
-		response := dto.ErrorResponse("Failed to list orders")
+		response := contracts.ErrorResponse("Failed to list orders")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -131,7 +143,7 @@ func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create response
-	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
+	response := contracts.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -144,7 +156,7 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		response := dto.ErrorResponse("Unauthorized")
+		response := contracts.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -163,20 +175,23 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 		pageSize = 10 // Default page size
 	}
 
+	// Calculate offset for pagination
+	offset := (page - 1) * pageSize
+
 	// Get orders by status if provided
 	var orders []*entity.Order
 	var err error
 
 	if status != "" {
-		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), page, pageSize)
+		orders, err = h.orderUseCase.ListOrdersByStatus(entity.OrderStatus(status), offset, pageSize)
 	} else {
-		orders, err = h.orderUseCase.ListAllOrders(page, pageSize)
+		orders, err = h.orderUseCase.ListAllOrders(offset, pageSize)
 	}
 
 	if err != nil {
 		h.logger.Error("Failed to list orders: %v", err)
 		// TODO: Add proper error handling
-		response := dto.ErrorResponse("Failed to list orders")
+		response := contracts.ErrorResponse("Failed to list orders")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -185,7 +200,7 @@ func (h *OrderHandler) ListAllOrders(w http.ResponseWriter, r *http.Request) {
 
 	// Create response
 	// TODO: FIX total count logic
-	response := dto.OrderSummaryListResponse(orders, page, pageSize, len(orders))
+	response := contracts.OrderSummaryListResponse(orders, page, pageSize, len(orders))
 
 	// Return orders
 	w.Header().Set("Content-Type", "application/json")
@@ -197,7 +212,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
 	if !ok {
 		h.logger.Error("Unauthorized access attempt")
-		response := dto.ErrorResponse("Unauthorized")
+		response := contracts.ErrorResponse("Unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
@@ -232,7 +247,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	updatedOrder, err := h.orderUseCase.UpdateOrderStatus(input)
 	if err != nil {
 		h.logger.Error("Failed to update order status: %v", err)
-		response := dto.ErrorResponse(err.Error())
+		response := contracts.ErrorResponse(err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -240,7 +255,7 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Convert order to DTO
-	orderDTO := dto.OrderUpdateStatusResponse(updatedOrder)
+	orderDTO := contracts.OrderUpdateStatusResponse(*updatedOrder.ToOrderSummaryDTO())
 
 	// Return updated order
 	w.Header().Set("Content-Type", "application/json")
