@@ -220,7 +220,33 @@ func (c *CheckoutRepository) HasActiveCheckoutsWithProduct(productID uint) (bool
 
 // Update implements repository.CheckoutRepository.
 func (c *CheckoutRepository) Update(checkout *entity.Checkout) error {
-	return c.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(checkout).Error
+	return c.db.Transaction(func(tx *gorm.DB) error {
+		// First, get the current items in the database
+		var currentItems []entity.CheckoutItem
+		if err := tx.Where("checkout_id = ?", checkout.ID).Find(&currentItems).Error; err != nil {
+			return fmt.Errorf("failed to fetch current checkout items: %w", err)
+		}
+
+		// Create a map of current item IDs in the checkout entity for efficient lookup
+		currentItemIDs := make(map[uint]bool)
+		for _, item := range checkout.Items {
+			if item.ID != 0 {
+				currentItemIDs[item.ID] = true
+			}
+		}
+
+		// Delete items that are no longer in the checkout
+		for _, dbItem := range currentItems {
+			if !currentItemIDs[dbItem.ID] {
+				if err := tx.Unscoped().Delete(&dbItem).Error; err != nil {
+					return fmt.Errorf("failed to delete checkout item %d: %w", dbItem.ID, err)
+				}
+			}
+		}
+
+		// Save the checkout with remaining items
+		return tx.Session(&gorm.Session{FullSaveAssociations: true}).Save(checkout).Error
+	})
 }
 
 // NewCheckoutRepository creates a new GORM-based CheckoutRepository
