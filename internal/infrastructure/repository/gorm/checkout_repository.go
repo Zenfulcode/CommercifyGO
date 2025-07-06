@@ -88,6 +88,19 @@ func (c *CheckoutRepository) GetBySessionID(sessionID string) (*entity.Checkout,
 	return &checkout, nil
 }
 
+// GetAbandonedBySessionID implements repository.CheckoutRepository.
+func (c *CheckoutRepository) GetAbandonedBySessionID(sessionID string) (*entity.Checkout, error) {
+	var checkout entity.Checkout
+	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
+		Preload("User").
+		Where("session_id = ? AND status = ?", sessionID, entity.CheckoutStatusAbandoned).
+		First(&checkout).Error
+	if err != nil {
+		return nil, err
+	}
+	return &checkout, nil
+}
+
 // GetByUserID implements repository.CheckoutRepository.
 func (c *CheckoutRepository) GetByUserID(userID uint) (*entity.Checkout, error) {
 	var checkout entity.Checkout

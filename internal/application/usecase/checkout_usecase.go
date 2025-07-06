@@ -780,6 +780,26 @@ func (uc *CheckoutUseCase) GetOrCreateCheckoutBySessionIDWithCurrency(sessionID 
 		return checkout, nil
 	}
 
+	// If no active checkout found, try to get an abandoned checkout and reactivate it
+	abandonedCheckout, err := uc.checkoutRepo.GetAbandonedBySessionID(sessionID)
+	if err == nil {
+		// Reactivate the abandoned checkout
+		abandonedCheckout.Reactivate()
+
+		// If currency is specified, change currency if different
+		if currency != "" && abandonedCheckout.Currency != currency {
+			return uc.ChangeCurrency(abandonedCheckout, currency)
+		}
+
+		// Update the checkout in repository
+		err = uc.checkoutRepo.Update(abandonedCheckout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reactivate abandoned checkout: %w", err)
+		}
+
+		return abandonedCheckout, nil
+	}
+
 	// If not found, create a new one
 	var checkoutCurrency string
 	if currency != "" {
