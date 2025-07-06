@@ -323,6 +323,37 @@ func TestCheckoutStatus(t *testing.T) {
 		assert.Equal(t, CheckoutStatus("abandoned"), CheckoutStatusAbandoned)
 		assert.Equal(t, CheckoutStatus("expired"), CheckoutStatusExpired)
 	})
+
+	t.Run("MarkAsAbandoned", func(t *testing.T) {
+		checkout, err := NewCheckout("session123", "USD")
+		require.NoError(t, err)
+
+		originalTime := checkout.LastActivityAt
+		time.Sleep(1 * time.Millisecond) // Ensure time difference
+
+		checkout.MarkAsAbandoned()
+
+		assert.Equal(t, CheckoutStatusAbandoned, checkout.Status)
+		assert.True(t, checkout.LastActivityAt.After(originalTime))
+	})
+
+	t.Run("Reactivate", func(t *testing.T) {
+		checkout, err := NewCheckout("session123", "USD")
+		require.NoError(t, err)
+
+		// First mark as abandoned
+		checkout.MarkAsAbandoned()
+		assert.Equal(t, CheckoutStatusAbandoned, checkout.Status)
+
+		originalTime := checkout.LastActivityAt
+		time.Sleep(1 * time.Millisecond) // Ensure time difference
+
+		// Then reactivate
+		checkout.Reactivate()
+
+		assert.Equal(t, CheckoutStatusActive, checkout.Status)
+		assert.True(t, checkout.LastActivityAt.After(originalTime))
+	})
 }
 
 func TestCheckoutDTOConversions(t *testing.T) {

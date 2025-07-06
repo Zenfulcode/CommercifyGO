@@ -367,6 +367,12 @@ func (c *Checkout) MarkAsExpired() {
 	c.LastActivityAt = time.Now()
 }
 
+// Reactivate marks an abandoned checkout as active again
+func (c *Checkout) Reactivate() {
+	c.Status = CheckoutStatusActive
+	c.LastActivityAt = time.Now()
+}
+
 // IsExpired checks if the checkout has expired
 func (c *Checkout) IsExpired() bool {
 	return time.Now().After(c.ExpiresAt)

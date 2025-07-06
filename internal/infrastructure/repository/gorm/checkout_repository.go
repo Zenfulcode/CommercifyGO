@@ -88,6 +88,19 @@ func (c *CheckoutRepository) GetBySessionID(sessionID string) (*entity.Checkout,
 	return &checkout, nil
 }
 
+// GetAbandonedBySessionID implements repository.CheckoutRepository.
+func (c *CheckoutRepository) GetAbandonedBySessionID(sessionID string) (*entity.Checkout, error) {
+	var checkout entity.Checkout
+	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
+		Preload("User").
+		Where("session_id = ? AND status = ?", sessionID, entity.CheckoutStatusAbandoned).
+		First(&checkout).Error
+	if err != nil {
+		return nil, err
+	}
+	return &checkout, nil
+}
+
 // GetByUserID implements repository.CheckoutRepository.
 func (c *CheckoutRepository) GetByUserID(userID uint) (*entity.Checkout, error) {
 	var checkout entity.Checkout
@@ -207,7 +220,55 @@ func (c *CheckoutRepository) HasActiveCheckoutsWithProduct(productID uint) (bool
 
 // Update implements repository.CheckoutRepository.
 func (c *CheckoutRepository) Update(checkout *entity.Checkout) error {
-	return c.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(checkout).Error
+	return c.db.Transaction(func(tx *gorm.DB) error {
+		// First, get the current items in the database
+		var currentItems []entity.CheckoutItem
+		if err := tx.Where("checkout_id = ?", checkout.ID).Find(&currentItems).Error; err != nil {
+			return fmt.Errorf("failed to fetch current checkout items: %w", err)
+		}
+
+		// Create a map of current item IDs in the checkout entity for efficient lookup
+		currentItemIDs := make(map[uint]bool)
+		for _, item := range checkout.Items {
+			if item.ID != 0 {
+				currentItemIDs[item.ID] = true
+			}
+		}
+
+		// Delete items that are no longer in the checkout
+		for _, dbItem := range currentItems {
+			if !currentItemIDs[dbItem.ID] {
+				if err := tx.Unscoped().Delete(&dbItem).Error; err != nil {
+					return fmt.Errorf("failed to delete checkout item %d: %w", dbItem.ID, err)
+				}
+			}
+		}
+
+		// Save the checkout with remaining items
+		return tx.Session(&gorm.Session{FullSaveAssociations: true}).Save(checkout).Error
+	})
+}
+
+// GetAllExpiredCheckoutsForDeletion implements repository.CheckoutRepository.
+func (c *CheckoutRepository) GetAllExpiredCheckoutsForDeletion() ([]*entity.Checkout, error) {
+	var checkouts []*entity.Checkout
+
+	// Get all checkouts that are expired, abandoned, or completed (older than 30 days to be safe)
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+
+	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
+		Where("status IN (?, ?, ?) OR updated_at < ?",
+			entity.CheckoutStatusExpired,
+			entity.CheckoutStatusAbandoned,
+			entity.CheckoutStatusCompleted,
+			thirtyDaysAgo).
+		Find(&checkouts).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expired checkouts for deletion: %w", err)
+	}
+
+	return checkouts, nil
 }
 
 // NewCheckoutRepository creates a new GORM-based CheckoutRepository

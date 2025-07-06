@@ -572,6 +572,28 @@ func (uc *CheckoutUseCase) ExpireOldCheckoutsLegacy() (int, error) {
 	return result.AbandonedCount + result.DeletedCount + result.ExpiredCount, nil
 }
 
+// ForceDeleteAllExpiredCheckouts forcefully deletes all expired, abandoned, and old completed checkouts
+func (uc *CheckoutUseCase) ForceDeleteAllExpiredCheckouts() (*CheckoutCleanupResult, error) {
+	result := &CheckoutCleanupResult{}
+
+	// Get all expired checkouts for deletion
+	checkoutsToDelete, err := uc.checkoutRepo.GetAllExpiredCheckoutsForDeletion()
+	if err != nil {
+		return result, fmt.Errorf("failed to get expired checkouts for deletion: %w", err)
+	}
+
+	for _, checkout := range checkoutsToDelete {
+		err = uc.checkoutRepo.Delete(checkout.ID)
+		if err != nil {
+			log.Printf("Failed to force delete checkout %d: %v", checkout.ID, err)
+			continue
+		}
+		result.DeletedCount++
+	}
+
+	return result, nil
+}
+
 // CreateOrderFromCheckout creates an order from a checkout
 func (uc *CheckoutUseCase) CreateOrderFromCheckout(checkoutID uint) (*entity.Order, error) {
 	// Get checkout
@@ -778,6 +800,26 @@ func (uc *CheckoutUseCase) GetOrCreateCheckoutBySessionIDWithCurrency(sessionID 
 			return uc.ChangeCurrency(checkout, currency)
 		}
 		return checkout, nil
+	}
+
+	// If no active checkout found, try to get an abandoned checkout and reactivate it
+	abandonedCheckout, err := uc.checkoutRepo.GetAbandonedBySessionID(sessionID)
+	if err == nil {
+		// Reactivate the abandoned checkout
+		abandonedCheckout.Reactivate()
+
+		// If currency is specified, change currency if different
+		if currency != "" && abandonedCheckout.Currency != currency {
+			return uc.ChangeCurrency(abandonedCheckout, currency)
+		}
+
+		// Update the checkout in repository
+		err = uc.checkoutRepo.Update(abandonedCheckout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reactivate abandoned checkout: %w", err)
+		}
+
+		return abandonedCheckout, nil
 	}
 
 	// If not found, create a new one

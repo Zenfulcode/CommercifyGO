@@ -16,6 +16,9 @@ type CheckoutRepository interface {
 	// GetBySessionID retrieves an active checkout by session ID
 	GetBySessionID(sessionID string) (*entity.Checkout, error)
 
+	// GetAbandonedBySessionID retrieves an abandoned checkout by session ID
+	GetAbandonedBySessionID(sessionID string) (*entity.Checkout, error)
+
 	// Update updates a checkout
 	Update(checkout *entity.Checkout) error
 
@@ -45,4 +48,7 @@ type CheckoutRepository interface {
 
 	// HasActiveCheckoutsWithProduct checks if a product has any active checkouts
 	HasActiveCheckoutsWithProduct(productID uint) (bool, error)
+
+	// GetAllExpiredCheckoutsForDeletion retrieves all expired checkouts for force deletion
+	GetAllExpiredCheckoutsForDeletion() ([]*entity.Checkout, error)
 }

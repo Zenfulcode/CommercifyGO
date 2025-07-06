@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/joho/godotenv"
@@ -11,6 +12,10 @@ import (
 )
 
 func main() {
+	// Parse command line flags
+	forceDelete := flag.Bool("force", false, "Force delete all expired, abandoned, and old completed checkouts")
+	flag.Parse()
+
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
@@ -18,7 +23,11 @@ func main() {
 
 	// Initialize logger
 	logger := logger.NewLogger()
-	logger.Info("Starting checkout expiry cleanup tool")
+	if *forceDelete {
+		logger.Info("Starting checkout force deletion tool")
+	} else {
+		logger.Info("Starting checkout expiry cleanup tool")
+	}
 
 	// Load configuration
 	cfg, err := config.LoadConfig()
@@ -39,15 +48,27 @@ func main() {
 	// Get checkout use case
 	checkoutUseCase := diContainer.UseCases().CheckoutUseCase()
 
-	// Expire old checkouts
-	result, err := checkoutUseCase.ExpireOldCheckouts()
-	if err != nil {
-		logger.Fatal("Failed to expire old checkouts: %v", err)
-	}
+	if *forceDelete {
+		// Force delete all expired checkouts
+		deleteResult, err := checkoutUseCase.ForceDeleteAllExpiredCheckouts()
+		if err != nil {
+			logger.Fatal("Failed to force delete expired checkouts: %v", err)
+		}
 
-	logger.Info("Checkout cleanup completed:")
-	logger.Info("- Abandoned checkouts: %d", result.AbandonedCount)
-	logger.Info("- Deleted checkouts: %d", result.DeletedCount)
-	logger.Info("- Expired checkouts: %d", result.ExpiredCount)
-	logger.Info("Total processed: %d", result.AbandonedCount+result.DeletedCount+result.ExpiredCount)
+		logger.Info("Force deletion completed:")
+		logger.Info("- Force deleted checkouts: %d", deleteResult.DeletedCount)
+		logger.Info("Total processed: %d", deleteResult.DeletedCount)
+	} else {
+		// Regular expire old checkouts
+		expireResult, err := checkoutUseCase.ExpireOldCheckouts()
+		if err != nil {
+			logger.Fatal("Failed to expire old checkouts: %v", err)
+		}
+
+		logger.Info("Checkout cleanup completed:")
+		logger.Info("- Abandoned checkouts: %d", expireResult.AbandonedCount)
+		logger.Info("- Deleted checkouts: %d", expireResult.DeletedCount)
+		logger.Info("- Expired checkouts: %d", expireResult.ExpiredCount)
+		logger.Info("Total processed: %d", expireResult.AbandonedCount+expireResult.DeletedCount+expireResult.ExpiredCount)
+	}
 }
