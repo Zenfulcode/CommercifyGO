@@ -129,3 +129,6 @@ mod-tidy: ## Tidy Go modules
 # Maintenance commands
 expire-checkouts: ## Expire old checkouts manually
 	go run ./cmd/expire-checkouts
+
+force-delete-checkouts: ## Force delete all expired, abandoned, and old completed checkouts
+	go run ./cmd/expire-checkouts -force

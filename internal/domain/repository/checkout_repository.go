@@ -48,4 +48,7 @@ type CheckoutRepository interface {
 
 	// HasActiveCheckoutsWithProduct checks if a product has any active checkouts
 	HasActiveCheckoutsWithProduct(productID uint) (bool, error)
+
+	// GetAllExpiredCheckoutsForDeletion retrieves all expired checkouts for force deletion
+	GetAllExpiredCheckoutsForDeletion() ([]*entity.Checkout, error)
 }

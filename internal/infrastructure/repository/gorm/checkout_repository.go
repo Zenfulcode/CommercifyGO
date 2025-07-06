@@ -249,6 +249,28 @@ func (c *CheckoutRepository) Update(checkout *entity.Checkout) error {
 	})
 }
 
+// GetAllExpiredCheckoutsForDeletion implements repository.CheckoutRepository.
+func (c *CheckoutRepository) GetAllExpiredCheckoutsForDeletion() ([]*entity.Checkout, error) {
+	var checkouts []*entity.Checkout
+
+	// Get all checkouts that are expired, abandoned, or completed (older than 30 days to be safe)
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+
+	err := c.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
+		Where("status IN (?, ?, ?) OR updated_at < ?",
+			entity.CheckoutStatusExpired,
+			entity.CheckoutStatusAbandoned,
+			entity.CheckoutStatusCompleted,
+			thirtyDaysAgo).
+		Find(&checkouts).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expired checkouts for deletion: %w", err)
+	}
+
+	return checkouts, nil
+}
+
 // NewCheckoutRepository creates a new GORM-based CheckoutRepository
 func NewCheckoutRepository(db *gorm.DB) repository.CheckoutRepository {
 	return &CheckoutRepository{db: db}

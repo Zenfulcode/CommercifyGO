@@ -481,3 +481,63 @@ Use Stripe's test cards for development:
 - `4000 0000 0000 9995` - Payment declined
 
 For more test card numbers, visit [Stripe's testing documentation](https://stripe.com/docs/testing).
+
+## Maintenance Commands
+
+The project includes useful maintenance commands for database cleanup and optimization:
+
+### Checkout Cleanup
+
+The system provides two modes for managing expired and old checkouts:
+
+```bash
+# Regular cleanup (recommended for scheduled runs)
+make expire-checkouts
+# or
+go run ./cmd/expire-checkouts
+```
+
+This command performs the following operations:
+
+- Marks checkouts with customer/shipping info as **abandoned** after 15 minutes of inactivity
+- **Deletes** empty checkouts older than 24 hours
+- **Deletes** abandoned checkouts older than 7 days
+- Marks remaining expired checkouts as **expired** (legacy support)
+
+```bash
+# Force deletion (use with caution)
+make force-delete-checkouts
+# or
+go run ./cmd/expire-checkouts -force
+```
+
+This command performs aggressive cleanup:
+
+- **Force deletes** all expired, abandoned, and completed checkouts
+- **Force deletes** checkouts older than 30 days regardless of status
+- Should be used carefully as it permanently removes checkout data
+
+### Usage Examples
+
+```bash
+# Show help and available options
+./bin/expire-checkouts --help
+
+# Regular cleanup (safe for automation)
+./bin/expire-checkouts
+
+# Force delete all expired checkouts
+./bin/expire-checkouts -force
+```
+
+### Scheduling Maintenance
+
+For production environments, consider scheduling regular cleanup:
+
+```bash
+# Example crontab entry (runs every hour)
+0 * * * * /path/to/commercify/bin/expire-checkouts
+
+# Example crontab entry for weekly force cleanup (use with caution)
+0 2 * * 0 /path/to/commercify/bin/expire-checkouts -force
+```
