@@ -10,16 +10,85 @@ This document provides example request bodies and responses for the product syst
 
 ## Public Product Endpoints
 
-### List Products
+### Get Product
 
-`GET /api/products`
+```plaintext
+GET /api/products/{productId}
+```
 
-List all products with pagination.
+Get a product by ID.
+
+**Path Parameters:**
+
+- `productId` (required): Product ID
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Smartphone",
+    "description": "Latest smartphone model",
+    "currency": "USD",
+    "price": 999.99,
+    "sku": "PROD-001",
+    "total_stock": 50,
+    "category": "Electronics",
+    "category_id": 1,
+    "images": ["https://example.com/smartphone.jpg"],
+    "has_variants": true,
+    "active": true,
+    "variants": [
+      {
+        "id": 1,
+        "product_id": 1,
+        "variant_name": "Size L",
+        "sku": "PROD-001-L",
+        "stock": 50,
+        "attributes": {
+          "size": "L",
+          "color": "black"
+        },
+        "images": ["https://example.com/variant1.jpg"],
+        "is_default": true,
+        "weight": 0.35,
+        "price": 999.99,
+        "currency": "USD",
+        "created_at": "2025-07-07T10:30:45Z",
+        "updated_at": "2025-07-07T10:30:45Z"
+      }
+    ],
+    "created_at": "2025-07-07T10:30:45Z",
+    "updated_at": "2025-07-07T10:30:45Z"
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Product retrieved successfully
+- `404 Not Found`: Product not found
+
+### Search Products
+
+```plaintext
+GET /api/products/search
+```
+
+Search for products with optional filters.
 
 **Query Parameters:**
 
-- `page` (optional): Page number (default: 1)
-- `page_size` (optional): Items per page (default: 10)
+- `query` (string, optional): Search term
+- `category_id` (number, optional): Filter by category ID
+- `min_price` (number, optional): Minimum price filter
+- `max_price` (number, optional): Maximum price filter
+- `currency` (string, optional): Currency code (default: USD)
+- `active_only` (boolean, optional): Show only active products (default: true)
+- `page` (number, optional): Page number (default: 1)
+- `page_size` (number, optional): Items per page (default: 10)
 
 Example response:
 
@@ -272,30 +341,176 @@ Example response:
 - `200 OK`: Categories retrieved successfully
 - `500 Internal Server Error`: Server error occurred
 
-## Seller Product Endpoints
+## Admin Product Endpoints
+
+All admin product endpoints require authentication and admin role.
+
+### List Products
+
+```plaintext
+GET /api/admin/products
+```
+
+List all products (admin only).
+
+**Query Parameters:**
+
+- `page` (number, optional): Page number (default: 1)
+- `page_size` (number, optional): Items per page (default: 10)
+- `query` (string, optional): Search term
+- `category_id` (number, optional): Filter by category ID
+- `min_price` (number, optional): Minimum price filter
+- `max_price` (number, optional): Maximum price filter
+- `currency` (string, optional): Currency code
+- `active_only` (boolean, optional): Show only active products
+
+**Status Codes:**
+
+- `200 OK`: Products retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
 
 ### Create Product
 
-`POST /api/products`
+```plaintext
+POST /api/admin/products
+```
 
-Create a new product (seller only).
+Create a new product (admin only).
 
-Request body:
+**Request Body:**
 
 ```json
 {
   "name": "New Product",
   "description": "Product description",
-  "price": 199.99,
-  "stock_quantity": 100,
-  "weight": 1.5,
+  "currency": "USD",
   "category_id": 1,
-  "images": ["product.jpg"],
-  "variants": []
+  "images": ["https://example.com/product.jpg"],
+  "active": true,
+  "variants": [
+    {
+      "sku": "PROD-004-L",
+      "stock": 100,
+      "attributes": [
+        { "name": "size", "value": "L" },
+        { "name": "color", "value": "blue" }
+      ],
+      "images": ["https://example.com/variant1.jpg"],
+      "is_default": true,
+      "weight": 1.5,
+      "price": 199.99
+    }
+  ]
 }
 ```
 
-**Note:** All products must have at least one variant. If no variants are provided in the request, a default variant will be automatically created using the product's basic information (price, stock) and the product number as the SKU.
+**Note:** All products must have at least one variant. If no variants are provided in the request, a default variant will be automatically created.
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "message": "Product created successfully",
+  "data": {
+    "id": 4,
+    "name": "New Product",
+    "description": "Product description",
+    "currency": "USD",
+    "price": 199.99,
+    "sku": "PROD-004-L",
+    "total_stock": 100,
+    "category": "Electronics",
+    "category_id": 1,
+    "images": ["https://example.com/product.jpg"],
+    "has_variants": true,
+    "active": true,
+    "variants": [
+      {
+        "id": 1,
+        "product_id": 4,
+        "variant_name": "Size L",
+        "sku": "PROD-004-L",
+        "stock": 100,
+        "attributes": {
+          "size": "L",
+          "color": "blue"
+        },
+        "images": ["https://example.com/variant1.jpg"],
+        "is_default": true,
+        "weight": 1.5,
+        "price": 199.99,
+        "currency": "USD",
+        "created_at": "2025-07-07T10:30:45Z",
+        "updated_at": "2025-07-07T10:30:45Z"
+      }
+    ],
+    "created_at": "2025-07-07T10:30:45Z",
+    "updated_at": "2025-07-07T10:30:45Z"
+  }
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Product created successfully
+- `400 Bad Request`: Invalid request body or validation error
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Update Product
+
+```plaintext
+PUT /api/admin/products/{productId}
+```
+
+Update an existing product (admin only).
+
+**Path Parameters:**
+
+- `productId` (required): Product ID
+
+**Request Body:**
+
+```json
+{
+  "name": "Updated Product Name",
+  "description": "Updated description",
+  "currency": "USD",
+  "category_id": 2,
+  "images": ["https://example.com/updated-product.jpg"],
+  "active": true
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Product updated successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Product not found
+
+### Delete Product
+
+```plaintext
+DELETE /api/admin/products/{productId}
+```
+
+Delete a product (admin only).
+
+**Path Parameters:**
+
+- `productId` (required): Product ID
+
+**Status Codes:**
+
+- `200 OK`: Product deleted successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Product not found
+- `409 Conflict`: Cannot delete product with existing orders
 
 Example response:
 
@@ -464,49 +679,60 @@ Example response:
 
 ## Product Variant Endpoints
 
+All variant endpoints require authentication and admin role.
+
 ### Add Product Variant
 
-`POST /api/products/{productId}/variants`
+```plaintext
+POST /api/admin/products/{productId}/variants
+```
 
-Add a variant to a product (seller only).
+Add a variant to a product (admin only).
 
-Request body:
+**Path Parameters:**
+
+- `productId` (required): Product ID
+
+**Request Body:**
 
 ```json
 {
-  "sku": "PROD-RED-M",
-  "price": 29.99,
-  "compare_price": 39.99,
-  "stock_quantity": 10,
-  "attributes": {
-    "color": "Red",
-    "size": "Medium"
-  },
-  "images": ["red-shirt.jpg"],
-  "is_default": true
+  "sku": "PROD-004-M",
+  "stock": 10,
+  "attributes": [
+    { "name": "color", "value": "Red" },
+    { "name": "size", "value": "Medium" }
+  ],
+  "images": ["https://example.com/red-variant.jpg"],
+  "is_default": false,
+  "weight": 1.2,
+  "price": 29.99
 }
 ```
 
-Example response:
+**Response Body:**
 
 ```json
 {
   "success": true,
+  "message": "Variant added successfully",
   "data": {
     "id": 11,
-    "created_at": "2023-04-28T15:00:00Z",
-    "updated_at": "2023-04-28T15:00:00Z",
-    "product_id": 3,
-    "sku": "PROD-RED-M",
-    "price": 29.99,
-    "compare_price": 39.99,
-    "stock_quantity": 10,
+    "product_id": 4,
+    "variant_name": "Color Red, Size Medium",
+    "sku": "PROD-004-M",
+    "stock": 10,
     "attributes": {
       "color": "Red",
       "size": "Medium"
     },
-    "images": ["red-shirt.jpg"],
-    "is_default": true
+    "images": ["https://example.com/red-variant.jpg"],
+    "is_default": false,
+    "weight": 1.2,
+    "price": 29.99,
+    "currency": "USD",
+    "created_at": "2025-07-07T10:30:45Z",
+    "updated_at": "2025-07-07T10:30:45Z"
   }
 }
 ```
@@ -514,33 +740,71 @@ Example response:
 **Status Codes:**
 
 - `201 Created`: Variant created successfully
-- `400 Bad Request`: Invalid request body
+- `400 Bad Request`: Invalid request body or validation error
 - `401 Unauthorized`: Not authenticated
-- `403 Forbidden`: Not authorized (not the seller of this product)
-- `500 Internal Server Error`: Server error occurred
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Product not found
+- `409 Conflict`: Variant with this SKU already exists
 
 ### Update Product Variant
 
-`PUT /api/products/{productId}/variants/{variantId}`
+```plaintext
+PUT /api/admin/products/{productId}/variants/{variantId}
+```
 
-Update a product variant (seller only).
+Update a product variant (admin only).
 
-Request body:
+**Path Parameters:**
+
+- `productId` (required): Product ID
+- `variantId` (required): Variant ID
+
+**Request Body:**
 
 ```json
 {
-  "sku": "PROD-RED-M",
-  "price": 24.99,
-  "compare_price": 34.99,
-  "stock_quantity": 15,
-  "attributes": {
-    "color": "Red",
-    "size": "Medium"
-  },
-  "images": ["red-shirt-updated.jpg"],
-  "is_default": true
+  "sku": "PROD-004-M-UPDATED",
+  "stock": 15,
+  "attributes": [
+    { "name": "color", "value": "Dark Red" },
+    { "name": "size", "value": "Medium" }
+  ],
+  "images": ["https://example.com/dark-red-variant.jpg"],
+  "is_default": false,
+  "weight": 1.3,
+  "price": 24.99
 }
 ```
+
+**Status Codes:**
+
+- `200 OK`: Variant updated successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Product or variant not found
+- `409 Conflict`: Variant with this SKU already exists
+
+### Delete Product Variant
+
+```plaintext
+DELETE /api/admin/products/{productId}/variants/{variantId}
+```
+
+Delete a product variant (admin only).
+
+**Path Parameters:**
+
+- `productId` (required): Product ID
+- `variantId` (required): Variant ID
+
+**Status Codes:**
+
+- `200 OK`: Variant deleted successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Product or variant not found
+- `409 Conflict`: Cannot delete the last variant of a product or variant with existing orders
 
 Example response:
 

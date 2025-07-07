@@ -7,7 +7,7 @@ This document provides example request bodies for the user system API endpoints.
 ### Register User
 
 ```plaintext
-POST /api/users/register
+POST /api/auth/register
 ```
 
 Register a new user account.
@@ -19,8 +19,7 @@ Register a new user account.
   "email": "user@example.com",
   "password": "Password123!",
   "first_name": "John",
-  "last_name": "Smith",
-  "role": "user"
+  "last_name": "Smith"
 }
 ```
 
@@ -55,7 +54,7 @@ Example response:
 ### Login
 
 ```plaintext
-POST /api/users/login
+POST /api/auth/signin
 ```
 
 Authenticate a user and retrieve a JWT token.

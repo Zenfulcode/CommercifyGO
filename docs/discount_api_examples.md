@@ -2,98 +2,265 @@
 
 This document provides example request bodies for the discount system API endpoints.
 
+# Discount API Examples
+
+This document provides example request bodies for the discount system API endpoints.
+
 ## Public Discount Endpoints
+
+### Validate Discount Code
+
+```plaintext
+POST /api/discounts/validate
+```
+
+Validate a discount code to check if it's valid and applicable.
+
+**Request Body:**
+
+```json
+{
+  "discount_code": "SUMMER2025"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "discount_id": 1,
+    "code": "SUMMER2025",
+    "type": "basket",
+    "method": "percentage",
+    "value": 15.0,
+    "min_order_value": 50.0,
+    "max_discount_value": 30.0
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Validation completed (check `valid` field for result)
+- `400 Bad Request`: Invalid request body
+
+## Admin Discount Endpoints
+
+All admin discount endpoints require authentication and admin role.
+
+### Create Discount
+
+```plaintext
+POST /api/admin/discounts
+```
+
+Create a new discount (admin only).
+
+**Request Body:**
+
+```json
+{
+  "code": "SUMMER2025",
+  "type": "basket",
+  "method": "percentage",
+  "value": 15.0,
+  "min_order_value": 50.0,
+  "max_discount_value": 30.0,
+  "product_ids": [],
+  "category_ids": [],
+  "start_date": "2025-05-01T00:00:00Z",
+  "end_date": "2025-08-31T23:59:59Z",
+  "usage_limit": 500
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "message": "Discount created successfully",
+  "data": {
+    "id": 7,
+    "code": "SUMMER2025",
+    "type": "basket",
+    "method": "percentage",
+    "value": 15.0,
+    "min_order_value": 50.0,
+    "max_discount_value": 30.0,
+    "product_ids": [],
+    "category_ids": [],
+    "start_date": "2025-05-01T00:00:00Z",
+    "end_date": "2025-08-31T23:59:59Z",
+    "usage_limit": 500,
+    "current_usage": 0,
+    "active": true,
+    "created_at": "2025-07-07T10:30:45Z",
+    "updated_at": "2025-07-07T10:30:45Z"
+  }
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Discount created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `409 Conflict`: Discount code already exists
+
+### Get Discount
+
+```plaintext
+GET /api/admin/discounts/{discountId}
+```
+
+Get discount by ID (admin only).
+
+**Path Parameters:**
+
+- `discountId` (required): Discount ID
+
+**Status Codes:**
+
+- `200 OK`: Discount retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Discount not found
+
+### Update Discount
+
+```plaintext
+PUT /api/admin/discounts/{discountId}
+```
+
+Update an existing discount (admin only).
+
+**Path Parameters:**
+
+- `discountId` (required): Discount ID
+
+**Request Body:**
+
+```json
+{
+  "code": "SUMMER2025_UPDATED",
+  "type": "basket",
+  "method": "percentage",
+  "value": 20.0,
+  "min_order_value": 75.0,
+  "max_discount_value": 40.0,
+  "start_date": "2025-05-01T00:00:00Z",
+  "end_date": "2025-09-30T23:59:59Z",
+  "usage_limit": 750,
+  "active": true
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Discount updated successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Discount not found
+
+### Delete Discount
+
+```plaintext
+DELETE /api/admin/discounts/{discountId}
+```
+
+Delete a discount (admin only).
+
+**Path Parameters:**
+
+- `discountId` (required): Discount ID
+
+**Status Codes:**
+
+- `200 OK`: Discount deleted successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Discount not found
+
+### List Discounts
+
+```plaintext
+GET /api/admin/discounts
+```
+
+List all discounts (admin only).
+
+**Status Codes:**
+
+- `200 OK`: Discounts retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
 
 ### List Active Discounts
 
-`GET /api/discounts`
-
-List all currently active discounts.
-
-**Query Parameters:**
-
-- `offset` (optional): Pagination offset (default: 0)
-- `limit` (optional): Pagination limit (default: 10)
-
-Example response:
-
-```json
-[
-  {
-    "id": 1,
-    "code": "SUMMER2023",
-    "type": "basket",
-    "method": "percentage",
-    "value": 10.0,
-    "min_order_value": 50.0,
-    "max_discount_value": 20.0,
-    "start_date": "2023-06-01T00:00:00Z",
-    "end_date": "2023-08-31T23:59:59Z",
-    "usage_limit": 1000,
-    "current_usage": 243,
-    "active": true
-  },
-  {
-    "id": 2,
-    "code": "WELCOME10",
-    "type": "basket",
-    "method": "fixed",
-    "value": 10.0,
-    "min_order_value": 0.0,
-    "max_discount_value": 10.0,
-    "start_date": "2023-01-01T00:00:00Z",
-    "end_date": "2023-12-31T23:59:59Z",
-    "usage_limit": 0,
-    "current_usage": 567,
-    "active": true
-  }
-]
+```plaintext
+GET /api/admin/discounts/active
 ```
+
+List only active discounts (admin only).
+
+**Status Codes:**
+
+- `200 OK`: Active discounts retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
 
 ### Apply Discount to Order
 
-`POST /api/orders/{id}/discounts`
+```plaintext
+POST /api/admin/discounts/apply/{orderId}
+```
 
-Apply a discount code to an existing order.
+Apply a discount code to an existing order (admin only).
+
+**Path Parameters:**
+
+- `orderId` (required): Order ID
+
+**Request Body:**
 
 ```json
 {
-  "discount_code": "SUMMER2023"
+  "discount_code": "SUMMER2025"
 }
 ```
 
-Example response:
+**Status Codes:**
 
-```json
-{
-  "id": 5,
-  "user_id": 1,
-  "items": [
-    {
-      "id": 12,
-      "order_id": 5,
-      "product_id": 3,
-      "quantity": 2,
-      "price": 24.99,
-      "subtotal": 49.98
-    }
-  ],
-  "subtotal": 49.98,
-  "discount_code": "SUMMER2023",
-  "discount_amount": 5.00,
-  "shipping_cost": 5.99,
-  "total_amount": 50.97,
-  "status": "pending",
-  "created_at": "2023-06-15T14:22:15Z",
-  "updated_at": "2023-06-15T14:23:05Z"
-}
-```
+- `200 OK`: Discount applied successfully
+- `400 Bad Request`: Invalid request body or discount cannot be applied
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Order or discount not found
 
 ### Remove Discount from Order
 
-`DELETE /api/orders/{id}/discounts`
+```plaintext
+DELETE /api/admin/discounts/remove/{orderId}
+```
 
-Remove an applied discount from an order.
+Remove an applied discount from an order (admin only).
+
+**Path Parameters:**
+
+- `orderId` (required): Order ID
+
+**Status Codes:**
+
+- `200 OK`: Discount removed successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Order not found
 
 Example response:
 
@@ -113,7 +280,7 @@ Example response:
   ],
   "subtotal": 49.98,
   "discount_code": null,
-  "discount_amount": 0.00,
+  "discount_amount": 0.0,
   "shipping_cost": 5.99,
   "total_amount": 55.97,
   "status": "pending",
