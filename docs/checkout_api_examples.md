@@ -2,13 +2,24 @@
 
 This document outlines the Checkout API endpoints for the Commercify e-commerce system.
 
+## Response Format
+
+All checkout API responses follow the standard Commercify response format:
+
+```json
+{
+  "success": boolean,
+  "message": "string (optional)",
+  "data": object,
+  "error": "string (optional, present when success is false)"
+}
+```
+
+For checkout endpoints, the `data` field contains the checkout object with all its properties.
+
 ## Important Notes
 
 - **SKUs must be variant SKUs**: When adding or updating items in checkout, the SKU parameter must refer to a product variant SKU, not a product number. All products now have at least one variant, and SKU lookups are performed exclusively against the product_variants table.
-
-## Guest Checkout Endpoints
-
-The following endpoints support guest checkout functionality, allowing users to create and manage checkout sessions without authentication.
 
 ### Get Current Checkout
 
@@ -22,61 +33,62 @@ Retrieves the current checkout session for a user. If no checkout exists, a new 
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [
-    {
-      "id": 1,
-      "product_id": 42,
-      "variant_id": 7,
-      "product_name": "Organic Cotton T-Shirt",
-      "variant_name": "Medium / Blue",
-      "sku": "TS-BL-M",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.3,
-      "subtotal": 49.98,
-      "created_at": "2025-05-24T10:30:00Z",
-      "updated_at": "2025-05-24T10:30:00Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "shipping_method_id": 0,
-  "shipping_method": null,
-  "payment_provider": "",
-  "total_amount": 49.98,
-  "shipping_cost": 0,
-  "total_weight": 0.6,
-  "customer_details": {
-    "email": "",
-    "phone": "",
-    "full_name": ""
-  },
-  "currency": "USD",
-  "discount_code": "",
-  "discount_amount": 0,
-  "final_amount": 49.98,
-  "applied_discount": null,
-  "created_at": "2025-05-24T10:30:00Z",
-  "updated_at": "2025-05-24T10:30:00Z",
-  "last_activity_at": "2025-05-24T10:30:00Z",
-  "expires_at": "2025-05-24T11:30:00Z"
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [
+      {
+        "id": 1,
+        "product_id": 42,
+        "variant_id": 7,
+        "product_name": "Organic Cotton T-Shirt",
+        "variant_name": "Medium / Blue",
+        "sku": "TS-BL-M",
+        "price": 24.99,
+        "quantity": 2,
+        "weight": 0.3,
+        "subtotal": 49.98,
+        "created_at": "2025-05-24T10:30:00Z",
+        "updated_at": "2025-05-24T10:30:00Z"
+      }
+    ],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "billing_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "shipping_method_id": 0,
+    "shipping_option": null,
+    "payment_provider": "",
+    "total_amount": 49.98,
+    "shipping_cost": 0,
+    "total_weight": 0.6,
+    "customer_details": {
+      "email": "",
+      "phone": "",
+      "full_name": ""
+    },
+    "currency": "USD",
+    "discount_code": "",
+    "discount_amount": 0,
+    "final_amount": 49.98,
+    "applied_discount": null,
+    "last_activity_at": "2025-05-24T10:30:00Z",
+    "expires_at": "2025-05-24T11:30:00Z"
+  }
 }
 ```
 
@@ -106,48 +118,53 @@ Adds a product item to the current checkout session.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [
-    {
-      "id": 1,
-      "product_id": 42,
-      "variant_id": 7,
-      "product_name": "Organic Cotton T-Shirt",
-      "variant_name": "Medium / Blue",
-      "sku": "TS-BL-M",
-      "price": 24.99,
-      "quantity": 1,
-      "weight": 0.3,
-      "subtotal": 24.99,
-      "created_at": "2025-05-24T10:30:00Z",
-      "updated_at": "2025-05-24T10:30:00Z"
-    }
-  ],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "total_amount": 24.99,
-  "shipping_cost": 0,
-  "total_weight": 0.3,
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 24.99,
-  "created_at": "2025-05-24T10:30:00Z",
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [
+      {
+        "id": 1,
+        "product_id": 42,
+        "variant_id": 7,
+        "product_name": "Organic Cotton T-Shirt",
+        "variant_name": "Medium / Blue",
+        "sku": "TS-BL-M",
+        "price": 24.99,
+        "quantity": 1,
+        "weight": 0.3,
+        "subtotal": 24.99,
+        "created_at": "2025-05-24T10:30:00Z",
+        "updated_at": "2025-05-24T10:30:00Z"
+      }
+    ],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "billing_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "total_amount": 24.99,
+    "shipping_cost": 0,
+    "total_weight": 0.3,
+    "currency": "USD",
+    "discount_amount": 0,
+    "final_amount": 24.99,
+    "last_activity_at": "2025-05-24T10:30:00Z",
+    "expires_at": "2025-05-24T11:30:00Z"
+  }
+}
   "updated_at": "2025-05-24T10:30:00Z",
   "last_activity_at": "2025-05-24T10:30:00Z",
   "expires_at": "2025-05-24T11:30:00Z"
@@ -185,33 +202,37 @@ Updates the quantity of an item in the current checkout.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [
-    {
-      "id": 1,
-      "product_id": 42,
-      "variant_id": 8,
-      "product_name": "Organic Cotton T-Shirt",
-      "variant_name": "Large / Blue",
-      "sku": "TS-BL-L",
-      "price": 24.99,
-      "quantity": 2,
-      "weight": 0.35,
-      "subtotal": 49.98,
-      "created_at": "2025-05-24T10:30:00Z",
-      "updated_at": "2025-05-24T10:35:00Z"
-    }
-  ],
-  "status": "active",
-  "total_amount": 49.98,
-  "shipping_cost": 0,
-  "total_weight": 0.7,
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 49.98,
-  "updated_at": "2025-05-24T10:35:00Z",
-  "last_activity_at": "2025-05-24T10:35:00Z",
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [
+      {
+        "id": 1,
+        "product_id": 42,
+        "variant_id": 8,
+        "product_name": "Organic Cotton T-Shirt",
+        "variant_name": "Large / Blue",
+        "sku": "TS-BL-L",
+        "price": 24.99,
+        "quantity": 2,
+        "weight": 0.35,
+        "subtotal": 49.98,
+        "created_at": "2025-05-24T10:30:00Z",
+        "updated_at": "2025-05-24T10:35:00Z"
+      }
+    ],
+    "status": "active",
+    "total_amount": 49.98,
+    "shipping_cost": 0,
+    "total_weight": 0.7,
+    "currency": "USD",
+    "discount_amount": 0,
+    "final_amount": 49.98,
+    "last_activity_at": "2025-05-24T10:35:00Z",
+    "expires_at": "2025-05-24T11:35:00Z"
+  }
+}
   "expires_at": "2025-05-24T11:35:00Z"
 }
 ```
@@ -239,35 +260,38 @@ Removes an item from the current checkout session using the product variant SKU.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "total_amount": 0,
-  "shipping_cost": 0,
-  "total_weight": 0,
-  "currency": "USD",
-  "discount_amount": 0,
-  "final_amount": 0,
-  "updated_at": "2025-05-24T10:40:00Z",
-  "last_activity_at": "2025-05-24T10:40:00Z",
-  "expires_at": "2025-05-24T11:40:00Z"
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "billing_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "total_amount": 0,
+    "shipping_cost": 0,
+    "total_weight": 0,
+    "currency": "USD",
+    "discount_amount": 0,
+    "final_amount": 0,
+    "last_activity_at": "2025-05-24T10:40:00Z",
+    "expires_at": "2025-05-24T11:40:00Z"
+  }
+}
 }
 ```
 
@@ -290,31 +314,38 @@ Removes all items from the current checkout session.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
-  "total_amount": 0,
-  "shipping_cost": 0,
-  "total_weight": 0,
-  "currency": "USD",
-  "discount_amount": 0,
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "billing_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "total_amount": 0,
+    "shipping_cost": 0,
+    "total_weight": 0,
+    "currency": "USD",
+    "discount_amount": 0,
+    "final_amount": 0,
+    "last_activity_at": "2025-05-24T10:45:00Z",
+    "expires_at": "2025-05-24T11:45:00Z"
+  }
+}
   "final_amount": 0,
   "updated_at": "2025-05-24T10:45:00Z",
   "last_activity_at": "2025-05-24T10:45:00Z",
@@ -353,26 +384,36 @@ Sets the shipping address for the current checkout.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main Street",
-    "address_line2": "Apt 4B",
-    "city": "Springfield",
-    "state": "IL",
-    "postal_code": "62704",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "",
-    "address_line2": "",
-    "city": "",
-    "state": "",
-    "postal_code": "",
-    "country": ""
-  },
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "123 Main Street",
+      "address_line2": "Apt 4B",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "billing_address": {
+      "address_line1": "",
+      "address_line2": "",
+      "city": "",
+      "state": "",
+      "postal_code": "",
+      "country": ""
+    },
+    "total_amount": 0,
+    "shipping_cost": 0,
+    "total_weight": 0,
+    "currency": "USD",
+    "last_activity_at": "2025-05-24T10:50:00Z",
+    "expires_at": "2025-05-24T11:50:00Z"
+  }
+}
   "total_amount": 0,
   "shipping_cost": 0,
   "total_weight": 0,
@@ -415,29 +456,36 @@ Sets the billing address for the current checkout.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main Street",
-    "address_line2": "Apt 4B",
-    "city": "Springfield",
-    "state": "IL",
-    "postal_code": "62704",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "456 Commerce Ave",
-    "address_line2": "Suite 300",
-    "city": "Springfield",
-    "state": "IL",
-    "postal_code": "62704",
-    "country": "US"
-  },
-  "total_amount": 0,
-  "shipping_cost": 0,
-  "total_weight": 0,
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "123 Main Street",
+      "address_line2": "Apt 4B",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "billing_address": {
+      "address_line1": "456 Commerce Ave",
+      "address_line2": "Suite 300",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "total_amount": 0,
+    "shipping_cost": 0,
+    "total_weight": 0,
+    "currency": "USD",
+    "last_activity_at": "2025-05-24T10:55:00Z",
+    "expires_at": "2025-05-24T11:55:00Z"
+  }
+}
   "currency": "USD",
   "updated_at": "2025-05-24T10:55:00Z",
   "last_activity_at": "2025-05-24T10:55:00Z",
@@ -474,33 +522,41 @@ Sets the customer contact information for the current checkout.
 
 ```json
 {
-  "id": 123,
-  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "items": [],
-  "status": "active",
-  "shipping_address": {
-    "address_line1": "123 Main Street",
-    "address_line2": "Apt 4B",
-    "city": "Springfield",
-    "state": "IL",
-    "postal_code": "62704",
-    "country": "US"
-  },
-  "billing_address": {
-    "address_line1": "456 Commerce Ave",
-    "address_line2": "Suite 300",
-    "city": "Springfield",
-    "state": "IL",
-    "postal_code": "62704",
-    "country": "US"
-  },
-  "customer_details": {
-    "email": "customer@example.com",
-    "phone": "+1234567890",
-    "full_name": "John Doe"
-  },
-  "total_amount": 0,
-  "shipping_cost": 0,
+  "success": true,
+  "data": {
+    "id": 123,
+    "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "items": [],
+    "status": "active",
+    "shipping_address": {
+      "address_line1": "123 Main Street",
+      "address_line2": "Apt 4B",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "billing_address": {
+      "address_line1": "456 Commerce Ave",
+      "address_line2": "Suite 300",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    },
+    "customer_details": {
+      "email": "customer@example.com",
+      "phone": "+1234567890",
+      "full_name": "John Doe"
+    },
+    "total_amount": 0,
+    "shipping_cost": 0,
+    "total_weight": 0,
+    "currency": "USD",
+    "last_activity_at": "2025-05-24T11:00:00Z",
+    "expires_at": "2025-05-24T12:00:00Z"
+  }
+}
   "total_weight": 0,
   "currency": "USD",
   "updated_at": "2025-05-24T11:00:00Z",
@@ -758,63 +814,31 @@ Alternatively, for mobile payment methods:
 ```json
 {
   "success": true,
-  "message": "Order created successfully",
   "data": {
-    "id": 456,
-    "user_id": 123,
-    "order_number": "ORD-2025-0001",
-    "status": "pending",
-    "total_amount": 49.95,
-    "final_amount": 49.95,
-    "currency": "USD",
-    "items": [
-      {
-        "id": 1,
-        "product_id": 42,
-        "variant_id": 7,
-        "product_name": "Organic Cotton T-Shirt",
-        "variant_name": "Medium / Blue",
-        "sku": "TS-BL-M",
-        "price": 24.99,
-        "quantity": 2,
-        "subtotal": 49.98
-      }
-    ],
-    "shipping_address": {
-      "address_line1": "123 Main Street",
-      "address_line2": "Apt 4B",
-      "city": "Springfield",
-      "state": "IL",
-      "postal_code": "62704",
-      "country": "US"
+    "order": {
+      "id": 456,
+      "order_number": "ORD-2025-0001",
+      "checkout_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "user_id": 123,
+      "customer": {
+        "email": "customer@example.com",
+        "phone": "+1234567890",
+        "full_name": "John Doe"
+      },
+      "status": "pending",
+      "payment_status": "pending",
+      "total_amount": 49.98,
+      "shipping_cost": 5.99,
+      "discount_amount": 0,
+      "final_amount": 55.97,
+      "order_lines_amount": 1,
+      "currency": "USD",
+      "created_at": "2025-05-24T11:20:00Z",
+      "updated_at": "2025-05-24T11:20:00Z"
     },
-    "billing_address": {
-      "address_line1": "456 Commerce Ave",
-      "address_line2": "Suite 300",
-      "city": "Springfield",
-      "state": "IL",
-      "postal_code": "62704",
-      "country": "US"
-    },
-    "customer_details": {
-      "email": "customer@example.com",
-      "phone": "+1234567890",
-      "full_name": "John Doe"
-    },
-    "shipping_method": "Standard Shipping",
-    "shipping_cost": 5.99,
-    "subtotal": 49.98,
-    "total": 55.97,
-    "discount_code": "",
-    "discount_amount": 0,
-    "final_amount": 55.97,
-    "currency": "USD",
-    "payment_provider": "stripe",
-    "payment_status": "pending",
-    "created_at": "2025-05-24T11:20:00Z"
-  },
-  "action_required": false,
-  "redirect_url": ""
+    "action_required": false,
+    "redirect_url": ""
+  }
 }
 ```
 

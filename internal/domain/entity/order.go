@@ -123,6 +123,7 @@ func NewOrderFromCheckout(checkout *Checkout) (*Order, error) {
 			ProductVariantID: item.ProductVariantID,
 			Quantity:         item.Quantity,
 			Price:            item.Price,
+			Subtotal:         item.Price * int64(item.Quantity),
 			SKU:              item.SKU,
 			ProductName:      item.ProductName,
 			ImageURL:         item.ImageURL,
