@@ -3,6 +3,7 @@ name: Build and Push Docker Image to GHCR
 on:
   release:
     types: [published]
+  workflow_dispatch:  # Allow manual testing
 
 env:
   REGISTRY: ghcr.io
@@ -27,7 +28,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Convert repository name to lowercase
         run: |
@@ -52,6 +53,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
