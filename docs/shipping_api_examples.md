@@ -6,88 +6,86 @@ This document provides example request bodies for the shipping system API endpoi
 
 ### Calculate Shipping Options
 
-`POST /api/shipping/options`
+```plaintext
+POST /api/shipping/options
+```
 
 Calculate available shipping options for an address and order details.
+
+**Request Body:**
 
 ```json
 {
   "address": {
-    "street_address": "123 Main St",
+    "address_line1": "123 Main St",
+    "address_line2": "Apt 4B",
     "city": "San Francisco",
     "state": "CA",
     "postal_code": "94105",
     "country": "US"
   },
-  "order_value": 150.00,
+  "order_value": 150.0,
   "order_weight": 2.5
 }
 ```
 
-Example response:
+**Response Body:**
 
 ```json
 {
-  "options": [
-    {
-      "shipping_rate_id": 1,
-      "shipping_method_id": 1,
-      "name": "Standard Shipping",
-      "description": "Delivery in 3-5 business days",
-      "estimated_delivery_days": 5,
-      "cost": 7.99,
-      "free_shipping": false
-    },
-    {
-      "shipping_rate_id": 2,
-      "shipping_method_id": 2,
-      "name": "Express Shipping",
-      "description": "Delivery in 1-2 business days",
-      "estimated_delivery_days": 2,
-      "cost": 14.99,
-      "free_shipping": false
-    },
-    {
-      "shipping_rate_id": 3,
-      "shipping_method_id": 3,
-      "name": "Free Ground Shipping",
-      "description": "Free shipping for orders over $100",
-      "estimated_delivery_days": 7,
-      "cost": 0,
-      "free_shipping": true
-    }
-  ]
+  "success": true,
+  "data": {
+    "options": [
+      {
+        "shipping_rate_id": 1,
+        "shipping_method_id": 1,
+        "name": "Standard Shipping",
+        "description": "Delivery in 3-5 business days",
+        "estimated_delivery_days": 5,
+        "cost": 7.99,
+        "free_shipping": false
+      },
+      {
+        "shipping_rate_id": 2,
+        "shipping_method_id": 2,
+        "name": "Express Shipping",
+        "description": "Delivery in 1-2 business days",
+        "estimated_delivery_days": 2,
+        "cost": 14.99,
+        "free_shipping": false
+      },
+      {
+        "shipping_rate_id": 3,
+        "shipping_method_id": 3,
+        "name": "Free Ground Shipping",
+        "description": "Free shipping for orders over $100",
+        "estimated_delivery_days": 7,
+        "cost": 0.0,
+        "free_shipping": true
+      }
+    ]
+  }
 }
 ```
 
-### Get Shipping Cost for a Specific Rate
+**Status Codes:**
 
-`POST /api/shipping/rates/{id}/cost`
-
-Calculate shipping cost for a specific shipping rate.
-
-```json
-{
-  "order_value": 99.95,
-  "order_weight": 1.5
-}
-```
-
-Example response:
-
-```json
-{
-  "cost": 5.99
-}
-```
+- `200 OK`: Shipping options calculated successfully
+- `400 Bad Request`: Invalid request body or address
 
 ## Admin Shipping Endpoints
 
+All admin shipping endpoints require authentication and admin role.
+
 ### Create Shipping Method
 
-`POST /api/admin/shipping/methods`
+```plaintext
+POST /api/admin/shipping/methods
+```
 
-Create a new shipping method.
+Create a new shipping method (admin only).
+
+**Request Body:**
 
 ```json
 {
@@ -96,6 +94,120 @@ Create a new shipping method.
   "estimated_delivery_days": 1
 }
 ```
+
+**Status Codes:**
+
+- `201 Created`: Shipping method created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Create Shipping Zone
+
+```plaintext
+POST /api/admin/shipping/zones
+```
+
+Create a new shipping zone (admin only).
+
+**Request Body:**
+
+```json
+{
+  "name": "US West Coast",
+  "description": "West coast shipping zone",
+  "countries": ["US"],
+  "states": ["CA", "OR", "WA"],
+  "zip_codes": ["9****", "8****"]
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Shipping zone created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Create Shipping Rate
+
+```plaintext
+POST /api/admin/shipping/rates
+```
+
+Create a new shipping rate (admin only).
+
+**Request Body:**
+
+```json
+{
+  "shipping_method_id": 1,
+  "shipping_zone_id": 1,
+  "base_rate": 9.99,
+  "min_order_value": 0.0,
+  "free_shipping_threshold": 100.0,
+  "active": true
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Shipping rate created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Create Weight-Based Rate
+
+```plaintext
+POST /api/admin/shipping/rates/weight
+```
+
+Create a weight-based shipping rate (admin only).
+
+**Request Body:**
+
+```json
+{
+  "shipping_rate_id": 1,
+  "min_weight": 0.0,
+  "max_weight": 5.0,
+  "rate": 5.99
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Weight-based rate created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Create Value-Based Rate
+
+```plaintext
+POST /api/admin/shipping/rates/value
+```
+
+Create a value-based shipping rate (admin only).
+
+**Request Body:**
+
+```json
+{
+  "shipping_rate_id": 1,
+  "min_order_value": 0.0,
+  "max_order_value": 50.0,
+  "rate": 9.99
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Value-based rate created successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
 
 ### Update Shipping Method
 
@@ -156,8 +268,8 @@ Create a new shipping rate connecting a method and zone.
   "shipping_method_id": 1,
   "shipping_zone_id": 1,
   "base_rate": 8.99,
-  "min_order_value": 0.00,
-  "free_shipping_threshold": 100.00,
+  "min_order_value": 0.0,
+  "free_shipping_threshold": 100.0,
   "active": true
 }
 ```
@@ -171,8 +283,8 @@ Update an existing shipping rate.
 ```json
 {
   "base_rate": 7.99,
-  "min_order_value": 0.00,
-  "free_shipping_threshold": 75.00,
+  "min_order_value": 0.0,
+  "free_shipping_threshold": 75.0,
   "active": true
 }
 ```
@@ -203,7 +315,7 @@ Add a value-based rate to an existing shipping rate.
   "shipping_rate_id": 1,
   "min_order_value": 50.0,
   "max_order_value": 100.0,
-  "rate": -1.50
+  "rate": -1.5
 }
 ```
 

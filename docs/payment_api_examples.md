@@ -4,86 +4,89 @@ This document provides example request bodies for the payment system API endpoin
 
 ## Public Payment Endpoints
 
+# Payment API Examples
+
+This document provides example request bodies for the payment system API endpoints.
+
+## Public Payment Endpoints
+
 ### Get Available Payment Providers
 
 ```plaintext
 GET /api/payment/providers
-GET /api/payment/providers?currency=<currency_code>
 ```
 
-Retrieves the list of available payment providers for the store. Optionally filter by currency to get only providers that support the specified currency.
+Retrieves the list of available payment providers for the store.
 
 **Query Parameters:**
 
-- `currency` (optional): Three-letter ISO currency code (e.g., "USD", "EUR", "NOK") to filter providers by supported currency
+- `currency` (string, optional): Three-letter ISO currency code to filter providers by supported currency
 
-Example response:
+**Response Body:**
 
 ```json
-[
-  {
-    "type": "stripe",
-    "name": "Stripe",
-    "description": "Pay with credit or debit card",
-    "enabled": true,
-    "methods": ["credit_card"],
-    "supported_currencies": [
-      "USD",
-      "EUR",
-      "GBP",
-      "JPY",
-      "CAD",
-      "AUD",
-      "CHF",
-      "SEK",
-      "NOK",
-      "DKK",
-      "PLN",
-      "CZK",
-      "HUF",
-      "BGN",
-      "RON",
-      "HRK",
-      "ISK",
-      "MXN",
-      "BRL",
-      "SGD",
-      "HKD",
-      "INR",
-      "MYR",
-      "PHP",
-      "THB",
-      "TWD",
-      "KRW",
-      "NZD",
-      "ILS",
-      "ZAR"
-    ]
-  },
-  {
-    "type": "mobilepay",
-    "name": "MobilePay",
-    "description": "Pay with MobilePay app",
-    "enabled": true,
-    "methods": ["wallet"],
-    "supported_currencies": ["NOK", "DKK", "EUR"]
-  }
-]
+{
+  "success": true,
+  "data": [
+    {
+      "type": "stripe",
+      "name": "Stripe",
+      "description": "Pay with credit or debit card",
+      "enabled": true,
+      "methods": ["credit_card"],
+      "supported_currencies": [
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY",
+        "CAD",
+        "AUD",
+        "CHF",
+        "SEK",
+        "NOK",
+        "DKK",
+        "PLN",
+        "CZK",
+        "HUF",
+        "BGN",
+        "RON",
+        "HRK",
+        "ISK",
+        "MXN",
+        "BRL",
+        "SGD",
+        "HKD",
+        "INR",
+        "MYR",
+        "PHP",
+        "THB",
+        "TWD",
+        "KRW",
+        "NZD",
+        "ILS",
+        "ZAR"
+      ]
+    },
+    {
+      "type": "mobilepay",
+      "name": "MobilePay",
+      "description": "Pay with MobilePay app",
+      "enabled": true,
+      "methods": ["wallet"],
+      "supported_currencies": ["NOK", "DKK", "EUR"]
+    }
+  ]
+}
 ```
-
-Example request filtering by currency:
-
-```plaintext
-GET /api/payment/providers?currency=NOK
-```
-
-This would return only payment providers that support Norwegian Krone (NOK), which would include Stripe and MobilePay but exclude providers that don't support NOK.
 
 **Status Codes:**
 
 - `200 OK`: Providers retrieved successfully
+- `500 Internal Server Error`: Failed to retrieve providers
 
 ## Admin Payment Management Endpoints
+
+All admin payment endpoints require authentication and admin role.
 
 ### Capture Payment
 
@@ -93,14 +96,254 @@ POST /api/admin/payments/{paymentId}/capture
 
 Capture a previously authorized payment (admin only).
 
-**Request Body (Partial Capture):**
+**Path Parameters:**
+
+- `paymentId` (required): Payment ID
+
+**Request Body (Optional for partial capture):**
 
 ```json
 {
-  "amount": 1500.00,
-  "is_full": false
+  "amount": 150.0
 }
 ```
+
+**Status Codes:**
+
+- `200 OK`: Payment captured successfully
+- `400 Bad Request`: Invalid request or payment cannot be captured
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Payment not found
+
+### Cancel Payment
+
+```plaintext
+POST /api/admin/payments/{paymentId}/cancel
+```
+
+Cancel an authorized payment (admin only).
+
+**Path Parameters:**
+
+- `paymentId` (required): Payment ID
+
+**Status Codes:**
+
+- `200 OK`: Payment cancelled successfully
+- `400 Bad Request`: Payment cannot be cancelled
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Payment not found
+
+### Refund Payment
+
+```plaintext
+POST /api/admin/payments/{paymentId}/refund
+```
+
+Refund a captured payment (admin only).
+
+**Path Parameters:**
+
+- `paymentId` (required): Payment ID
+
+**Request Body (Optional for partial refund):**
+
+```json
+{
+  "amount": 75.0,
+  "reason": "Customer requested refund"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Payment refunded successfully
+- `400 Bad Request`: Invalid request or payment cannot be refunded
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Payment not found
+
+### Force Approve MobilePay Payment
+
+```plaintext
+POST /api/admin/payments/{paymentId}/force-approve
+```
+
+Force approve a MobilePay payment (admin only). This is typically used for testing purposes.
+
+**Path Parameters:**
+
+- `paymentId` (required): Payment ID
+
+**Status Codes:**
+
+- `200 OK`: Payment force approved successfully
+- `400 Bad Request`: Payment cannot be force approved or not a MobilePay payment
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Payment not found
+
+## Admin Payment Provider Management Endpoints
+
+### Get Payment Providers
+
+```plaintext
+GET /api/admin/payment-providers
+```
+
+Get all payment providers with their configuration (admin only).
+
+**Status Codes:**
+
+- `200 OK`: Payment providers retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Get Enabled Payment Providers
+
+```plaintext
+GET /api/admin/payment-providers/enabled
+```
+
+Get only enabled payment providers (admin only).
+
+**Status Codes:**
+
+- `200 OK`: Enabled payment providers retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Enable/Disable Payment Provider
+
+```plaintext
+PUT /api/admin/payment-providers/{providerType}/enable
+```
+
+Enable or disable a payment provider (admin only).
+
+**Path Parameters:**
+
+- `providerType` (required): Provider type (e.g., "stripe", "mobilepay")
+
+**Request Body:**
+
+```json
+{
+  "enabled": true
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Provider status updated successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Provider not found
+
+### Update Provider Configuration
+
+```plaintext
+PUT /api/admin/payment-providers/{providerType}/configuration
+```
+
+Update payment provider configuration (admin only).
+
+**Path Parameters:**
+
+- `providerType` (required): Provider type (e.g., "stripe", "mobilepay")
+
+**Request Body:**
+
+```json
+{
+  "configuration": {
+    "api_key": "sk_test_...",
+    "webhook_secret": "whsec_...",
+    "sandbox_mode": true
+  }
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Configuration updated successfully
+- `400 Bad Request`: Invalid configuration
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Provider not found
+
+### Register Webhook
+
+```plaintext
+POST /api/admin/payment-providers/{providerType}/webhook
+```
+
+Register a webhook for a payment provider (admin only).
+
+**Path Parameters:**
+
+- `providerType` (required): Provider type (e.g., "stripe", "mobilepay")
+
+**Request Body:**
+
+```json
+{
+  "url": "https://api.example.com/webhooks/stripe",
+  "events": ["payment_intent.succeeded", "payment_intent.payment_failed"]
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Webhook registered successfully
+- `400 Bad Request`: Invalid request body
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+
+### Delete Webhook
+
+```plaintext
+DELETE /api/admin/payment-providers/{providerType}/webhook
+```
+
+Delete webhook for a payment provider (admin only).
+
+**Path Parameters:**
+
+- `providerType` (required): Provider type (e.g., "stripe", "mobilepay")
+
+**Status Codes:**
+
+- `200 OK`: Webhook deleted successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Webhook not found
+
+### Get Webhook Info
+
+```plaintext
+GET /api/admin/payment-providers/{providerType}/webhook
+```
+
+Get webhook information for a payment provider (admin only).
+
+**Path Parameters:**
+
+- `providerType` (required): Provider type (e.g., "stripe", "mobilepay")
+
+**Status Codes:**
+
+- `200 OK`: Webhook information retrieved successfully
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Webhook not found
+  "is_full": false
+  }
+
+````
 
 **Request Body (Full Capture):**
 
@@ -108,9 +351,10 @@ Capture a previously authorized payment (admin only).
 {
   "is_full": true
 }
-```
+````
 
-**Note:** 
+**Note:**
+
 - When `is_full` is `true`, the `amount` field is ignored and the full authorized amount is captured
 - When `is_full` is `false` (or omitted), the `amount` field is required
 - If both `amount` and `is_full: true` are provided, `is_full` takes precedence
@@ -171,7 +415,7 @@ Refund a captured payment (admin only).
 
 ```json
 {
-  "amount": 1500.00,
+  "amount": 1500.0,
   "is_full": false
 }
 ```
@@ -184,7 +428,8 @@ Refund a captured payment (admin only).
 }
 ```
 
-**Note:** 
+**Note:**
+
 - When `is_full` is `true`, the `amount` field is ignored and the full captured amount is refunded
 - When `is_full` is `false` (or omitted), the `amount` field is required
 - If both `amount` and `is_full: true` are provided, `is_full` takes precedence

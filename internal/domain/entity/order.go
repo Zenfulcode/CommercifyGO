@@ -123,6 +123,7 @@ func NewOrderFromCheckout(checkout *Checkout) (*Order, error) {
 			ProductVariantID: item.ProductVariantID,
 			Quantity:         item.Quantity,
 			Price:            item.Price,
+			Subtotal:         item.Price * int64(item.Quantity),
 			SKU:              item.SKU,
 			ProductName:      item.ProductName,
 			ImageURL:         item.ImageURL,
@@ -317,8 +318,13 @@ func (o *Order) SetOrderNumber(id *uint) {
 		prefix = "GS"
 	}
 
+	var orderID uint
+	if id != nil {
+		orderID = *id
+	}
+
 	// Format: ORD-YYYYMMDD-000001 or GS-YYYYMMDD-000001
-	o.OrderNumber = fmt.Sprintf("%s-%s-%06d", prefix, o.CreatedAt.Format("20060102"), id)
+	o.OrderNumber = fmt.Sprintf("%s-%s-%06d", prefix, o.CreatedAt.Format("20060102"), orderID)
 }
 
 // ApplyDiscount applies a discount to the order
