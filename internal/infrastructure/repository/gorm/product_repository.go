@@ -88,8 +88,10 @@ func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) 
 
 // Update updates an existing product and its variants
 func (r *ProductRepository) Update(product *entity.Product) error {
-	// Use FullSaveAssociations to handle variant updates properly
-	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(product).Error
+	// Use Select to explicitly update all fields including CategoryID
+	return r.db.Select("name", "description", "currency", "category_id", "images", "active", "updated_at").
+		Session(&gorm.Session{FullSaveAssociations: true}).
+		Save(product).Error
 }
 
 // Delete deletes a product by ID and its associated variants (hard deletion)

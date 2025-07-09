@@ -124,6 +124,7 @@ func (up *UpdateProductRequest) ToUseCaseInput() usecase.UpdateProductInput {
 	input := usecase.UpdateProductInput{
 		Name:        up.Name,
 		Description: up.Description,
+		Currency:    up.Currency,
 		CategoryID:  up.CategoryID,
 		Images:      up.Images,
 		Active:      up.Active,
