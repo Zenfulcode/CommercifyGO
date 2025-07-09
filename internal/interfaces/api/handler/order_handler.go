@@ -42,8 +42,8 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters for includes
-	includePaymentTransactions := r.URL.Query().Get("include_payment_transactions") == "true"
-	includeItems := r.URL.Query().Get("include_items") != "false" // Default to true for backward compatibility
+	includePaymentTransactions := r.URL.Query().Get("includePaymentTransactions") == "true"
+	includeItems := r.URL.Query().Get("includeItems") != "false" // Default to true for backward compatibility
 
 	// Get order
 	order, err := h.orderUseCase.GetOrderByID(uint(id))
