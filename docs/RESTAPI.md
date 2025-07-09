@@ -758,6 +758,15 @@ DELETE /api/admin/categories/{id}
 
 Delete category (admin only).
 
+**Status Codes:**
+
+- `200 OK`: Category deleted successfully
+- `400 Bad Request`: Cannot delete category with child categories or products
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Category not found
+- `500 Internal Server Error`: Server error
+
 ### Product Management
 
 #### List Products

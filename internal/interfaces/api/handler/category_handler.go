@@ -205,6 +205,9 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 		} else if err.Error() == "cannot delete category with child categories" {
 			statusCode = http.StatusBadRequest
 			errorMessage = "Cannot delete category with child categories"
+		} else if err.Error() == "cannot delete category with products" {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Cannot delete category with products"
 		}
 
 		response := contracts.ErrorResponse(errorMessage)
