@@ -188,7 +188,7 @@ func (p *Product) HasVariants() bool {
 	return len(p.Variants) > 0
 }
 
-func (p *Product) Update(name *string, description *string, images *[]string, active *bool) bool {
+func (p *Product) Update(name *string, description *string, currency *string, images *[]string, active *bool, categoryID *uint) bool {
 	updated := false
 	if name != nil && *name != "" && p.Name != *name {
 		p.Name = *name
@@ -198,12 +198,20 @@ func (p *Product) Update(name *string, description *string, images *[]string, ac
 		p.Description = *description
 		updated = true
 	}
+	if currency != nil && *currency != "" && p.Currency != *currency {
+		p.Currency = *currency
+		updated = true
+	}
 	if images != nil && len(*images) > 0 && !slices.Equal(p.Images, *images) {
 		p.Images = *images
 		updated = true
 	}
 	if active != nil && p.Active != *active {
 		p.Active = *active
+		updated = true
+	}
+	if categoryID != nil && p.CategoryID != *categoryID {
+		p.CategoryID = *categoryID
 		updated = true
 	}
 

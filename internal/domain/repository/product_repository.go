@@ -12,6 +12,7 @@ type ProductRepository interface {
 	Delete(productID uint) error
 	List(query, currency string, categoryID, offset, limit uint, minPriceCents, maxPriceCents int64, active bool) ([]*entity.Product, error)
 	Count(searchQuery, currency string, categoryID uint, minPriceCents, maxPriceCents int64, active bool) (int, error)
+	HasProductsWithCategory(categoryID uint) (bool, error)
 }
 
 // CategoryRepository defines the interface for category data access

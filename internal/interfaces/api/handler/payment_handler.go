@@ -27,6 +27,20 @@ func NewPaymentHandler(orderUseCase *usecase.OrderUseCase, logger logger.Logger)
 	}
 }
 
+// handleValidationError handles request validation errors
+func (h *PaymentHandler) handleValidationError(w http.ResponseWriter, err error, context string) {
+	h.logger.Error("Validation error in %s: %v", context, err)
+	h.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+}
+
+// writeErrorResponse is a helper to write error responses consistently
+func (h *PaymentHandler) writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	response := contracts.ErrorResponse(message)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(response)
+}
+
 // GetAvailablePaymentProviders returns a list of available payment providers
 func (h *PaymentHandler) GetAvailablePaymentProviders(w http.ResponseWriter, r *http.Request) {
 	// Check for currency parameter
@@ -56,30 +70,26 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Parse request body
-	var input struct {
-		Amount float64 `json:"amount,omitempty"` // Optional when is_full is true
-		IsFull bool    `json:"is_full"`          // Whether to capture the full authorized amount
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	var request contracts.CapturePaymentRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		h.handleValidationError(w, err, "CapturePayment")
 		return
 	}
 
 	// Validate input - either amount or is_full must be specified
-	if !input.IsFull && input.Amount <= 0 {
+	if !request.IsFull && request.Amount <= 0 {
 		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
 		return
 	}
 
 	// If both amount and is_full are specified, prioritize is_full
-	if input.IsFull && input.Amount > 0 {
+	if request.IsFull && request.Amount > 0 {
 		h.logger.Info("Both amount and is_full specified for payment %s, using is_full=true", paymentID)
 	}
 
 	// Capture payment
 	var err error
-	if input.IsFull {
+	if request.IsFull {
 		// For full capture, we need to get the order first to determine the full amount
 		order, orderErr := h.orderUseCase.GetOrderByPaymentID(paymentID)
 		if orderErr != nil {
@@ -89,7 +99,7 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 		}
 		err = h.orderUseCase.CapturePayment(paymentID, order.FinalAmount)
 	} else {
-		err = h.orderUseCase.CapturePayment(paymentID, money.ToCents(input.Amount))
+		err = h.orderUseCase.CapturePayment(paymentID, money.ToCents(request.Amount))
 	}
 	if err != nil {
 		h.logger.Error("Failed to capture payment: %v", err)
@@ -135,30 +145,26 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
-	var input struct {
-		Amount float64 `json:"amount,omitempty"` // Optional when is_full is true
-		IsFull bool    `json:"is_full"`          // Whether to refund the full captured amount
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	var request contracts.RefundPaymentRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		h.handleValidationError(w, err, "RefundPayment")
 		return
 	}
 
 	// Validate input - either amount or is_full must be specified
-	if !input.IsFull && input.Amount <= 0 {
+	if !request.IsFull && request.Amount <= 0 {
 		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
 		return
 	}
 
 	// If both amount and is_full are specified, prioritize is_full
-	if input.IsFull && input.Amount > 0 {
+	if request.IsFull && request.Amount > 0 {
 		h.logger.Info("Both amount and is_full specified for payment %s, using is_full=true", paymentID)
 	}
 
 	// Refund payment
 	var err error
-	if input.IsFull {
+	if request.IsFull {
 		// For full refund, we need to get the order first to determine the full amount
 		order, orderErr := h.orderUseCase.GetOrderByPaymentID(paymentID)
 		if orderErr != nil {
@@ -168,7 +174,7 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 		}
 		err = h.orderUseCase.RefundPayment(paymentID, order.FinalAmount)
 	} else {
-		err = h.orderUseCase.RefundPayment(paymentID, money.ToCents(input.Amount))
+		err = h.orderUseCase.RefundPayment(paymentID, money.ToCents(request.Amount))
 	}
 	if err != nil {
 		h.logger.Error("Failed to refund payment: %v", err)

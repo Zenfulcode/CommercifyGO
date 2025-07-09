@@ -394,7 +394,7 @@ func TestProduct(t *testing.T) {
 		newImages := []string{"new-image1.jpg", "new-image2.jpg"}
 		newActive := false
 
-		updated := product.Update(&newName, &newDescription, &newImages, &newActive)
+		updated := product.Update(&newName, &newDescription, nil, &newImages, &newActive, nil)
 		assert.True(t, updated)
 		assert.Equal(t, "Updated Product", product.Name)
 		assert.Equal(t, "Updated Description", product.Description)
@@ -402,12 +402,12 @@ func TestProduct(t *testing.T) {
 		assert.False(t, product.Active)
 
 		// Test no update (same values)
-		updated = product.Update(&newName, &newDescription, &newImages, &newActive)
+		updated = product.Update(&newName, &newDescription, nil, &newImages, &newActive, nil)
 		assert.False(t, updated)
 
 		// Test empty name (should not update)
 		emptyName := ""
-		updated = product.Update(&emptyName, nil, nil, nil)
+		updated = product.Update(&emptyName, nil, nil, nil, nil, nil)
 		assert.False(t, updated)
 		assert.Equal(t, "Updated Product", product.Name) // unchanged
 	})

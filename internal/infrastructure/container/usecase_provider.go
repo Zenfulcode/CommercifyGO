@@ -79,6 +79,7 @@ func (p *useCaseProvider) CategoryUseCase() *usecase.CategoryUseCase {
 	if p.categoryUseCase == nil {
 		p.categoryUseCase = usecase.NewCategoryUseCase(
 			p.container.Repositories().CategoryRepository(),
+			p.container.Repositories().ProductRepository(),
 		)
 	}
 	return p.categoryUseCase

@@ -278,6 +278,16 @@ export interface ValidateDiscountResponse {
 }
 
 //////////
+// source: email_contract.go
+
+/**
+ * EmailTestRequest represents the request body for testing emails
+ */
+export interface EmailTestRequest {
+  email: string;
+}
+
+//////////
 // source: order_contract.go
 
 /**
@@ -319,6 +329,18 @@ export interface OrderSearchRequest {
   start_date?: string;
   end_date?: string;
   pagination: PaginationDTO;
+}
+
+//////////
+// source: payments_contracts.go
+
+export interface CapturePaymentRequest {
+  amount?: number /* float64 */; // Optional when is_full is true
+  is_full: boolean; // Whether to capture the full amount
+}
+export interface RefundPaymentRequest {
+  amount?: number /* float64 */; // Optional when is_full is true
+  is_full: boolean; // Whether to refund the full captured amount
 }
 
 //////////

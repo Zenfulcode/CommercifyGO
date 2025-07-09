@@ -173,6 +173,7 @@ func (uc *ProductUseCase) GetProductByID(id uint) (*entity.Product, error) {
 type UpdateProductInput struct {
 	Name        *string
 	Description *string
+	Currency    *string
 	CategoryID  *uint
 	Images      *[]string
 	Active      *bool
@@ -193,11 +194,18 @@ func (uc *ProductUseCase) UpdateProduct(id uint, input UpdateProductInput) (*ent
 		if err != nil {
 			return nil, errors.New("category not found")
 		}
-		product.CategoryID = *input.CategoryID
+	}
+
+	// Validate currency exists if changing
+	if input.Currency != nil && *input.Currency != product.Currency {
+		_, err := uc.currencyRepo.GetByCode(*input.Currency)
+		if err != nil {
+			return nil, errors.New("invalid currency code: " + *input.Currency)
+		}
 	}
 
 	// Update basic product fields
-	updated := product.Update(input.Name, input.Description, input.Images, input.Active)
+	updated := product.Update(input.Name, input.Description, input.Currency, input.Images, input.Active, input.CategoryID)
 
 	// Handle variant updates if provided
 	if input.Variants != nil {

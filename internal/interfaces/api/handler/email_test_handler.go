@@ -9,6 +9,8 @@ import (
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/service"
 	"github.com/zenfulcode/commercify/internal/infrastructure/logger"
+	"github.com/zenfulcode/commercify/internal/infrastructure/validation"
+	"github.com/zenfulcode/commercify/internal/interfaces/api/contracts"
 	"gorm.io/gorm"
 )
 
@@ -36,6 +38,13 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	targetEmail := h.getTargetEmail(r)
 	if targetEmail == "" {
 		targetEmail = h.config.AdminEmail // Fallback to admin email
+	}
+
+	// Validate email format
+	if err := validation.ValidateEmail(targetEmail); err != nil {
+		h.logger.Error("Invalid email format: %v", err)
+		h.sendErrorResponse(w, http.StatusBadRequest, []string{err.Error()})
+		return
 	}
 
 	h.logger.Info("Sending test emails to: %s", targetEmail)
@@ -158,25 +167,14 @@ func (h *EmailTestHandler) TestEmail(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("Order notification email sent successfully")
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	if len(errors) > 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]any{
-			"success": false,
-			"errors":  errors,
-		})
+		h.sendErrorResponse(w, http.StatusInternalServerError, errors)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]any{
-		"success": true,
-		"message": "Both order confirmation and notification emails sent successfully",
-		"details": map[string]string{
-			"target_email": targetEmail,
-			"order_id":     "12345",
-		},
+	h.sendSuccessResponse(w, "Both order confirmation and notification emails sent successfully", map[string]string{
+		"target_email": targetEmail,
+		"order_id":     "12345",
 	})
 }
 
@@ -189,15 +187,32 @@ func (h *EmailTestHandler) getTargetEmail(r *http.Request) string {
 
 	// Then try request body for POST requests
 	if r.Method == http.MethodPost {
-		var requestBody struct {
-			Email string `json:"email"`
-		}
+		var requestBody contracts.EmailTestRequest
 
 		// Try to decode JSON body
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err == nil {
-			return requestBody.Email
+			// Validate the request
+			if err := requestBody.Validate(); err == nil {
+				return requestBody.Email
+			}
 		}
 	}
 
 	return ""
+}
+
+// sendErrorResponse sends an error response
+func (h *EmailTestHandler) sendErrorResponse(w http.ResponseWriter, statusCode int, errors []string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	response := contracts.ErrorResponse(errors[0])
+	json.NewEncoder(w).Encode(response)
+}
+
+// sendSuccessResponse sends a success response
+func (h *EmailTestHandler) sendSuccessResponse(w http.ResponseWriter, message string, details map[string]string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := contracts.SuccessResponseWithMessage(details, message)
+	json.NewEncoder(w).Encode(response)
 }

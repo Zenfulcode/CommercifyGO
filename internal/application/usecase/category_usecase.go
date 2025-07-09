@@ -12,12 +12,14 @@ import (
 // CategoryUseCase implements category-related use cases
 type CategoryUseCase struct {
 	categoryRepo repository.CategoryRepository
+	productRepo  repository.ProductRepository
 }
 
 // NewCategoryUseCase creates a new CategoryUseCase
-func NewCategoryUseCase(categoryRepo repository.CategoryRepository) *CategoryUseCase {
+func NewCategoryUseCase(categoryRepo repository.CategoryRepository, productRepo repository.ProductRepository) *CategoryUseCase {
 	return &CategoryUseCase{
 		categoryRepo: categoryRepo,
+		productRepo:  productRepo,
 	}
 }
 
@@ -151,6 +153,16 @@ func (uc *CategoryUseCase) DeleteCategory(categoryID uint) error {
 
 	if len(children) > 0 {
 		return errors.New("cannot delete category with child categories")
+	}
+
+	// Check if category has products
+	hasProducts, err := uc.productRepo.HasProductsWithCategory(categoryID)
+	if err != nil {
+		return fmt.Errorf("failed to check for products in category: %w", err)
+	}
+
+	if hasProducts {
+		return errors.New("cannot delete category with products")
 	}
 
 	// Delete the category

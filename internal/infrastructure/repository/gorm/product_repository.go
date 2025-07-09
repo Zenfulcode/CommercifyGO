@@ -88,8 +88,10 @@ func (r *ProductRepository) GetByIDAndCurrency(productID uint, currency string) 
 
 // Update updates an existing product and its variants
 func (r *ProductRepository) Update(product *entity.Product) error {
-	// Use FullSaveAssociations to handle variant updates properly
-	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(product).Error
+	// Use Select to explicitly update all fields including CategoryID
+	return r.db.Select("name", "description", "currency", "category_id", "images", "active", "updated_at").
+		Session(&gorm.Session{FullSaveAssociations: true}).
+		Save(product).Error
 }
 
 // Delete deletes a product by ID and its associated variants (hard deletion)
@@ -205,4 +207,13 @@ func (r *ProductRepository) Count(searchQuery, currency string, categoryID uint,
 	}
 
 	return int(count), nil
+}
+
+// HasProductsWithCategory checks if any products exist for the given category
+func (r *ProductRepository) HasProductsWithCategory(categoryID uint) (bool, error) {
+	var count int64
+	if err := r.db.Model(&entity.Product{}).Where("category_id = ?", categoryID).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("failed to check products for category %d: %w", categoryID, err)
+	}
+	return count > 0, nil
 }
