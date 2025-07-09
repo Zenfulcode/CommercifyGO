@@ -322,6 +322,18 @@ export interface OrderSearchRequest {
 }
 
 //////////
+// source: payments_contracts.go
+
+export interface CapturePaymentRequest {
+  amount?: number /* float64 */; // Optional when is_full is true
+  is_full: boolean; // Whether to capture the full amount
+}
+export interface RefundPaymentRequest {
+  amount?: number /* float64 */; // Optional when is_full is true
+  is_full: boolean; // Whether to refund the full captured amount
+}
+
+//////////
 // source: products_contract.go
 
 /**
