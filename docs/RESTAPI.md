@@ -1145,7 +1145,49 @@ Get webhook information for payment provider (admin only).
 POST /api/admin/test/email
 ```
 
-Send test email (admin only).
+Send test order confirmation and notification emails to a specified email address (admin only).
+
+**Request Body:**
+
+```json
+{
+  "email": "test@example.com"
+}
+```
+
+**Query Parameters:**
+
+- `email` (optional): Email address to send test emails to. Can be provided as query parameter instead of request body.
+
+**Response Body (Success):**
+
+```json
+{
+  "success": true,
+  "message": "Both order confirmation and notification emails sent successfully",
+  "details": {
+    "target_email": "test@example.com",
+    "order_id": "12345"
+  }
+}
+```
+
+**Response Body (Error):**
+
+```json
+{
+  "success": false,
+  "errors": ["Invalid email format"]
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Test emails sent successfully
+- `400 Bad Request`: Invalid email format
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `500 Internal Server Error`: Failed to send one or more emails
 
 ## Webhook Endpoints
 

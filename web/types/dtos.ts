@@ -159,6 +159,17 @@ export interface AppliedDiscountDTO {
 }
 
 //////////
+// source: email.go
+
+/**
+ * EmailTestDetails represents additional details in the email test response
+ */
+export interface EmailTestDetails {
+  target_email: string;
+  order_id: string;
+}
+
+//////////
 // source: order.go
 
 /**

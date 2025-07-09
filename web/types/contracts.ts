@@ -278,6 +278,16 @@ export interface ValidateDiscountResponse {
 }
 
 //////////
+// source: email_contract.go
+
+/**
+ * EmailTestRequest represents the request body for testing emails
+ */
+export interface EmailTestRequest {
+  email: string;
+}
+
+//////////
 // source: order_contract.go
 
 /**
