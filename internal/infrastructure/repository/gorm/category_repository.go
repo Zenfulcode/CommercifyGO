@@ -23,7 +23,7 @@ func (c *CategoryRepository) Create(category *entity.Category) error {
 func (c *CategoryRepository) Delete(categoryID uint) error {
 	// Note: This will fail if there are products in this category due to RESTRICT constraint
 	// which is the intended behavior for data integrity
-	return c.db.Delete(&entity.Category{}, categoryID).Error
+	return c.db.Unscoped().Delete(&entity.Category{}, categoryID).Error
 }
 
 // GetByID implements repository.CategoryRepository.
@@ -61,7 +61,8 @@ func (c *CategoryRepository) List() ([]*entity.Category, error) {
 
 // Update implements repository.CategoryRepository.
 func (c *CategoryRepository) Update(category *entity.Category) error {
-	return c.db.Save(category).Error
+	// Use Select with "*" and Omit to ensure all fields are updated, including nil values
+	return c.db.Select("*").Omit("created_at").Save(category).Error
 }
 
 // NewCategoryRepository creates a new GORM-based CategoryRepository
