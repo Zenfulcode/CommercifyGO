@@ -22,6 +22,8 @@ func TestSMTPEmailService_SendOrderShipped(t *testing.T) {
 		SMTPUsername: "test",
 		SMTPPassword: "test",
 		AdminEmail:   "admin@example.com",
+		ContactEmail: "support@example.com",
+		StoreName:    "Test Store",
 	}
 
 	service := NewSMTPEmailService(emailConfig, zapLogger)

@@ -115,8 +115,8 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 	data := map[string]any{
 		"Order":           order,
 		"User":            user,
-		"StoreName":       s.config.FromName,
-		"ContactEmail":    s.config.FromEmail,
+		"StoreName":       s.config.StoreName,
+		"ContactEmail":    s.config.ContactEmail,
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
@@ -148,7 +148,7 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	data := map[string]any{
 		"Order":           order,
 		"User":            user,
-		"StoreName":       s.config.FromName,
+		"StoreName":       s.config.StoreName,
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
@@ -183,8 +183,8 @@ func (s *SMTPEmailService) SendOrderShipped(order *entity.Order, user *entity.Us
 	data := map[string]any{
 		"Order":           order,
 		"User":            user,
-		"StoreName":       s.config.FromName,
-		"ContactEmail":    s.config.FromEmail,
+		"StoreName":       s.config.StoreName,
+		"ContactEmail":    s.config.ContactEmail,
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
