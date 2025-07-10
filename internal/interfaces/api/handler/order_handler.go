@@ -261,3 +261,62 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
+
+// UpdateOrderStatusWithTracking handles updating an order's status with tracking information (admin only)
+func (h *OrderHandler) UpdateOrderStatusWithTracking(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(middleware.UserIDKey).(uint)
+	if !ok {
+		h.logger.Error("Unauthorized access attempt")
+		response := contracts.ErrorResponse("Unauthorized")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get order ID from URL
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["orderId"], 10, 32)
+	if err != nil {
+		h.logger.Error("Invalid order ID: %v", err)
+		http.Error(w, "Invalid order ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body
+	var statusInput struct {
+		Status         string `json:"status"`
+		TrackingNumber string `json:"tracking_number,omitempty"`
+		TrackingURL    string `json:"tracking_url,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&statusInput); err != nil {
+		h.logger.Error("Failed to decode request body: %v", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Update order status with tracking
+	input := usecase.UpdateOrderStatusWithTrackingInput{
+		OrderID:        uint(id),
+		Status:         entity.OrderStatus(statusInput.Status),
+		TrackingNumber: statusInput.TrackingNumber,
+		TrackingURL:    statusInput.TrackingURL,
+	}
+
+	updatedOrder, err := h.orderUseCase.UpdateOrderStatusWithTracking(input)
+	if err != nil {
+		h.logger.Error("Failed to update order status: %v", err)
+		response := contracts.ErrorResponse(err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Convert order to DTO
+	response := contracts.OrderUpdateStatusResponse(*updatedOrder.ToOrderSummaryDTO())
+
+	// Return updated order
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

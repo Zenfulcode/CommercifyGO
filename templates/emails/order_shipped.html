@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Order Confirmation</title>
+    <title>Your Order Has Been Shipped</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -21,7 +21,7 @@
         color: #28a745;
         margin-bottom: 10px;
       }
-      .confirmation-info {
+      .shipping-info {
         border: 1px solid #28a745;
         padding: 20px;
         margin-bottom: 20px;
@@ -55,6 +55,13 @@
         padding: 15px;
         border-radius: 5px;
       }
+      .tracking-info {
+        background-color: #e3f2fd;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #2196f3;
+      }
       .total {
         text-align: right;
         font-weight: bold;
@@ -66,6 +73,15 @@
         font-size: 12px;
         color: #777;
       }
+      .cta-button {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 5px;
+        margin-top: 15px;
+      }
       .status-badge {
         background-color: #28a745;
         color: white;
@@ -75,40 +91,40 @@
         text-transform: uppercase;
         font-weight: bold;
       }
-      .info-box {
-        background-color: #e3f2fd;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border-left: 4px solid #2196f3;
-      }
     </style>
   </head>
   <body>
     <div class="header">
-      <h1>✅ Order Confirmation</h1>
-      <p>Thank you for your order!</p>
+      <h1>📦 Your Order Has Been Shipped!</h1>
+      <p>Great news! Your order is on its way to you.</p>
     </div>
 
     <p>Dear {{.User.FirstName}} {{.User.LastName}},</p>
 
     <p>
-      We're pleased to confirm that we've received your order. Here are your
-      order details:
+      We're excited to let you know that your order has been shipped and is on its way to you!
     </p>
 
-    <div class="confirmation-info">
-      <h2>📋 Order Information</h2>
+    <div class="shipping-info">
+      <h2>🚚 Shipping Information</h2>
       <p><strong>Status:</strong> <span class="status-badge">{{.Order.Status}}</span></p>
-      <p><strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006 at 3:04 PM"}}</p>
+      <p><strong>Shipped Date:</strong> {{.Order.UpdatedAt.Format "January 2, 2006 at 3:04 PM"}}</p>
+      {{if .TrackingNumber}}
+      <div class="tracking-info">
+        <p><strong>📋 Tracking Number:</strong> <code>{{.TrackingNumber}}</code></p>
+        {{if .TrackingURL}}
+        <a href="{{.TrackingURL}}" class="cta-button" target="_blank">Track Your Package</a>
+        {{end}}
+      </div>
+      {{else}}
+      <p><em>Tracking information will be provided separately once available.</em></p>
+      {{end}}
     </div>
 
     <div class="order-details">
       <p><strong>Order Number:</strong> #{{.Order.ID}}</p>
-      <p>
-        <strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006"}}
-      </p>
-      <p><strong>Order Status:</strong> {{.Order.Status}}</p>
+      <p><strong>Order Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006"}}</p>
+      <p><strong>Total Amount:</strong> {{formatPriceWithCurrency .Order.FinalAmount .Currency}}</p>
     </div>
 
     <h2>📋 Order Summary</h2>
@@ -141,7 +157,9 @@
       <p><strong>Shipping:</strong> {{formatPriceWithCurrency .Order.ShippingCost .Currency}}</p>
       {{else}}
       <p><strong>Shipping:</strong> Free</p>
-      {{end}}      {{if gt .Order.DiscountAmount 0}}
+      {{end}}
+
+      {{if gt .Order.DiscountAmount 0}}
       <p>
         <strong>Discount:</strong> -{{formatPriceWithCurrency .Order.DiscountAmount .Currency}} {{if
         .AppliedDiscount}} {{if .AppliedDiscount.DiscountCode}}
@@ -167,33 +185,28 @@
       {{end}}
     </div>
 
-    <h2>💳 Billing Address</h2>
-    <div class="address">
-      {{if .BillingAddr.Street1}}
-        {{.BillingAddr.Street1}}<br />
-        {{if .BillingAddr.Street2}}{{.BillingAddr.Street2}}<br />{{end}}
-        {{.BillingAddr.City}}{{if .BillingAddr.State}}, {{.BillingAddr.State}}{{end}}
-        {{if .BillingAddr.PostalCode}} {{.BillingAddr.PostalCode}}{{end}}<br />
-        {{.BillingAddr.Country}}
-      {{else}}
-        <p>No billing address provided</p>
+    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <h3>📅 Expected Delivery</h3>
+      <p>Your order is expected to arrive within the standard delivery timeframe for your location. You'll receive a notification when your package is out for delivery.</p>
+      {{if .TrackingNumber}}
+      <p>For real-time updates, please use the tracking number provided above.</p>
       {{end}}
     </div>
 
-    <div class="info-box">
-      <h3>📦 What's Next?</h3>
-      <p>We'll notify you when your order has been shipped. If you have any questions about your order, please contact us at {{.ContactEmail}}.</p>
-    </div>
+    <p>
+      If you have any questions about your shipment or need assistance, please don't hesitate to contact us at {{.ContactEmail}}.
+    </p>
 
-    <p>Thank you for shopping with us!</p>
+    <p>Thank you for your business!</p>
 
     <p>
-      Sincerely,<br />
+      Best regards,<br />
       The {{.StoreName}} Team
     </p>
 
     <div class="footer">
       <p>This is an automated email, please do not reply to this message.</p>
+      <p>If you need help, please contact us at {{.ContactEmail}}</p>
     </div>
   </body>
 </html>

@@ -165,6 +165,44 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	})
 }
 
+// SendOrderShipped sends an order shipped notification email to the customer
+func (s *SMTPEmailService) SendOrderShipped(order *entity.Order, user *entity.User, trackingNumber, trackingURL string) error {
+	s.logger.Info("Sending order shipped email for Order ID: %d to User: %s", order.ID, user.Email)
+
+	// Prepare data for the template
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Email template data - Order ID: %d", order.ID)
+	s.logger.Info("Tracking Number: %s", trackingNumber)
+	s.logger.Info("Tracking URL: %s", trackingURL)
+	s.logger.Info("Shipping Address: %+v", shippingAddr)
+
+	data := map[string]any{
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.FromName,
+		"ContactEmail":    s.config.FromEmail,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
+		"TrackingNumber":  trackingNumber,
+		"TrackingURL":     trackingURL,
+	}
+
+	// Send email
+	return s.SendEmail(service.EmailData{
+		To:       user.Email,
+		Subject:  fmt.Sprintf("Your Order #%d Has Been Shipped! 📦", order.ID),
+		IsHTML:   true,
+		Template: "order_shipped.html",
+		Data:     data,
+	})
+}
+
 // renderTemplate renders an HTML template with the given data
 func (s *SMTPEmailService) renderTemplate(templateName string, data map[string]any) (string, error) {
 	// Get template path

@@ -465,3 +465,103 @@ Example response:
 - `403 Forbidden`: User not authorized (not an admin)
 - `404 Not Found`: Order not found
 - `500 Internal Server Error`: Failed to update order status
+
+## Order Shipment Email Notification Examples
+
+### Update Order Status with Tracking Information
+
+```plaintext
+PUT /api/admin/orders/{orderId}/status-with-tracking
+```
+
+Update order status with optional tracking information. When an order status is changed to "shipped", an email notification is automatically sent to the customer.
+
+**Path Parameters:**
+
+- `orderId` (required): Order ID
+
+**Request Body for Basic Shipment:**
+
+```json
+{
+  "status": "shipped"
+}
+```
+
+**Request Body with Tracking Information:**
+
+```json
+{
+  "status": "shipped",
+  "tracking_number": "1Z999AA1234567890",
+  "tracking_url": "https://www.ups.com/track?loc=en_US&tracknum=1Z999AA1234567890"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "order_number": "ORD-20250707-123",
+    "user_id": 1,
+    "status": "shipped",
+    "payment_status": "captured",
+    "currency": "USD",
+    "total_amount": 7498,
+    "shipping_cost": 1499,
+    "tax_amount": 0,
+    "discount_amount": 0,
+    "created_at": "2024-03-20T11:00:00Z",
+    "updated_at": "2024-03-20T14:30:00Z"
+  }
+}
+```
+
+**Email Notification Details:**
+
+When the order status is updated to "shipped":
+
+1. **Customer Email**: An automated email is sent to the customer's email address containing:
+
+   - Order details and summary
+   - Shipping address
+   - Expected delivery information
+   - Tracking number and link (if provided)
+   - Professional styling with shipping-themed design
+
+2. **Email Template**: Uses `templates/emails/order_shipped.html`
+
+3. **Email Subject**: "Your Order #[OrderID] Has Been Shipped! 📦"
+
+4. **Tracking Integration**: If tracking number and URL are provided, the email includes:
+
+   - Clickable tracking link
+   - Visual tracking information section
+   - Instructions for tracking the package
+
+5. **Guest Order Support**: Works for both registered users and guest orders using customer details
+
+**Example Email Content Features:**
+
+- Green header indicating successful shipment
+- Shipping status badge
+- Tracking number in code format for easy copying
+- Professional tracking button (if URL provided)
+- Complete order summary
+- Shipping address confirmation
+- Expected delivery timeline
+- Contact information for support
+
+**Status Codes:**
+
+- `200 OK`: Order status updated successfully and email sent
+- `400 Bad Request`: Invalid order status or tracking information
+- `401 Unauthorized`: User not authenticated
+- `403 Forbidden`: User not authorized (not an admin)
+- `404 Not Found`: Order not found
+- `500 Internal Server Error`: Failed to update order status or send email
+
+**Note**: Email sending failures are logged but do not prevent the order status update from succeeding. The system ensures order status changes are persisted even if email delivery fails.
