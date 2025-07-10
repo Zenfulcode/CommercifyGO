@@ -61,8 +61,8 @@ func (c *CategoryRepository) List() ([]*entity.Category, error) {
 
 // Update implements repository.CategoryRepository.
 func (c *CategoryRepository) Update(category *entity.Category) error {
-	// Use Select with "*" and Omit to ensure all fields are updated, including nil values
-	return c.db.Select("*").Omit("created_at").Save(category).Error
+	// Use explicit field updates to ensure parent_id is properly updated when nil
+	return c.db.Model(category).Select("name", "description", "parent_id").Updates(category).Error
 }
 
 // NewCategoryRepository creates a new GORM-based CategoryRepository

@@ -81,7 +81,7 @@ type UpdateCategory struct {
 	CategoryID  uint   `json:"category_id" validate:"required"`
 	Name        string `json:"name,omitempty" validate:"omitempty,min=1,max=255"`
 	Description string `json:"description,omitempty" validate:"max=1000"`
-	ParentID    *uint  `json:"parent_id,omitempty"` // Optional parent category ID
+	ParentID    *uint  `json:"parent_id,omitempty"` // Optional parent category ID (0 means remove parent)
 }
 
 // UpdateCategory updates an existing category
@@ -92,14 +92,24 @@ func (uc *CategoryUseCase) UpdateCategory(input UpdateCategory) (*entity.Categor
 		return nil, fmt.Errorf("failed to get category: %w", err)
 	}
 
-	// Validate parent category exists if parentID is provided
+	// Handle ParentID logic: if ParentID is provided and is 0, set it to nil (remove parent)
+	var actualParentID *uint
 	if input.ParentID != nil {
+		if *input.ParentID == 0 {
+			actualParentID = nil
+		} else {
+			actualParentID = input.ParentID
+		}
+	}
+
+	// Validate parent category exists if parentID is provided and not 0
+	if actualParentID != nil {
 		// Check for circular reference (category cannot be its own parent)
-		if *input.ParentID == input.CategoryID {
+		if *actualParentID == input.CategoryID {
 			return nil, errors.New("category cannot be its own parent")
 		}
 
-		parent, err := uc.categoryRepo.GetByID(*input.ParentID)
+		parent, err := uc.categoryRepo.GetByID(*actualParentID)
 		if err != nil {
 			return nil, fmt.Errorf("parent category not found: %w", err)
 		}
@@ -116,7 +126,7 @@ func (uc *CategoryUseCase) UpdateCategory(input UpdateCategory) (*entity.Categor
 		category.Description = input.Description
 	}
 	if input.ParentID != nil {
-		category.ParentID = input.ParentID
+		category.ParentID = actualParentID
 	}
 
 	// Save updated category
@@ -134,7 +144,18 @@ func (uc *CategoryUseCase) UpdateCategory(input UpdateCategory) (*entity.Categor
 		return nil, fmt.Errorf("failed to update category: %w", err)
 	}
 
-	return category, nil
+	// Clear associations if ParentID was set to nil
+	if input.ParentID != nil && actualParentID == nil {
+		category.Parent = nil
+	}
+
+	// Refetch the category to get the updated data with proper associations
+	updatedCategory, err := uc.categoryRepo.GetByID(category.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch updated category: %w", err)
+	}
+
+	return updatedCategory, nil
 }
 
 // DeleteCategory deletes a category by ID
