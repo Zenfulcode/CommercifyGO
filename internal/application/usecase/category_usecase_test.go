@@ -129,3 +129,48 @@ func TestCategoryUseCase_DeleteCategory_WithProducts(t *testing.T) {
 		assert.Equal(t, "cannot delete category with child categories", err.Error())
 	})
 }
+
+func TestCategoryUseCase_UpdateCategory_ParentIDZero(t *testing.T) {
+	t.Run("should remove parent when parent_id is 0", func(t *testing.T) {
+		// Setup
+		db := testutil.SetupTestDB(t)
+		defer testutil.CleanupTestDB(t, db)
+
+		categoryRepo := gorm.NewCategoryRepository(db)
+		productRepo := gorm.NewProductRepository(db)
+		categoryUseCase := NewCategoryUseCase(categoryRepo, productRepo)
+
+		// Create parent category
+		parentCategory, err := categoryUseCase.CreateCategory(CreateCategory{
+			Name:        "Parent Category",
+			Description: "Parent category for test",
+			ParentID:    nil,
+		})
+		require.NoError(t, err)
+
+		// Create child category with parent
+		childCategory, err := categoryUseCase.CreateCategory(CreateCategory{
+			Name:        "Child Category",
+			Description: "Child category for test",
+			ParentID:    &parentCategory.ID,
+		})
+		require.NoError(t, err)
+
+		// Verify initial state
+		assert.NotNil(t, childCategory.ParentID)
+		assert.Equal(t, parentCategory.ID, *childCategory.ParentID)
+
+		// Update child to remove parent using parent_id: 0
+		zeroID := uint(0)
+		_, err = categoryUseCase.UpdateCategory(UpdateCategory{
+			CategoryID: childCategory.ID,
+			ParentID:   &zeroID,
+		})
+		require.NoError(t, err)
+
+		// Verify in database directly (this is the most reliable test)
+		fetchedCategory, err := categoryRepo.GetByID(childCategory.ID)
+		require.NoError(t, err)
+		assert.Nil(t, fetchedCategory.ParentID, "ParentID should be nil after setting to 0")
+	})
+}
