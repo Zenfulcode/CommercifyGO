@@ -255,9 +255,9 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Convert order to DTO
-	orderDTO := contracts.OrderUpdateStatusResponse(*updatedOrder.ToOrderSummaryDTO())
+	response := contracts.OrderUpdateStatusResponse(*updatedOrder.ToOrderSummaryDTO())
 
 	// Return updated order
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(orderDTO)
+	json.NewEncoder(w).Encode(response)
 }

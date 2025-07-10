@@ -78,7 +78,7 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 
 	// Validate input - either amount or is_full must be specified
 	if !request.IsFull && request.Amount <= 0 {
-		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Amount must be greater than zero when is_full is false")
 		return
 	}
 
@@ -102,8 +102,7 @@ func (h *PaymentHandler) CapturePayment(w http.ResponseWriter, r *http.Request) 
 		err = h.orderUseCase.CapturePayment(paymentID, money.ToCents(request.Amount))
 	}
 	if err != nil {
-		h.logger.Error("Failed to capture payment: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to capture payment: "+err.Error())
 		return
 	}
 
@@ -118,15 +117,14 @@ func (h *PaymentHandler) CancelPayment(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	paymentID := vars["paymentId"]
 	if paymentID == "" {
-		http.Error(w, "Invalid payment ID", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid payment ID")
 		return
 	}
 
 	// Cancel payment
 	err := h.orderUseCase.CancelPayment(paymentID)
 	if err != nil {
-		h.logger.Error("Failed to cancel payment: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to cancel payment: "+err.Error())
 		return
 	}
 
@@ -141,7 +139,7 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	paymentID := vars["paymentId"]
 	if paymentID == "" {
-		http.Error(w, "Invalid payment ID", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid payment ID")
 		return
 	}
 
@@ -153,7 +151,7 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 
 	// Validate input - either amount or is_full must be specified
 	if !request.IsFull && request.Amount <= 0 {
-		http.Error(w, "Amount must be greater than zero when is_full is false", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Amount must be greater than zero when is_full is false")
 		return
 	}
 
@@ -177,8 +175,7 @@ func (h *PaymentHandler) RefundPayment(w http.ResponseWriter, r *http.Request) {
 		err = h.orderUseCase.RefundPayment(paymentID, money.ToCents(request.Amount))
 	}
 	if err != nil {
-		h.logger.Error("Failed to refund payment: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to refund payment: "+err.Error())
 		return
 	}
 
@@ -193,7 +190,7 @@ func (h *PaymentHandler) ForceApproveMobilePayPayment(w http.ResponseWriter, r *
 	vars := mux.Vars(r)
 	paymentID := vars["paymentId"]
 	if paymentID == "" {
-		http.Error(w, "Invalid payment ID", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid payment ID")
 		return
 	}
 
@@ -202,21 +199,20 @@ func (h *PaymentHandler) ForceApproveMobilePayPayment(w http.ResponseWriter, r *
 		PhoneNumber string `json:"phone_number"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		h.handleValidationError(w, err, "ForceApproveMobilePayPayment")
 		return
 	}
 
 	// Validate phone number
 	if input.PhoneNumber == "" {
-		http.Error(w, "Phone number is required", http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusBadRequest, "Phone number is required")
 		return
 	}
 
 	// Force approve payment
 	err := h.orderUseCase.ForceApproveMobilePayPayment(paymentID, input.PhoneNumber)
 	if err != nil {
-		h.logger.Error("Failed to force approve payment: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to force approve payment: "+err.Error())
 		return
 	}
 
