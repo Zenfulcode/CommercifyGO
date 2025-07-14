@@ -79,7 +79,7 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body)
 
 	// Send email
-	s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
+	// s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
 	err = smtp.SendMail(
 		fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort),
 		auth,
@@ -115,8 +115,8 @@ func (s *SMTPEmailService) SendOrderConfirmation(order *entity.Order, user *enti
 	data := map[string]any{
 		"Order":           order,
 		"User":            user,
-		"StoreName":       s.config.FromName,
-		"ContactEmail":    s.config.FromEmail,
+		"StoreName":       s.config.StoreName,
+		"ContactEmail":    s.config.ContactEmail,
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
@@ -148,7 +148,7 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 	data := map[string]any{
 		"Order":           order,
 		"User":            user,
-		"StoreName":       s.config.FromName,
+		"StoreName":       s.config.StoreName,
 		"AppliedDiscount": appliedDiscount,
 		"ShippingAddr":    shippingAddr,
 		"BillingAddr":     billingAddr,
@@ -161,6 +161,41 @@ func (s *SMTPEmailService) SendOrderNotification(order *entity.Order, user *enti
 		Subject:  fmt.Sprintf("New Order #%d Received", order.ID),
 		IsHTML:   true,
 		Template: "order_notification.html",
+		Data:     data,
+	})
+}
+
+// SendOrderShipped sends an order shipped notification email to the customer
+func (s *SMTPEmailService) SendOrderShipped(order *entity.Order, user *entity.User, trackingNumber, trackingURL string) error {
+	s.logger.Info("Sending order shipped email for Order ID: %d to User: %s", order.ID, user.Email)
+
+	// Prepare data for the template
+	shippingAddr := order.GetShippingAddress()
+	billingAddr := order.GetBillingAddress()
+	appliedDiscount := order.GetAppliedDiscount()
+
+	// Debug logging
+	s.logger.Info("Tracking URL: %s", trackingURL)
+
+	data := map[string]any{
+		"Order":           order,
+		"User":            user,
+		"StoreName":       s.config.StoreName,
+		"ContactEmail":    s.config.ContactEmail,
+		"AppliedDiscount": appliedDiscount,
+		"ShippingAddr":    shippingAddr,
+		"BillingAddr":     billingAddr,
+		"Currency":        order.Currency,
+		"TrackingNumber":  trackingNumber,
+		"TrackingURL":     trackingURL,
+	}
+
+	// Send email
+	return s.SendEmail(service.EmailData{
+		To:       user.Email,
+		Subject:  fmt.Sprintf("Your Order #%d Has Been Shipped! 📦", order.ID),
+		IsHTML:   true,
+		Template: "order_shipped.html",
 		Data:     data,
 	})
 }

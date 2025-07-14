@@ -160,6 +160,7 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/users", userHandler.ListUsers).Methods(http.MethodGet)
 	admin.HandleFunc("/orders", orderHandler.ListAllOrders).Methods(http.MethodGet)
 	admin.HandleFunc("/orders/{orderId:[0-9]+}/status", orderHandler.UpdateOrderStatus).Methods(http.MethodPut)
+	admin.HandleFunc("/orders/{orderId:[0-9]+}/status-with-tracking", orderHandler.UpdateOrderStatusWithTracking).Methods(http.MethodPut)
 
 	// Admin checkout routes
 	admin.HandleFunc("/checkouts", checkoutHandler.ListAdminCheckouts).Methods(http.MethodGet)

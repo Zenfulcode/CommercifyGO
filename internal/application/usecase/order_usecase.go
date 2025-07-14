@@ -64,6 +64,14 @@ type UpdateOrderStatusInput struct {
 	Status  entity.OrderStatus `json:"status"`
 }
 
+// UpdateOrderStatusWithTrackingInput contains the data needed to update an order status with tracking information
+type UpdateOrderStatusWithTrackingInput struct {
+	OrderID        uint               `json:"order_id"`
+	Status         entity.OrderStatus `json:"status"`
+	TrackingNumber string             `json:"tracking_number,omitempty"`
+	TrackingURL    string             `json:"tracking_url,omitempty"`
+}
+
 // UpdateOrderStatus updates the status of an order
 func (uc *OrderUseCase) UpdateOrderStatus(input UpdateOrderStatusInput) (*entity.Order, error) {
 	// Get order
@@ -71,6 +79,9 @@ func (uc *OrderUseCase) UpdateOrderStatus(input UpdateOrderStatusInput) (*entity
 	if err != nil {
 		return nil, errors.New("order not found")
 	}
+
+	// Store the old status to check if we need to send shipped email
+	oldStatus := order.Status
 
 	// Update status
 	if err := order.UpdateStatus(input.Status); err != nil {
@@ -80,6 +91,42 @@ func (uc *OrderUseCase) UpdateOrderStatus(input UpdateOrderStatusInput) (*entity
 	// Update order in repository
 	if err := uc.orderRepo.Update(order); err != nil {
 		return nil, err
+	}
+
+	// Handle emails for order status changes
+	if err := uc.handleEmailsForOrderStatusChange(order, oldStatus, input.Status, "", ""); err != nil {
+		// Log the error but don't fail the status update since the order status change was successful
+		log.Printf("Warning: Failed to send emails for order %d: %v", order.ID, err)
+	}
+
+	return order, nil
+}
+
+// UpdateOrderStatusWithTracking updates the status of an order with optional tracking information
+func (uc *OrderUseCase) UpdateOrderStatusWithTracking(input UpdateOrderStatusWithTrackingInput) (*entity.Order, error) {
+	// Get order
+	order, err := uc.orderRepo.GetByID(input.OrderID)
+	if err != nil {
+		return nil, errors.New("order not found")
+	}
+
+	// Store the old status to check if we need to send shipped email
+	oldStatus := order.Status
+
+	// Update status
+	if err := order.UpdateStatus(input.Status); err != nil {
+		return nil, err
+	}
+
+	// Update order in repository
+	if err := uc.orderRepo.Update(order); err != nil {
+		return nil, err
+	}
+
+	// Handle emails for order status changes
+	if err := uc.handleEmailsForOrderStatusChange(order, oldStatus, input.Status, input.TrackingNumber, input.TrackingURL); err != nil {
+		// Log the error but don't fail the status update since the order status change was successful
+		log.Printf("Warning: Failed to send emails for order %d: %v", order.ID, err)
 	}
 
 	return order, nil
@@ -125,8 +172,6 @@ func (uc *OrderUseCase) GetOrderByExternalID(externalID string) (*entity.Order, 
 	if err != nil {
 		return nil, fmt.Errorf("invalid reference format in MobilePay webhook event: %s", externalID)
 	}
-
-	fmt.Printf("Extracted order ID from external ID: %d\n", orderID)
 
 	// Delegate to the order repository which has this functionality
 	order, err := uc.orderRepo.GetByID(orderID)
@@ -735,24 +780,10 @@ func (uc *OrderUseCase) handleEmailsForPaymentStatusChange(order *entity.Order, 
 		return nil
 	}
 
-	// Create user object for email sending
-	var user *entity.User
-	if order.IsGuestOrder || order.UserID == nil {
-		// Guest order - create a temporary user object with customer details
-		if order.CustomerDetails == nil {
-			return fmt.Errorf("guest order missing customer details")
-		}
-		user = &entity.User{
-			Email:     order.CustomerDetails.Email,
-			FirstName: order.CustomerDetails.FullName, // Use FullName as FirstName for guest orders
-		}
-	} else {
-		// Registered user - get from repository
-		var err error
-		user, err = uc.userRepo.GetByID(*order.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to get user %d: %w", *order.UserID, err)
-		}
+	// Get user object for email sending (handles both registered and guest orders)
+	user, err := uc.getUserForEmail(order)
+	if err != nil {
+		return fmt.Errorf("failed to get user for payment status email: %w", err)
 	}
 
 	// Send order confirmation email to customer
@@ -767,4 +798,46 @@ func (uc *OrderUseCase) handleEmailsForPaymentStatusChange(order *entity.Order, 
 
 	log.Printf("Sent order confirmation and notification emails for order %d (status: %s)", order.ID, newStatus)
 	return nil
+}
+
+// handleEmailsForOrderStatusChange sends appropriate emails when order status changes
+func (uc *OrderUseCase) handleEmailsForOrderStatusChange(order *entity.Order, previousStatus, newStatus entity.OrderStatus, trackingNumber, trackingURL string) error {
+	// Only send emails when order status changes to shipped
+	if previousStatus != entity.OrderStatusShipped && newStatus == entity.OrderStatusShipped {
+		// Get user object for email sending (handles both registered and guest orders)
+		user, err := uc.getUserForEmail(order)
+		if err != nil {
+			return fmt.Errorf("failed to get user for shipped email: %w", err)
+		}
+
+		// Send order shipped email with optional tracking information
+		if err := uc.emailSvc.SendOrderShipped(order, user, trackingNumber, trackingURL); err != nil {
+			return fmt.Errorf("failed to send order shipped email: %w", err)
+		}
+
+		log.Printf("Sent order shipped email for order %d to %s", order.ID, user.Email)
+	}
+
+	return nil
+}
+
+// getUserForEmail creates a user object for email sending (handles both registered and guest orders)
+func (uc *OrderUseCase) getUserForEmail(order *entity.Order) (*entity.User, error) {
+	if order.IsGuestOrder || order.UserID == nil {
+		// Guest order - create a temporary user object with customer details
+		if order.CustomerDetails == nil {
+			return nil, fmt.Errorf("guest order missing customer details")
+		}
+		return &entity.User{
+			Email:     order.CustomerDetails.Email,
+			FirstName: order.CustomerDetails.FullName, // Use FullName as FirstName for guest orders
+		}, nil
+	} else {
+		// Registered user - get from repository
+		user, err := uc.userRepo.GetByID(*order.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user %d: %w", *order.UserID, err)
+		}
+		return user, nil
+	}
 }

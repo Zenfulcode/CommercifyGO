@@ -99,6 +99,36 @@ Create a `.env` file in the root directory by copying the `.env.example`
 cp .env.example .env
 ```
 
+### Email Configuration
+
+The application includes configurable email settings for transactional emails. Configure the following environment variables in your `.env` file:
+
+```bash
+# Email Service Configuration
+EMAIL_ENABLED=true                          # Enable/disable email functionality
+EMAIL_SMTP_HOST=smtp.example.com            # SMTP server hostname
+EMAIL_SMTP_PORT=587                         # SMTP server port (usually 587 for TLS)
+EMAIL_SMTP_USERNAME=username                # SMTP authentication username
+EMAIL_SMTP_PASSWORD=password                # SMTP authentication password
+
+# Email Addresses and Branding
+EMAIL_FROM_ADDRESS=noreply@example.com      # From address for outgoing emails
+EMAIL_FROM_NAME=My Store                    # From name for outgoing emails
+EMAIL_ADMIN_ADDRESS=admin@example.com       # Admin email for order notifications
+EMAIL_CONTACT_ADDRESS=support@example.com   # Customer support contact email (used in templates)
+STORE_NAME=My Store                         # Store name displayed in email templates
+```
+
+**Email Features:**
+
+- **Order Confirmation**: Sent when orders are placed
+- **Order Shipped**: Sent when orders are marked as shipped (with optional tracking)
+- **Order Notifications**: Sent to admin when new orders are received
+- **Checkout Recovery**: Sent to customers who abandon their carts (if implemented)
+
+**Template Customization:**
+Email templates are located in `templates/emails/` and can be customized to match your brand.
+
 ### Database Setup
 
 The application supports both SQLite for local development and PostgreSQL for production.

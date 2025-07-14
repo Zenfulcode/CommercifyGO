@@ -4,11 +4,14 @@ bin/
 docs/
 web/
 
-.env.example
-.env.test
+.env
+.env.*
+.gitignore
+commercify.db
 cookies.txt
+docker-compose.local.yml
 docker-compose.yml
 readme.md
 SECURITY.md
-todo.txt
+Makefile
 tygo.yaml

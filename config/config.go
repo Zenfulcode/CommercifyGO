@@ -59,6 +59,8 @@ type EmailConfig struct {
 	FromEmail    string
 	FromName     string
 	AdminEmail   string
+	ContactEmail string // Contact email for customer support
+	StoreName    string // Store name used in emails
 	Enabled      bool
 }
 
@@ -142,7 +144,7 @@ func LoadConfig() (*Config, error) {
 		enabledProviders = append(enabledProviders, "mobilepay")
 	}
 
-	return &Config{
+	config := Config{
 		Server: ServerConfig{
 			Port:         getEnv("SERVER_PORT", "6091"),
 			ReadTimeout:  readTimeout,
@@ -173,6 +175,7 @@ func LoadConfig() (*Config, error) {
 			FromEmail:    getEnv("EMAIL_FROM_ADDRESS", "noreply@example.com"),
 			FromName:     getEnv("EMAIL_FROM_NAME", "Commercify Store"),
 			AdminEmail:   getEnv("EMAIL_ADMIN_ADDRESS", "admin@example.com"),
+			StoreName:    getEnv("STORE_NAME", "Commercify Store"),
 			Enabled:      emailEnabled,
 		},
 		Stripe: StripeConfig{
@@ -199,7 +202,11 @@ func LoadConfig() (*Config, error) {
 			AllowAllOrigins: true,
 		},
 		DefaultCurrency: getEnv("DEFAULT_CURRENCY", "USD"),
-	}, nil
+	}
+
+	config.Email.ContactEmail = getEnv("EMAIL_CONTACT_ADDRESS", config.Email.FromEmail)
+
+	return &config, nil
 }
 
 // getEnv gets an environment variable or returns a default value

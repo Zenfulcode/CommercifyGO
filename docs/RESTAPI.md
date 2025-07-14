@@ -641,6 +641,90 @@ PUT /api/admin/orders/{orderId}/status
 
 Update order status (admin only).
 
+**Request Body:**
+
+```json
+{
+  "status": "shipped"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 1,
+  "order_number": "ORD-001",
+  "currency": "USD",
+  "user_id": 1,
+  "total_amount": 9999,
+  "status": "shipped",
+  "payment_status": "captured",
+  "created_at": "2025-07-10T10:00:00Z",
+  "updated_at": "2025-07-10T11:00:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Order status updated successfully
+- `400 Bad Request`: Invalid request body or status
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Order not found
+
+**Valid Order Statuses:**
+
+- `pending`: Order is pending
+- `paid`: Order has been paid
+- `shipped`: Order has been shipped (triggers shipment email)
+- `cancelled`: Order has been cancelled
+- `completed`: Order is completed
+
+#### Update Order Status with Tracking
+
+```plaintext
+PUT /api/admin/orders/{orderId}/status-with-tracking
+```
+
+Update order status with optional tracking information (admin only). When updating status to "shipped" with tracking information, an enhanced shipment email will be sent to the customer.
+
+**Request Body:**
+
+```json
+{
+  "status": "shipped",
+  "tracking_number": "1Z999AA1234567890",
+  "tracking_url": "https://www.ups.com/track?loc=en_US&tracknum=1Z999AA1234567890"
+}
+```
+
+**Response Body:**
+
+```json
+{
+  "id": 1,
+  "order_number": "ORD-001",
+  "currency": "USD",
+  "user_id": 1,
+  "total_amount": 9999,
+  "status": "shipped",
+  "payment_status": "captured",
+  "created_at": "2025-07-10T10:00:00Z",
+  "updated_at": "2025-07-10T11:00:00Z"
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Order status updated successfully
+- `400 Bad Request`: Invalid request body or status
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: Not authorized (not an admin)
+- `404 Not Found`: Order not found
+
+**Note:** When an order status is changed to "shipped", an email notification is automatically sent to the customer. If tracking information is provided, it will be included in the email with a tracking link.
+
 ### Checkout Management
 
 #### List Checkouts

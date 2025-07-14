@@ -22,4 +22,7 @@ type EmailService interface {
 
 	// SendOrderNotification sends an order notification email to the admin
 	SendOrderNotification(order *entity.Order, user *entity.User) error
+
+	// SendOrderShipped sends an order shipped notification email to the customer
+	SendOrderShipped(order *entity.Order, user *entity.User, trackingNumber, trackingURL string) error
 }
