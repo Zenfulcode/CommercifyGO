@@ -173,8 +173,6 @@ func (uc *OrderUseCase) GetOrderByExternalID(externalID string) (*entity.Order, 
 		return nil, fmt.Errorf("invalid reference format in MobilePay webhook event: %s", externalID)
 	}
 
-	fmt.Printf("Extracted order ID from external ID: %d\n", orderID)
-
 	// Delegate to the order repository which has this functionality
 	order, err := uc.orderRepo.GetByID(orderID)
 	if err != nil {

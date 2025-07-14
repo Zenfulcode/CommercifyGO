@@ -79,7 +79,7 @@ func (s *SMTPEmailService) SendEmail(data service.EmailData) error {
 		"%s", s.config.FromName, s.config.FromEmail, data.To, data.Subject, contentType, body)
 
 	// Send email
-	s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
+	// s.logger.Info("Attempting to send email via SMTP to %s:%d", s.config.SMTPHost, s.config.SMTPPort)
 	err = smtp.SendMail(
 		fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort),
 		auth,
@@ -175,10 +175,7 @@ func (s *SMTPEmailService) SendOrderShipped(order *entity.Order, user *entity.Us
 	appliedDiscount := order.GetAppliedDiscount()
 
 	// Debug logging
-	s.logger.Info("Email template data - Order ID: %d", order.ID)
-	s.logger.Info("Tracking Number: %s", trackingNumber)
 	s.logger.Info("Tracking URL: %s", trackingURL)
-	s.logger.Info("Shipping Address: %+v", shippingAddr)
 
 	data := map[string]any{
 		"Order":           order,
