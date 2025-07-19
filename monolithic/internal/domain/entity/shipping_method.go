@@ -74,5 +74,7 @@ func (s *ShippingMethod) ToShippingMethodDTO() *dto.ShippingMethodDetailDTO {
 		Description:           s.Description,
 		EstimatedDeliveryDays: s.EstimatedDeliveryDays,
 		Active:                s.Active,
+		CreatedAt:             s.CreatedAt,
+		UpdatedAt:             s.UpdatedAt,
 	}
 }
