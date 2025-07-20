@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option go_package = "github.com/zenfulcode/commercify/common/api";
+
+package api;
+
+service OrderService {
+    rpc CreateOrder(CreateOrderCommand) returns (CreateOrderResult);
+    rpc GetOrder(GetOrderQuery) returns (GetOrderResult);
+}
+
+message GetOrderQuery {
+    string order_id = 1;
+}
+
+message GetOrderResult {
+    string order_id = 1;
+    string status = 2;
+    repeated OrderItem items = 3;
+}
+message OrderStatus {
+    enum Status {
+        PENDING = 0;
+        PAID = 1;
+        SHIPPED = 2;
+        COMPLETED = 3;
+        RETURNED = 4;
+        CANCELLED = 5;
+        FAILED = 6;
+    }
+    Status status = 1;
+    string message = 2;
+}
+
+message CreateOrderCommand {
+    string customer_id = 1;
+    repeated OrderItem items = 2;
+}
+
+message CreateOrderResult {
+    string order_id = 1;
+    string status = 2;
+}
+
+message OrderItem {
+    string product_id = 1;
+    string product_name = 2;
+    int32 quantity = 3;
+    string price_id = 4;
+    string currency = 5;
+}   
