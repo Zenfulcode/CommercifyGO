@@ -3,6 +3,7 @@ package gorm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
@@ -60,6 +61,28 @@ func (u *UserRepository) List(offset int, limit int) ([]*entity.User, error) {
 // Update implements repository.UserRepository.
 func (u *UserRepository) Update(user *entity.User) error {
 	return u.db.Save(user).Error
+}
+
+// GetTotalCustomersCount implements repository.UserRepository.
+func (u *UserRepository) GetTotalCustomersCount() (int64, error) {
+	var count int64
+	err := u.db.Model(&entity.User{}).Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get total customers count: %w", err)
+	}
+	return count, nil
+}
+
+// GetNewCustomersCount implements repository.UserRepository.
+func (u *UserRepository) GetNewCustomersCount(startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := u.db.Model(&entity.User{}).
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate).
+		Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get new customers count: %w", err)
+	}
+	return count, nil
 }
 
 // NewUserRepository creates a new GORM-based UserRepository

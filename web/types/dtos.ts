@@ -123,6 +123,65 @@ export interface CurrencyDTO {
 }
 
 //////////
+// source: dashboard.go
+
+/**
+ * DashboardStatsRequest represents a request for dashboard statistics
+ */
+export interface DashboardStatsRequest {
+  start_date?: string;
+  end_date?: string;
+  days?: number /* int */; // Alternative to date range, defaults to 30
+}
+/**
+ * PercentageChange represents a percentage change with value and direction
+ */
+export interface PercentageChange {
+  value: number /* float64 */; // percentage change (e.g., 15.5 for +15.5%)
+  direction: string; // "up", "down", or "stable"
+}
+/**
+ * DashboardStats represents aggregated dashboard statistics
+ */
+export interface DashboardStats {
+  total_revenue: number /* int64 */; // in cents
+  total_orders: number /* int64 */;
+  total_customers: number /* int64 */;
+  new_customers: number /* int64 */;
+  total_products: number /* int64 */;
+  low_stock_products: number /* int64 */;
+  revenue_change?: PercentageChange; // vs previous period
+  orders_change?: PercentageChange; // vs previous period
+  recent_orders: RecentOrderSummary[];
+  top_products: TopProductSummary[];
+  period_start: string;
+  period_end: string;
+}
+/**
+ * RecentOrderSummary represents a summary of recent orders for dashboard
+ */
+export interface RecentOrderSummary {
+  id: number /* uint */;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  total_amount: number /* int64 */; // in cents
+  status: string;
+  created_at: string;
+}
+/**
+ * TopProductSummary represents top selling products for dashboard
+ */
+export interface TopProductSummary {
+  product_id: number /* uint */;
+  product_name: string;
+  variant_id?: number /* uint */;
+  variant_name?: string;
+  quantity_sold: number /* int64 */;
+  revenue: number /* int64 */; // in cents
+}
+
+//////////
 // source: discount.go
 
 /**

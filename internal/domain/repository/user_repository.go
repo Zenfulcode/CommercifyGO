@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/zenfulcode/commercify/internal/domain/entity"
+import (
+	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/entity"
+)
 
 // UserRepository defines the interface for user data access
 type UserRepository interface {
@@ -10,4 +14,8 @@ type UserRepository interface {
 	Update(user *entity.User) error
 	Delete(id uint) error
 	List(offset, limit int) ([]*entity.User, error)
+
+	// Dashboard statistics methods
+	GetTotalCustomersCount() (int64, error)
+	GetNewCustomersCount(startDate, endDate time.Time) (int64, error)
 }
