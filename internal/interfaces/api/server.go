@@ -77,6 +77,7 @@ func (s *Server) setupRoutes() {
 	currencyHandler := s.container.Handlers().CurrencyHandler()
 	healthHandler := s.container.Handlers().HealthHandler()
 	emailTestHandler := s.container.Handlers().EmailTestHandler()
+	dashboardHandler := s.container.Handlers().DashboardHandler()
 
 	// Extract middleware from container
 	authMiddleware := s.container.Middlewares().AuthMiddleware()
@@ -173,6 +174,9 @@ func (s *Server) setupRoutes() {
 	admin.HandleFunc("/currencies", currencyHandler.UpdateCurrency).Methods(http.MethodPut)
 	admin.HandleFunc("/currencies", currencyHandler.DeleteCurrency).Methods(http.MethodDelete)
 	admin.HandleFunc("/currencies/default", currencyHandler.SetDefaultCurrency).Methods(http.MethodPut)
+
+	// Admin dashboard routes
+	admin.HandleFunc("/dashboard/stats", dashboardHandler.GetStats).Methods(http.MethodGet)
 
 	// Admin email test route
 	admin.HandleFunc("/test/email", emailTestHandler.TestEmail).Methods(http.MethodPost)

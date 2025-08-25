@@ -16,6 +16,7 @@ type UseCaseProvider interface {
 	DiscountUseCase() *usecase.DiscountUseCase
 	ShippingUseCase() *usecase.ShippingUseCase
 	CurrencyUsecase() *usecase.CurrencyUseCase
+	DashboardUseCase() *usecase.DashboardUseCase
 }
 
 // useCaseProvider is the concrete implementation of UseCaseProvider
@@ -23,14 +24,15 @@ type useCaseProvider struct {
 	container Container
 	mu        sync.Mutex
 
-	userUseCase     *usecase.UserUseCase
-	productUseCase  *usecase.ProductUseCase
-	categoryUseCase *usecase.CategoryUseCase
-	checkoutUseCase *usecase.CheckoutUseCase
-	orderUseCase    *usecase.OrderUseCase
-	discountUseCase *usecase.DiscountUseCase
-	shippingUseCase *usecase.ShippingUseCase
-	currencyUseCase *usecase.CurrencyUseCase
+	userUseCase      *usecase.UserUseCase
+	productUseCase   *usecase.ProductUseCase
+	categoryUseCase  *usecase.CategoryUseCase
+	checkoutUseCase  *usecase.CheckoutUseCase
+	orderUseCase     *usecase.OrderUseCase
+	discountUseCase  *usecase.DiscountUseCase
+	shippingUseCase  *usecase.ShippingUseCase
+	currencyUseCase  *usecase.CurrencyUseCase
+	dashboardUseCase *usecase.DashboardUseCase
 }
 
 // NewUseCaseProvider creates a new use case provider
@@ -190,4 +192,19 @@ func (p *useCaseProvider) CurrencyUsecase() *usecase.CurrencyUseCase {
 		p.currencyUseCase.CreateCurrency(defaultCurrency)
 	}
 	return p.currencyUseCase
+}
+
+// DashboardUseCase returns the dashboard use case
+func (p *useCaseProvider) DashboardUseCase() *usecase.DashboardUseCase {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.dashboardUseCase == nil {
+		p.dashboardUseCase = usecase.NewDashboardUseCase(
+			p.container.Repositories().OrderRepository(),
+			p.container.Repositories().UserRepository(),
+			p.container.Repositories().ProductRepository(),
+		)
+	}
+	return p.dashboardUseCase
 }

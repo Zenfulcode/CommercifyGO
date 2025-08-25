@@ -3,7 +3,9 @@ package gorm
 import (
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/zenfulcode/commercify/internal/domain/dto"
 	"github.com/zenfulcode/commercify/internal/domain/entity"
 	"github.com/zenfulcode/commercify/internal/domain/repository"
 	"gorm.io/gorm"
@@ -65,7 +67,6 @@ func (o *OrderRepository) GetByPaymentID(paymentID string) (*entity.Order, error
 func (o *OrderRepository) GetByUser(userID uint, offset int, limit int) ([]*entity.Order, error) {
 	var orders []*entity.Order
 	if err := o.db.Preload("Items").Preload("Items.Product").Preload("Items.ProductVariant").
-		Preload("User").
 		Where("user_id = ?", userID).
 		Offset(offset).Limit(limit).
 		Order("created_at DESC").
@@ -78,10 +79,11 @@ func (o *OrderRepository) GetByUser(userID uint, offset int, limit int) ([]*enti
 // HasOrdersWithProduct implements repository.OrderRepository.
 func (o *OrderRepository) HasOrdersWithProduct(productID uint) (bool, error) {
 	var count int64
-	if err := o.db.Model(&entity.Order{}).
-		Joins("JOIN order_items ON orders.id = order_items.order_id").
+	err := o.db.Table("order_items").
+		Joins("JOIN orders ON order_items.order_id = orders.id").
 		Where("order_items.product_id = ?", productID).
-		Count(&count).Error; err != nil {
+		Count(&count).Error
+	if err != nil {
 		return false, fmt.Errorf("failed to check orders with product %d: %w", productID, err)
 	}
 	return count > 0, nil
@@ -90,9 +92,10 @@ func (o *OrderRepository) HasOrdersWithProduct(productID uint) (bool, error) {
 // IsDiscountIdUsed implements repository.OrderRepository.
 func (o *OrderRepository) IsDiscountIdUsed(discountID uint) (bool, error) {
 	var count int64
-	if err := o.db.Model(&entity.Order{}).
-		Where("discount_discount_id = ?", discountID).
-		Count(&count).Error; err != nil {
+	err := o.db.Model(&entity.Order{}).
+		Where("JSON_EXTRACT(applied_discount, '$.id') = ?", discountID).
+		Count(&count).Error
+	if err != nil {
 		return false, fmt.Errorf("failed to check if discount %d is used: %w", discountID, err)
 	}
 	return count > 0, nil
@@ -128,6 +131,79 @@ func (o *OrderRepository) ListByStatus(status entity.OrderStatus, offset int, li
 // Update implements repository.OrderRepository.
 func (o *OrderRepository) Update(order *entity.Order) error {
 	return o.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(order).Error
+}
+
+// GetTotalRevenueByDateRange implements repository.OrderRepository.
+func (o *OrderRepository) GetTotalRevenueByDateRange(startDate, endDate time.Time) (int64, error) {
+	var totalRevenue int64
+	err := o.db.Model(&entity.Order{}).
+		Where("created_at >= ? AND created_at <= ? AND status IN (?)",
+			startDate, endDate, []entity.OrderStatus{entity.OrderStatusPaid, entity.OrderStatusShipped, entity.OrderStatusCompleted}).
+		Select("COALESCE(SUM(total_amount), 0)").
+		Scan(&totalRevenue).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get total revenue: %w", err)
+	}
+	return totalRevenue, nil
+}
+
+// GetTotalOrdersByDateRange implements repository.OrderRepository.
+func (o *OrderRepository) GetTotalOrdersByDateRange(startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := o.db.Model(&entity.Order{}).
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate).
+		Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get total orders count: %w", err)
+	}
+	return count, nil
+}
+
+// GetRecentOrdersSummary implements repository.OrderRepository.
+func (o *OrderRepository) GetRecentOrdersSummary(startDate, endDate time.Time, limit int) ([]dto.RecentOrderSummary, error) {
+	var results []dto.RecentOrderSummary
+
+	err := o.db.Table("orders").
+		Select("orders.id, orders.order_number, orders.total_amount, orders.status, orders.created_at, "+
+			"CASE WHEN orders.user_id IS NULL THEN 'Guest' ELSE (users.first_name || ' ' || users.last_name) END as customer_name, "+
+			"CASE WHEN orders.user_id IS NULL THEN orders.customer_email ELSE users.email END as customer_email").
+		Joins("LEFT JOIN users ON orders.user_id = users.id").
+		Where("orders.created_at >= ? AND orders.created_at <= ?", startDate, endDate).
+		Order("orders.created_at DESC").
+		Limit(limit).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent orders summary: %w", err)
+	}
+
+	return results, nil
+}
+
+// GetTopProductsSummary implements repository.OrderRepository.
+func (o *OrderRepository) GetTopProductsSummary(startDate, endDate time.Time, limit int) ([]dto.TopProductSummary, error) {
+	var results []dto.TopProductSummary
+
+	err := o.db.Table("order_items").
+		Select("order_items.product_id, products.name as product_name, "+
+			"order_items.product_variant_id, COALESCE(product_variants.sku, '') as variant_name, "+
+			"SUM(order_items.quantity) as quantity_sold, "+
+			"SUM(order_items.price * order_items.quantity) as revenue").
+		Joins("JOIN products ON order_items.product_id = products.id").
+		Joins("LEFT JOIN product_variants ON order_items.product_variant_id = product_variants.id").
+		Joins("JOIN orders ON order_items.order_id = orders.id").
+		Where("orders.created_at >= ? AND orders.created_at <= ? AND orders.status IN (?)",
+			startDate, endDate, []entity.OrderStatus{entity.OrderStatusPaid, entity.OrderStatusShipped, entity.OrderStatusCompleted}).
+		Group("order_items.product_id, products.name, order_items.product_variant_id, product_variants.sku").
+		Order("quantity_sold DESC").
+		Limit(limit).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top products summary: %w", err)
+	}
+
+	return results, nil
 }
 
 // NewOrderRepository creates a new GORM-based OrderRepository

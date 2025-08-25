@@ -217,3 +217,31 @@ func (r *ProductRepository) HasProductsWithCategory(categoryID uint) (bool, erro
 	}
 	return count > 0, nil
 }
+
+// GetTotalProductsCount returns the total number of active products
+func (r *ProductRepository) GetTotalProductsCount() (int64, error) {
+	var count int64
+	if err := r.db.Model(&entity.Product{}).Where("active = ?", true).Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count total products: %w", err)
+	}
+	return count, nil
+}
+
+// GetLowStockProductsCount returns the number of products with stock below the threshold
+func (r *ProductRepository) GetLowStockProductsCount(lowStockThreshold int) (int64, error) {
+	var count int64
+
+	// Count products that have variants with stock below the threshold
+	query := `
+		SELECT COUNT(DISTINCT p.id) 
+		FROM products p 
+		JOIN product_variants pv ON p.id = pv.product_id 
+		WHERE p.active = true 
+		AND pv.stock <= ?`
+
+	if err := r.db.Raw(query, lowStockThreshold).Scan(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count low stock products: %w", err)
+	}
+
+	return count, nil
+}
