@@ -21,6 +21,7 @@ type HandlerProvider interface {
 	CurrencyHandler() *handler.CurrencyHandler
 	HealthHandler() *handler.HealthHandler
 	EmailTestHandler() *handler.EmailTestHandler
+	DashboardHandler() *handler.DashboardHandler
 }
 
 // handlerProvider is the concrete implementation of HandlerProvider
@@ -41,6 +42,7 @@ type handlerProvider struct {
 	currencyHandler        *handler.CurrencyHandler
 	healthHandler          *handler.HealthHandler
 	emailTestHandler       *handler.EmailTestHandler
+	dashboardHandler       *handler.DashboardHandler
 }
 
 // NewHandlerProvider creates a new handler provider
@@ -244,4 +246,18 @@ func (p *handlerProvider) WebhookHandlerProvider() *handler.WebhookHandlerProvid
 		)
 	}
 	return p.webhookHandlerProvider
+}
+
+// DashboardHandler returns the dashboard handler
+func (p *handlerProvider) DashboardHandler() *handler.DashboardHandler {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.dashboardHandler == nil {
+		p.dashboardHandler = handler.NewDashboardHandler(
+			p.container.UseCases().DashboardUseCase(),
+			p.container.Logger(),
+		)
+	}
+	return p.dashboardHandler
 }

@@ -89,11 +89,7 @@ docker-dev-push: ## Build Docker image for development
 	docker build -t ghcr.io/zenfulcode/commercifygo:v2-dev .
 	docker push ghcr.io/zenfulcode/commercifygo:v2-dev
 
-# Development commands
-test: ## Run tests
-	go test ./...
-
-test-verbose: ## Run tests with verbose output
+test: ## Run tests with verbose output
 	go test -v ./...
 
 clean: ## Clean build artifacts
@@ -123,8 +119,8 @@ fmt: ## Format Go code
 vet: ## Run go vet
 	go vet ./...
 
-mod-tidy: ## Tidy Go modules
-	go mod tidy
+tygo:
+	@tygo generate
 
 # Maintenance commands
 expire-checkouts: ## Expire old checkouts manually
@@ -132,3 +128,5 @@ expire-checkouts: ## Expire old checkouts manually
 
 force-delete-checkouts: ## Force delete all expired, abandoned, and old completed checkouts
 	go run ./cmd/expire-checkouts -force
+
+

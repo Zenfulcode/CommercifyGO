@@ -1,6 +1,11 @@
 package repository
 
-import "github.com/zenfulcode/commercify/internal/domain/entity"
+import (
+	"time"
+
+	"github.com/zenfulcode/commercify/internal/domain/dto"
+	"github.com/zenfulcode/commercify/internal/domain/entity"
+)
 
 // OrderRepository defines the interface for order data access
 type OrderRepository interface {
@@ -14,4 +19,10 @@ type OrderRepository interface {
 	GetByPaymentID(paymentID string) (*entity.Order, error)
 	ListAll(offset, limit int) ([]*entity.Order, error)
 	HasOrdersWithProduct(productID uint) (bool, error)
+
+	// Dashboard statistics methods
+	GetTotalRevenueByDateRange(startDate, endDate time.Time) (int64, error)
+	GetTotalOrdersByDateRange(startDate, endDate time.Time) (int64, error)
+	GetRecentOrdersSummary(startDate, endDate time.Time, limit int) ([]dto.RecentOrderSummary, error)
+	GetTopProductsSummary(startDate, endDate time.Time, limit int) ([]dto.TopProductSummary, error)
 }
